@@ -565,7 +565,7 @@ class CastleXHomeView extends ItemView {
     this.updateClock();
     copy.createEl("p", { text: "青山一道同云雨，明月何曾是两乡。", cls: "cx-hero-note" });
     const actions = hero.createDiv({ cls: "cx-hero-actions" });
-    const today = actions.createEl("button", { text: "今日记录", cls: "cx-button cx-button-primary" });
+    const today = actions.createEl("button", { text: "打开今日 Daily", cls: "cx-button cx-button-primary" });
     today.addEventListener("click", () => this.openFile(todayFile));
     const refresh = actions.createEl("button", { text: "刷新", cls: "cx-button" });
     refresh.addEventListener("click", () => this.renderDashboard());
@@ -573,8 +573,24 @@ class CastleXHomeView extends ItemView {
 
   renderKpis(parent, todayFrontmatter, streaks) {
     const grid = parent.createDiv({ cls: "cx-kpi-grid" });
+    const timeEntries = TIME_METRICS.map((metric) => ({
+      metric,
+      minutes: minutesValue(todayFrontmatter[metric.key]),
+    }));
+    const recorded = timeEntries.filter((entry) => entry.minutes !== null);
+    const totalMinutes = recorded.reduce((sum, entry) => sum + entry.minutes, 0);
+    const dominant = recorded
+      .filter((entry) => entry.minutes > 0)
+      .sort((a, b) => b.minutes - a.minutes)[0] ?? null;
+    const timeKpi = !recorded.length
+      ? { value: "—", label: "今日投入", detail: "尚未记录时间分配" }
+      : {
+        value: formatDuration(totalMinutes),
+        label: "今日投入",
+        detail: dominant ? `${dominant.metric.label} · ${formatDuration(dominant.minutes)}` : "今日无已记录投入",
+      };
     [
-      { value: `${completion(todayFrontmatter)}/6`, label: "今日记录", detail: `${Math.round(completion(todayFrontmatter) / 6 * 100)}% complete` },
+      timeKpi,
       { value: streaks.active, label: "连续航行", detail: `最长 ${streaks.longest} 天` },
     ].forEach((item) => {
       const card = grid.createDiv({ cls: "cx-kpi cx-glass" });
@@ -629,17 +645,19 @@ class CastleXHomeView extends ItemView {
     const route = shell.createDiv({ cls: "cx-route cx-glass" });
     route.createDiv({ text: "最近 14 天", cls: "cx-route-label" });
     const track = route.createDiv({ cls: "cx-route-track" });
+    let voyageDays = 0;
     for (let offset = -13; offset <= 0; offset += 1) {
       const date = addDays(new Date(), offset);
       const iso = localISO(date);
       const count = completion(streaks.byDate.get(iso)?.frontmatter);
+      if (count === REQUIRED.length) voyageDays += 1;
       const day = track.createDiv({ cls: `cx-route-day cx-level-${count}${offset === 0 ? " is-today" : ""}` });
       day.createSpan({ cls: "cx-route-node" });
       day.createSpan({ text: new Intl.DateTimeFormat("en-US", { weekday: "narrow" }).format(date), cls: "cx-route-weekday" });
       day.setAttr("aria-label", `${iso}: ${count}/6`);
     }
-    const target = streaks.active < 7 ? 7 : streaks.active < 14 ? 14 : streaks.active < 30 ? 30 : Math.ceil((streaks.active + 1) / 30) * 30;
-    route.createDiv({ text: `下一里程碑 ${target} 天 · 还差 ${Math.max(0, target - streaks.active)} 天`, cls: "cx-route-milestone" });
+    const sailingRate = Math.round(voyageDays / 14 * 100);
+    route.createDiv({ text: `近14日航行 ${voyageDays}天 · 出海率 ${sailingRate}%`, cls: "cx-route-milestone" });
   }
 
   createSvg(parent, tag, attributes = {}) {
