@@ -1,0 +1,29 @@
+.DS_Store
+*.icloud
+.env
+.env.*
+
+# Obsidian device state and plugin-local data
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/workspace*.json
+.obsidian/cache/
+.obsidian/plugins/*/data.json
+
+# Vault content must never enter this repository
+01_Inbox/
+10_Journal/
+20_Areas/
+30_Projects/
+40_Library/
+99_Archive/
+AI-Ledger/
+90_System/AI-Ledger/
+CastleX/
+
+# Common private exports and temporary files
+attachments-private/
+private/
+*.bak
+*.tmp
+

@@ -1,0 +1,24 @@
+#!/bin/sh
+set -eu
+
+marker=$1
+generated_root=$2
+staging_target=$3
+icloud_target=$4
+
+counter=0
+while [ "$counter" -lt 180 ]; do
+  generated=$(find "$generated_root" -type f -name '*.png' -newer "$marker" -print | head -n 1)
+  if [ -n "$generated" ]; then
+    cp "$generated" "$staging_target"
+    cp "$generated" "$icloud_target"
+    echo "$generated"
+    exit 0
+  fi
+  counter=$((counter + 1))
+  sleep 1
+done
+
+echo "Timed out waiting for generated background" >&2
+exit 1
+

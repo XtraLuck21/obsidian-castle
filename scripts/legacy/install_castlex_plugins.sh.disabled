@@ -1,0 +1,47 @@
+#!/bin/sh
+set -eu
+
+destination=$1
+mkdir -p "$destination"
+
+install_latest() {
+  repo=$1
+  plugin_id=$2
+  work=$(mktemp -d)
+  release_json="$work/release.json"
+
+  curl -fsSL "https://api.github.com/repos/$repo/releases/latest" -o "$release_json"
+  zip_url=$(jq -r '.assets[] | select(.name | endswith(".zip")) | .browser_download_url' "$release_json" | head -n 1)
+
+  if [ -n "$zip_url" ]; then
+    curl -fsSL "$zip_url" -o "$work/plugin.zip"
+    mkdir -p "$work/extracted"
+    unzip -q "$work/plugin.zip" -d "$work/extracted"
+    manifest=$(find "$work/extracted" -name manifest.json -type f | head -n 1)
+    if [ -z "$manifest" ]; then
+      echo "No manifest.json in release archive for $repo" >&2
+      exit 1
+    fi
+    source_dir=$(dirname "$manifest")
+    mkdir -p "$destination/$plugin_id"
+    cp -R "$source_dir/." "$destination/$plugin_id/"
+  else
+    mkdir -p "$destination/$plugin_id"
+    for asset in manifest.json main.js styles.css; do
+      asset_url=$(jq -r --arg name "$asset" '.assets[] | select(.name == $name) | .browser_download_url' "$release_json" | head -n 1)
+      if [ -n "$asset_url" ]; then
+        curl -fsSL "$asset_url" -o "$destination/$plugin_id/$asset"
+      fi
+    done
+  fi
+
+  test -f "$destination/$plugin_id/manifest.json"
+  test -f "$destination/$plugin_id/main.js"
+  rm -rf "$work"
+}
+
+install_latest "obsidian-tasks-group/obsidian-tasks" "obsidian-tasks-plugin"
+install_latest "SilentVoid13/Templater" "templater-obsidian"
+install_latest "mProjectsCode/obsidian-meta-bind-plugin" "obsidian-meta-bind-plugin"
+install_latest "chhoumann/quickadd" "quickadd"
+
