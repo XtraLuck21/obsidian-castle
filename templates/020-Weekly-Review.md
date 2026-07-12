@@ -22,12 +22,12 @@ cssclasses:
 
 ---
 
-## AI Evidence Summary
+## AI Weekly Summary
 
-> [!ai-summary]+ AI · Evidence Summary · Unreviewed
+> [!ai-summary]+ AI · Weekly Summary · Unreviewed
 > **Generated:** —  
 > **Sources:** 本周七篇 Daily Notes  
-> **Rule:** 只陈述记录中有证据的事实；推断必须标注为推断。
+> **Rule:** 综合本周主线、模式与变化；只陈述有证据的事实，推断必须标注为推断，避免逐日复述。
 >
 > 尚未生成。
 

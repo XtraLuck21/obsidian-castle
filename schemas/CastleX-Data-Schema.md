@@ -30,14 +30,23 @@ Daily Notes contain, in order:
 
 1. Six-dimension `Daily State`
 2. Editable `Time Allocation`
-3. `Completed Today` as one flat list of short keyword-style bullet points
-4. `Decisions & Insights`
-5. Explicitly marked, detailed `AI Summary`
-6. `Raw Notes` at the end
+3. `Today’s Wins` as encouraging bullet points about effective habits, choices,
+   and responses
+4. `Completed Today` as factual bullet points for verified tasks and outcomes
+5. `Open Loops` for started, committed, awaiting, or unresolved follow-ups
+6. `Backlog` for explicitly deferred work that has not started
+7. `Raw Notes` at the end
 
 Daily Notes do not contain task checkboxes or a Timeline. Project tasks exist
-only in Project notes. `Completed Today` must not be divided into Project/Admin
-subsections; detailed context belongs in `AI Summary`.
+only in Project notes. All four synthesis sections use flat bullet lists.
+`Today’s Wins` must not repeat the accomplishment list: it recognizes how the
+day was handled, while `Completed Today` records what was finished. AI must not
+invent an Open Loop or Backlog item when the source provides no evidence.
+
+Daily Notes do not contain an `AI Summary` or `Decisions & Insights` section.
+Cross-day AI synthesis belongs in the Weekly Review under `AI Weekly Summary`,
+where the source set is broad enough to identify patterns without rewriting a
+single day’s Raw Notes.
 
 ## Time allocation
 

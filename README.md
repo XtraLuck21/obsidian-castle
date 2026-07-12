@@ -135,9 +135,12 @@ A day counts as a Voyage Day when all six fields contain values from `1` to
 replace the original human writing.
 
 Daily Notes also include a `Time Allocation` card. Its four rings can be edited
-manually in 15-minute steps or filled by an AI-assisted review. `Completed
-Today` remains a single flat list of short keyword-style bullet points; detailed
-process and context belong in the explicitly marked `AI Summary`.
+manually in 15-minute steps or filled by an AI-assisted review. After Raw Notes
+are provided, AI may populate four non-overlapping flat bullet lists: `Today’s
+Wins` recognizes effective habits and choices, `Completed Today` records factual
+finished work, `Open Loops` tracks unresolved follow-ups, and `Backlog` records
+explicitly deferred work. Daily Notes do not contain an AI Summary; cross-day
+synthesis belongs in the Weekly Review.
 
 ### Projects
 

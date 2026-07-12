@@ -34,6 +34,11 @@ cssclasses:
 ```castlex-time-rings
 ```
 
+## Today’s Wins
+
+- Protected a focused work block before checking messages
+- Adjusted the plan when energy dipped instead of forcing the original pace
+
 ## Completed Today
 
 - Example Project · section draft
@@ -41,20 +46,13 @@ cssclasses:
 - Fictional workout
 - Reading
 
-## Decisions & Insights
+## Open Loops
 
-- A smaller next action made the example easier to start.
+- Awaiting fictional reviewer feedback on the section draft
 
-## AI Summary
+## Backlog
 
-> [!ai-summary]- AI Summary · Unreviewed
-> **Generated:** 2099-01-01 20:00  
-> **Sources:** this fictional example note  
-> **Review status:** unreviewed
->
-> The example records two hours on Example Project, forty minutes of
-> administrative organization, fifty minutes of exercise, and one hour of
-> reading. The project draft was the main observable output.
+- Defer the fictional appendix until the draft review is complete
 
 ## Raw Notes
 

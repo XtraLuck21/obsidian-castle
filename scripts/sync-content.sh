@@ -69,4 +69,6 @@ for rel in "${files[@]}"; do
   fi
 done
 
-[[ "$mode" == "dry-run" ]] && echo "Preview only. Re-run with --apply after reviewing every path."
+if [[ "$mode" == "dry-run" ]]; then
+  echo "Preview only. Re-run with --apply after reviewing every path."
+fi

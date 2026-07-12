@@ -35,15 +35,23 @@ done
 pass "Daily template and Schema core fields"
 
 rg -q '^```castlex-time-rings$' "$template" || fail "Daily template missing time-ring block"
-if rg -q '^### (Project Contributions|Life & Admin)$' "$template"; then
-  fail "Completed Today must remain a flat bullet list"
+previous_line=0
+daily_sections=("## Today’s Wins" "## Completed Today" "## Open Loops" "## Backlog" "## Raw Notes")
+for section in "${daily_sections[@]}"; do
+  line="$(rg -n -F -m 1 "$section" "$template" | cut -d: -f1)"
+  [[ -n "$line" ]] || fail "Daily template missing section: $section"
+  (( line > previous_line )) || fail "Daily template section out of order: $section"
+  previous_line="$line"
+done
+if rg -q '^## (Decisions & Insights|AI Summary)$|^### (Project Contributions|Life & Admin)$' "$template"; then
+  fail "Daily template contains a removed or nested synthesis section"
 fi
 for deprecated in project_contribution admin_load activity_origin activity_reviewed; do
   if rg -q "^${deprecated}:" "$template"; then
     fail "Daily template still contains deprecated field: $deprecated"
   fi
 done
-pass "time-ring block and flat Completed Today structure"
+pass "time-ring block and four-section Daily synthesis structure"
 
 for script in "$SYSTEM_ROOT"/scripts/*.sh; do bash -n "$script"; done
 pass "shell script syntax"

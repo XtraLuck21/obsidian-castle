@@ -34,22 +34,21 @@ cssclasses:
 ```castlex-time-rings
 ```
 
+## Today’s Wins
+
+<!-- 鼓励有效习惯、选择与应对方式；不要复述 Completed Today 的成果。仅使用 Raw Notes 中有证据的内容。 -->
+
 ## Completed Today
 
-<!-- 从 Raw Notes 提炼为简短关键词 bullet points；不分 section，不在这里展开细节。 -->
+<!-- 已完成的可验证任务或结果；使用简短 bullet points，不写鼓励性评价，不分子 section。 -->
 
-## Decisions & Insights
+## Open Loops
 
-<!-- 当天形成的重要判断、理解和新发现。 -->
+<!-- 已经启动、承诺、等待反馈或需要明确跟进，但尚未闭环的事项。 -->
 
-## AI Summary
+## Backlog
 
-> [!ai-summary]- AI Summary · Unreviewed
-> **Generated:** —  
-> **Sources:** this daily note  
-> **Review status:** unreviewed
->
-> 尚未生成。具体过程、成果和上下文放在这里；AI 内容不得覆盖人类原文。
+<!-- 尚未启动且明确延后的事项；不得从模糊想法中发明任务。 -->
 
 ## Raw Notes
 
