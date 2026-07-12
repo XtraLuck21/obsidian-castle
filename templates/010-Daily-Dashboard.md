@@ -9,10 +9,15 @@ stress:
 energy:
 agency:
 appetite_stability:
-project_contribution:
-admin_load:
-activity_origin:
-activity_reviewed: false
+project_minutes:
+admin_minutes:
+workout_minutes:
+personal_enrichment_minutes:
+project_minutes_origin:
+admin_minutes_origin:
+workout_minutes_origin:
+personal_enrichment_minutes_origin:
+time_data_reviewed: false
 origin: human
 cssclasses:
   - daily-voyage
@@ -24,15 +29,14 @@ cssclasses:
 ```castlex-status
 ```
 
+## Time Allocation
+
+```castlex-time-rings
+```
+
 ## Completed Today
 
-### Project Contributions
-
-<!-- Codex 将直接推动 Project / Milestone / Task 的内容整理到这里。 -->
-
-### Life & Admin
-
-<!-- 家务、行政、就医、沟通、采购以及生活维护。 -->
+<!-- 从 Raw Notes 提炼为简短关键词 bullet points；不分 section，不在这里展开细节。 -->
 
 ## Decisions & Insights
 
@@ -45,7 +49,7 @@ cssclasses:
 > **Sources:** this daily note  
 > **Review status:** unreviewed
 >
-> 尚未生成。AI 内容不得覆盖人类原文。
+> 尚未生成。具体过程、成果和上下文放在这里；AI 内容不得覆盖人类原文。
 
 ## Raw Notes
 

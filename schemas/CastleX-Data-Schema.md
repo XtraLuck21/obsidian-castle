@@ -1,4 +1,4 @@
-# CastleX Data Schema v0.3
+# CastleX Data Schema v0.4
 
 ## Daily tracker
 
@@ -28,37 +28,86 @@ uses the same “larger is better” direction.
 
 Daily Notes contain, in order:
 
-1. `Completed Today / Project Contributions`
-2. `Completed Today / Life & Admin`
-3. `Decisions & Insights`
-4. Explicitly marked `AI Summary`
-5. `Raw Notes` at the end
+1. Six-dimension `Daily State`
+2. Editable `Time Allocation`
+3. `Completed Today` as one flat list of short keyword-style bullet points
+4. `Decisions & Insights`
+5. Explicitly marked, detailed `AI Summary`
+6. `Raw Notes` at the end
 
 Daily Notes do not contain task checkboxes or a Timeline. Project tasks exist
-only in Project notes.
+only in Project notes. `Completed Today` must not be divided into Project/Admin
+subsections; detailed context belongs in `AI Summary`.
 
-## Activity heatmap
+## Time allocation
 
-Codex derives two independent 0–5 fields from the Daily record:
+Daily Notes store source time values in whole minutes:
 
 ```yaml
-project_contribution: 0
-admin_load: 0
-activity_origin: ai
-activity_reviewed: false
+project_minutes: 120
+admin_minutes: 40
+workout_minutes: 50
+personal_enrichment_minutes: 60
+
+project_minutes_origin: ai
+admin_minutes_origin: ai
+workout_minutes_origin: ai
+personal_enrichment_minutes_origin: ai
+time_data_reviewed: false
 ```
 
-- `null` / empty means the day has not been processed.
-- `0` means the record was processed and no activity of that type occurred.
-- Values `1–5` form five colored intensity levels in the dashboard.
-- Project: 1 preparation, 2 small advance, 3 clear output, 4 substantial
-  milestone progress, 5 key breakthrough or delivery.
-- Admin: 1 light maintenance, 2 routine load, 3 meaningful capacity cost,
-  4 heavy load, 5 dominant or exhausting load.
-- The dashboard never invents these values. Codex writes them while processing
-  the Daily record; `activity_origin: ai` records provenance and
-  `activity_reviewed: false` means the derived result still awaits human review.
+- Empty means the category has not been recorded.
+- `0` means the day was reviewed and no time was spent in that category.
+- Values must be non-negative whole minutes. The Dashboard derives display
+  levels and never writes a subjective score.
+- `*_origin: human` means the current value was entered or corrected manually.
+- `*_origin: ai` means Codex transcribed and categorized the duration from the
+  user's source record.
+- `time_data_reviewed: false` means one or more AI-filled values still await
+  human confirmation. Review status does not change their origin.
 - Original human text remains the source of truth.
+
+### Category boundaries
+
+- `Project`: time that directly advances a defined Project, Milestone, or
+  observable work/study output.
+- `Admin`: email, appointments, errands, household maintenance, purchasing,
+  organizing, and similar life/work upkeep.
+- `Workout`: deliberately recorded exercise, training, or physical activity.
+- `Personal Enrichment`: reading, learning, art, media, reflection, or hobbies
+  that do not directly advance a defined Project.
+
+Assign a time block to one primary category unless the source explicitly splits
+it. Project-directed learning belongs to `Project`, not both Project and
+Personal Enrichment.
+
+### Four Heatmap levels
+
+For Project and Personal Enrichment:
+
+- Level 1: `1–60` minutes
+- Level 2: `61–120` minutes
+- Level 3: `121–180` minutes
+- Level 4: more than `180` minutes
+
+For Admin and Workout:
+
+- Level 1: `1–30` minutes
+- Level 2: `31–60` minutes
+- Level 3: `61–90` minutes
+- Level 4: more than `90` minutes
+
+Codex may only sum durations that are explicit in the source. It must not invent
+minutes from vague phrases. A mentioned activity without a usable duration stays
+empty and is called out for human clarification. A complete review may write
+`0` when the source confirms that no activity of that category occurred.
+
+### Deprecated score fields
+
+`project_contribution`, `admin_load`, `activity_origin`, and
+`activity_reviewed` belong to the pre-0.7 scoring model. New templates and the
+Dashboard do not read them. Existing values remain historical data and must
+never be converted into minutes.
 
 ## Project organization
 

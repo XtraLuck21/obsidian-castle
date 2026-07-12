@@ -24,15 +24,26 @@ node --check "$plugin/main.js"
 pass "plugin JavaScript syntax"
 
 jq -e '.id == "castlex-dashboard" and (.version | type == "string") and (.name | type == "string") and (.minAppVersion | type == "string")' "$manifest" >/dev/null
-node -e 'const m=require(process.argv[1]); const p=m.version.split(".").map(Number); if (p[0] < 1 && (p[1] || 0) < 6) process.exit(1)' "$manifest" || fail "plugin version must be at least 0.6.0"
+node -e 'const m=require(process.argv[1]); const p=m.version.split(".").map(Number); if (p[0] < 1 && (p[1] || 0) < 7) process.exit(1)' "$manifest" || fail "plugin version must be at least 0.7.0"
 pass "manifest fields and version"
 
-fields=(sleep_quality physical_state stress energy agency appetite_stability project_contribution admin_load activity_origin activity_reviewed)
+fields=(sleep_quality physical_state stress energy agency appetite_stability project_minutes admin_minutes workout_minutes personal_enrichment_minutes project_minutes_origin admin_minutes_origin workout_minutes_origin personal_enrichment_minutes_origin time_data_reviewed)
 for field in "${fields[@]}"; do
   rg -q "^${field}:" "$template" || fail "Daily template missing $field"
   rg -q "\`${field}\`|${field}:" "$schema" || fail "Schema missing $field"
 done
 pass "Daily template and Schema core fields"
+
+rg -q '^```castlex-time-rings$' "$template" || fail "Daily template missing time-ring block"
+if rg -q '^### (Project Contributions|Life & Admin)$' "$template"; then
+  fail "Completed Today must remain a flat bullet list"
+fi
+for deprecated in project_contribution admin_load activity_origin activity_reviewed; do
+  if rg -q "^${deprecated}:" "$template"; then
+    fail "Daily template still contains deprecated field: $deprecated"
+  fi
+done
+pass "time-ring block and flat Completed Today structure"
 
 for script in "$SYSTEM_ROOT"/scripts/*.sh; do bash -n "$script"; done
 pass "shell script syntax"

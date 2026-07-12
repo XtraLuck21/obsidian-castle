@@ -28,6 +28,44 @@ const METRICS = [
   { key: "stress", label: "压力", hint: "Stress · 1 low / 5 high" },
   { key: "agency", label: "行动感", hint: "Agency / ability to start" },
 ];
+const TIME_METRICS = [
+  {
+    id: "project",
+    key: "project_minutes",
+    originKey: "project_minutes_origin",
+    label: "Project",
+    labelZh: "项目",
+    unit: 60,
+    goal: 180,
+  },
+  {
+    id: "enrichment",
+    key: "personal_enrichment_minutes",
+    originKey: "personal_enrichment_minutes_origin",
+    label: "Personal Enrichment",
+    labelZh: "个人充实",
+    unit: 60,
+    goal: 180,
+  },
+  {
+    id: "workout",
+    key: "workout_minutes",
+    originKey: "workout_minutes_origin",
+    label: "Workout",
+    labelZh: "运动",
+    unit: 30,
+    goal: 90,
+  },
+  {
+    id: "admin",
+    key: "admin_minutes",
+    originKey: "admin_minutes_origin",
+    label: "Admin",
+    labelZh: "日常维护",
+    unit: 30,
+    goal: 90,
+  },
+];
 
 function pad(value) {
   return String(value).padStart(2, "0");
@@ -66,10 +104,32 @@ function rating(value) {
   return Number.isFinite(number) && number >= 1 && number <= 5 ? number : null;
 }
 
-function intensity(value) {
+function minutesValue(value) {
   if (value === null || value === undefined || value === "") return null;
   const number = Number(value);
-  return Number.isFinite(number) && number >= 0 && number <= 5 ? number : null;
+  return Number.isFinite(number) && number >= 0 ? Math.round(number) : null;
+}
+
+function timeLevel(value, metric) {
+  const minutes = minutesValue(value);
+  if (minutes === null) return null;
+  if (minutes === 0) return 0;
+  return Math.min(4, Math.ceil(minutes / metric.unit));
+}
+
+function formatDuration(value) {
+  const minutes = minutesValue(value);
+  if (minutes === null) return "Not recorded";
+  if (minutes === 0) return "0m";
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  if (!hours) return `${remainder}m`;
+  return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
+}
+
+function timeThresholdLabel(metric) {
+  if (metric.unit === 60) return "≤1h · ≤2h · ≤3h · >3h";
+  return "≤30m · ≤60m · ≤90m · >90m";
 }
 
 function completion(frontmatter) {
@@ -142,6 +202,143 @@ class DailyStatusChild extends MarkdownRenderChild {
   render() {
     this.containerEl.empty();
     renderReadonlyStatus(this.app, this.file, this.containerEl);
+  }
+}
+
+class DailyTimeRingsChild extends MarkdownRenderChild {
+  constructor(container, app, file) {
+    super(container);
+    this.app = app;
+    this.file = file;
+    this.writeQueue = Promise.resolve();
+  }
+
+  onload() {
+    this.render();
+    this.registerEvent(this.app.metadataCache.on("changed", (changedFile) => {
+      if (changedFile.path === this.file.path) this.render();
+    }));
+  }
+
+  frontmatter() {
+    return this.app.metadataCache.getFileCache(this.file)?.frontmatter ?? {};
+  }
+
+  async setMinutes(metric, nextValue) {
+    const next = nextValue === null ? null : Math.max(0, Math.round(Number(nextValue)));
+    if (next !== null && !Number.isFinite(next)) return;
+    const write = async () => {
+      await this.app.fileManager.processFrontMatter(this.file, (frontmatter) => {
+        const wasReviewed = frontmatter.time_data_reviewed === true;
+        if (next === null) {
+          delete frontmatter[metric.key];
+          delete frontmatter[metric.originKey];
+        } else {
+          frontmatter[metric.key] = next;
+          frontmatter[metric.originKey] = "human";
+        }
+        const hasPendingAI = TIME_METRICS.some((item) => frontmatter[item.originKey] === "ai");
+        frontmatter.time_data_reviewed = wasReviewed || !hasPendingAI;
+      });
+      new Notice(`${metric.label}: ${formatDuration(next)}`);
+    };
+    this.writeQueue = this.writeQueue.then(write, write);
+    await this.writeQueue;
+  }
+
+  async confirmAIValues() {
+    const write = async () => {
+      await this.app.fileManager.processFrontMatter(this.file, (frontmatter) => {
+        frontmatter.time_data_reviewed = true;
+      });
+      new Notice("AI time values marked as reviewed");
+    };
+    this.writeQueue = this.writeQueue.then(write, write);
+    await this.writeQueue;
+  }
+
+  render() {
+    this.containerEl.empty();
+    const frontmatter = this.frontmatter();
+    const values = TIME_METRICS.map((metric) => minutesValue(frontmatter[metric.key]));
+    const wrap = this.containerEl.createDiv({ cls: "cx-time-allocation" });
+    const visual = wrap.createDiv({ cls: "cx-time-rings-visual" });
+    const svg = createSvgElement(visual, "svg", { viewBox: "0 0 250 250", class: "cx-time-rings-svg" });
+    const radii = [106, 84, 62, 40];
+
+    TIME_METRICS.forEach((metric, index) => {
+      const radius = radii[index];
+      const circumference = 2 * Math.PI * radius;
+      const minutes = values[index];
+      const progress = minutes === null ? 0 : clamp(minutes / metric.goal, 0, 1);
+      createSvgElement(svg, "circle", {
+        cx: 125,
+        cy: 125,
+        r: radius,
+        class: "cx-time-ring-track",
+      });
+      createSvgElement(svg, "circle", {
+        cx: 125,
+        cy: 125,
+        r: radius,
+        class: `cx-time-ring-progress cx-time-ring-${metric.id}${minutes !== null && minutes >= metric.goal ? " is-complete" : ""}`,
+        "stroke-dasharray": circumference,
+        "stroke-dashoffset": circumference * (1 - progress),
+        transform: "rotate(-90 125 125)",
+      });
+    });
+
+    const recorded = values.filter((value) => value !== null);
+    const total = recorded.reduce((sum, value) => sum + value, 0);
+    const totalText = createSvgElement(svg, "text", { x: 125, y: 131, class: "cx-time-rings-total", "text-anchor": "middle" });
+    totalText.textContent = recorded.length ? formatDuration(total) : "—";
+
+    const editor = wrap.createDiv({ cls: "cx-time-editor" });
+    TIME_METRICS.forEach((metric, index) => {
+      const minutes = values[index];
+      const origin = frontmatter[metric.originKey];
+      const level = timeLevel(minutes, metric);
+      const row = editor.createDiv({ cls: `cx-time-row cx-time-row-${metric.id}` });
+      const heading = row.createDiv({ cls: "cx-time-row-heading" });
+      const label = heading.createDiv({ cls: "cx-time-row-label" });
+      label.createSpan({ cls: `cx-time-dot cx-time-dot-${metric.id}` });
+      label.createSpan({ text: metric.label });
+      const meta = heading.createDiv({ cls: "cx-time-row-meta" });
+      meta.createSpan({
+        text: minutes === null ? "Not recorded" : minutes === 0 ? "No time" : `Level ${level}/4`,
+        cls: "cx-time-level",
+      });
+      if (origin === "human" || origin === "ai") {
+        meta.createSpan({ text: origin === "ai" ? "AI" : "Human", cls: `cx-time-origin is-${origin}` });
+      }
+
+      const controls = row.createDiv({ cls: "cx-time-controls" });
+      const minus = controls.createEl("button", { text: "−15", cls: "cx-time-step", attr: { "aria-label": `Subtract 15 minutes from ${metric.label}` } });
+      const input = controls.createEl("input", {
+        cls: "cx-time-input",
+        attr: { type: "number", min: "0", step: "15", inputmode: "numeric", "aria-label": `${metric.label} minutes` },
+      });
+      input.value = minutes === null ? "" : String(minutes);
+      controls.createSpan({ text: "min", cls: "cx-time-unit" });
+      const plus = controls.createEl("button", { text: "+15", cls: "cx-time-step", attr: { "aria-label": `Add 15 minutes to ${metric.label}` } });
+      const clear = controls.createEl("button", { text: "Clear", cls: "cx-time-clear", attr: { "aria-label": `Clear ${metric.label} time` } });
+
+      minus.addEventListener("click", () => this.setMinutes(metric, Math.max(0, (minutesValue(input.value) ?? 0) - 15)));
+      plus.addEventListener("click", () => this.setMinutes(metric, (minutesValue(input.value) ?? 0) + 15));
+      clear.addEventListener("click", () => this.setMinutes(metric, null));
+      input.addEventListener("change", () => {
+        const raw = input.value.trim();
+        this.setMinutes(metric, raw === "" ? null : Number(raw));
+      });
+    });
+
+    const hasAI = TIME_METRICS.some((metric) => frontmatter[metric.originKey] === "ai");
+    if (hasAI && frontmatter.time_data_reviewed !== true) {
+      const review = wrap.createDiv({ cls: "cx-time-review" });
+      review.createSpan({ text: "AI-filled time values are awaiting review." });
+      const confirm = review.createEl("button", { text: "Confirm values", cls: "cx-time-confirm" });
+      confirm.addEventListener("click", () => this.confirmAIValues());
+    }
   }
 }
 
@@ -614,18 +811,19 @@ class CastleXHomeView extends ItemView {
   }
 
   renderHeatmap(parent, streaks) {
-    const card = this.createCard(parent, "Activity Heatmap", "Codex 派生的 0–5 强度；空白代表尚未处理");
+    const metric = TIME_METRICS.find((item) => item.id === this.heatmapMode) ?? TIME_METRICS[0];
+    const card = this.createCard(parent, "Time Allocation Heatmap", "按实际分钟数派生四档颜色；空白代表尚未记录");
     card.addClass("cx-heatmap-card");
     const header = card.querySelector(".cx-card-header");
-    this.renderModeTabs(header, [["project", "Project"], ["admin", "Admin"]], this.heatmapMode, (mode) => {
+    this.renderModeTabs(header, TIME_METRICS.map((item) => [item.id, item.label]), this.heatmapMode, (mode) => {
       this.heatmapMode = mode;
       this.renderDashboard();
     });
-    const grid = card.createDiv({ cls: "cx-heatmap" });
+    const grid = card.createDiv({ cls: `cx-heatmap cx-heatmap-${metric.id}` });
     const legend = card.createDiv({ cls: "cx-heatmap-legend" });
     const coverage = legend.createSpan();
-    legend.createSpan({ text: "0 · 无" });
-    legend.createSpan({ text: "5 · 高" });
+    legend.createSpan({ text: "0 · none" });
+    legend.createSpan({ text: timeThresholdLabel(metric), cls: "cx-heatmap-thresholds" });
 
     let renderSignature = "";
     const paint = (width, height) => {
@@ -660,16 +858,20 @@ class CastleXHomeView extends ItemView {
         const iso = localISO(date);
         const isFuture = date > today;
         const page = isFuture ? null : streaks.byDate.get(iso);
-        const field = this.heatmapMode === "project" ? "project_contribution" : "admin_load";
-        const level = isFuture ? null : intensity(page?.frontmatter[field]);
+        const minutes = isFuture ? null : minutesValue(page?.frontmatter[metric.key]);
+        const level = isFuture ? null : timeLevel(minutes, metric);
         if (level !== null) processed += 1;
         const state = isFuture ? " is-future" : level === null ? " is-missing" : ` cx-intensity-${level}`;
         const cell = grid.createSpan({ cls: `cx-heat-cell${state}` });
-        const description = isFuture ? "future" : level === null ? "not processed" : `${this.heatmapMode} intensity ${level}/5`;
+        const description = isFuture
+          ? "future"
+          : level === null
+            ? "not recorded"
+            : `${metric.label}: ${formatDuration(minutes)} · ${level === 0 ? "no activity" : `level ${level}/4`}`;
         cell.setAttr("aria-label", `${iso}: ${description}`);
         cell.setAttr("title", `${iso}: ${description}`);
       }
-      coverage.setText(`过去 ${visibleDays} 天 · 已处理 ${processed} 天`);
+      coverage.setText(`过去 ${visibleDays} 天 · 已记录 ${processed} 天`);
     };
 
     this.heatmapObserver?.disconnect();
@@ -781,6 +983,10 @@ module.exports = class CastleXDashboardPlugin extends Plugin {
     this.registerMarkdownCodeBlockProcessor("castlex-status", (_source, element, context) => {
       const file = this.app.vault.getAbstractFileByPath(context.sourcePath);
       if (file instanceof TFile) context.addChild(new DailyStatusChild(element, this.app, file));
+    });
+    this.registerMarkdownCodeBlockProcessor("castlex-time-rings", (_source, element, context) => {
+      const file = this.app.vault.getAbstractFileByPath(context.sourcePath);
+      if (file instanceof TFile) context.addChild(new DailyTimeRingsChild(element, this.app, file));
     });
     this.addRibbonIcon("ship-wheel", "Open CastleX Home", () => this.activateView());
     this.addCommand({ id: "open-home", name: "Open CastleX Home", callback: () => this.activateView() });

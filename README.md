@@ -31,7 +31,8 @@ committed to this repository.
 - Six-dimension Daily check-in stored in YAML
 - Read-only Daily status gauges and radar chart
 - 14-day Energy/Sleep trend chart
-- Responsive Activity Heatmap with Project/Admin views and `0–5` intensity
+- Responsive time-driven Heatmap with Project/Admin/Workout/Personal Enrichment views
+- Four editable Apple Fitness-inspired time rings in each Daily Note
 - Calendar navigation that opens or creates Daily Notes
 - Active Project progress and Project Task overview
 - Voyage-day streak calculation based on complete Daily check-ins
@@ -133,6 +134,11 @@ A day counts as a Voyage Day when all six fields contain values from `1` to
 `5`. The note keeps `Raw Notes` at the end so AI processing never needs to
 replace the original human writing.
 
+Daily Notes also include a `Time Allocation` card. Its four rings can be edited
+manually in 15-minute steps or filled by an AI-assisted review. `Completed
+Today` remains a single flat list of short keyword-style bullet points; detailed
+process and context belong in the explicitly marked `AI Summary`.
+
 ### Projects
 
 Project notes live under `30_Projects/` and use frontmatter to control state:
@@ -152,25 +158,32 @@ Supported status values are `active`, `on-hold`, `completed`, `someday`, and
 `cancelled`. The Dashboard only lists tasks from Projects whose status is
 `active`.
 
-### Activity Heatmap and AI provenance
+### Time Allocation Heatmap and AI provenance
 
-The Dashboard reads two independent Daily fields:
+The Dashboard reads four source time values in whole minutes:
 
 ```yaml
-project_contribution: 0
-admin_load: 0
-activity_origin: ai
-activity_reviewed: false
+project_minutes: 120
+admin_minutes: 40
+workout_minutes: 50
+personal_enrichment_minutes: 60
+
+project_minutes_origin: ai
+admin_minutes_origin: ai
+workout_minutes_origin: ai
+personal_enrichment_minutes_origin: ai
+time_data_reviewed: false
 ```
 
-Empty means the day has not been processed. `0` means processed with no activity
-of that type, and `1–5` are five increasing intensity levels. The Dashboard
-never invents these values; an AI-assisted review or the user must explicitly
-write them.
+Empty means the category has not been recorded. `0` means it was reviewed with
+no time in that category. The Dashboard derives four color levels from the
+minutes: Project and Personal Enrichment advance one level per hour; Admin and
+Workout advance one level per 30 minutes. It never asks AI to score the day.
 
-AI-generated content must remain visibly marked. `activity_origin: ai` records
-where a derived value came from, while `activity_reviewed: false` means it still
-awaits human review. Review status does not change authorship.
+AI-generated content must remain visibly marked. Per-category `*_origin: ai`
+records who filled the current value, while `time_data_reviewed: false` means AI
+values still await human review. AI may categorize and total explicit durations
+from the source record, but it must not invent minutes from vague descriptions.
 
 See [`examples/`](examples/) for deliberately fictional Daily, Project, and
 Weekly Review notes.
@@ -246,11 +259,12 @@ scripts/                   verification and conservative sync tools
 6. Deploy system files to the formal Vault only after testing.
 7. Review `git status`, `git diff --cached`, and `git ls-files` before pushing.
 
-To restore the stable `0.6.0` system baseline:
+To inspect or restore a tagged system baseline:
 
 ```bash
-git show castlex-system-v0.6.0
-git restore --source castlex-system-v0.6.0 -- \
+git tag --list
+git show castlex-system-v0.7.0
+git restore --source castlex-system-v0.7.0 -- \
   plugin templates schemas assets scripts README.md .gitignore
 ./scripts/verify-system.sh --source-only
 ./scripts/deploy-system.sh --dry-run
@@ -275,4 +289,3 @@ replace reviewing the staged file list before every public push.
 CastleX is currently an early public system baseline. Expect the plugin,
 templates, and data schema to evolve. Back up your Vault and preview every
 deployment before applying changes.
-
