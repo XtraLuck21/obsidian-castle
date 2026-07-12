@@ -50,8 +50,8 @@ pass "shell script syntax"
 
 obsolete_root="${HOME}/Documents/Castle"
 if rg -n --hidden "/Users/[^/]+/|${obsolete_root}" "$SYSTEM_ROOT" \
-  --glob '!scripts/verify-system.sh' \
-  --glob '!plugin/castlex-dashboard/main.js.map'; then
+  --glob '!**/scripts/verify-system.sh' \
+  --glob '!**/plugin/castlex-dashboard/main.js.map'; then
   fail "user-specific or obsolete absolute path found"
 fi
 pass "no user-specific or obsolete development path"

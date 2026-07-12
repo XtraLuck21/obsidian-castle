@@ -349,6 +349,7 @@ class CastleXHomeView extends ItemView {
     this.heatmapMode = "project";
     this.trendMode = "energy";
     this.calendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    this.currentDateISO = localISO();
     this.renderTimer = null;
     this.heatmapObserver = null;
   }
@@ -384,12 +385,21 @@ class CastleXHomeView extends ItemView {
   }
 
   updateClock() {
-    if (!this.clockEl) return;
-    this.clockEl.setText(new Intl.DateTimeFormat("zh-CN", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).format(new Date()));
+    const now = new Date();
+    if (this.clockEl) {
+      this.clockEl.setText(new Intl.DateTimeFormat("zh-CN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).format(now));
+    }
+
+    const todayISO = localISO(now);
+    if (todayISO !== this.currentDateISO) {
+      this.currentDateISO = todayISO;
+      this.calendarCursor = new Date(now.getFullYear(), now.getMonth(), 1);
+      this.scheduleRender();
+    }
   }
 
   async ensureFolder(path) {
@@ -962,7 +972,9 @@ class CastleXHomeView extends ItemView {
 
   async renderDashboard() {
     this.heatmapObserver?.disconnect();
-    const todayFile = await this.ensureDaily();
+    const now = new Date();
+    this.currentDateISO = localISO(now);
+    const todayFile = await this.ensureDaily(now);
     const pages = this.dailyPages();
     const todayFrontmatter = this.frontmatter(todayFile);
     const projects = this.projectPages();
