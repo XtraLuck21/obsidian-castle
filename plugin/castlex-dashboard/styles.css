@@ -98,15 +98,20 @@
 .cx-project-list, .cx-task-list { display: grid; gap: 6px; }
 .cx-project { min-width: 0; }
 .cx-project-line { align-items: center; color: rgba(239,244,246,.66); display: flex; font-size: .58rem; justify-content: space-between; margin-bottom: 3px; }
-.cx-text-link { background: none; border: 0; color: #edf3f5; cursor: pointer; font-size: .63rem; max-width: 100%; overflow: hidden; padding: 0; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
-.cx-text-link:hover { color: #dce9ec; text-decoration: underline; }
+.cx-shell button.cx-text-link { appearance: none; background: transparent !important; border: 1px solid transparent !important; border-radius: 8px; box-shadow: none !important; color: #edf3f5; cursor: pointer; font-size: .63rem; line-height: 1.2; max-width: 100%; min-height: 0; overflow: hidden; padding: 2px 4px 2px 0; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.cx-shell button.cx-text-link:hover { background: rgba(217,227,229,.08) !important; border-color: rgba(228,236,238,.1) !important; color: #dce9ec; }
 .cx-progress-track { background: rgba(255,255,255,.075); border-radius: 999px; height: 5px; overflow: hidden; }
 .cx-progress-bar { background: linear-gradient(90deg, #7893a0, #d1d6d2); border-radius: inherit; display: block; height: 100%; }
-.cx-task { align-items: center; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.035); border-radius: 8px; display: grid; gap: 7px; grid-template-columns: 23px minmax(0,1fr); padding: 5px 6px; }
-.cx-task-check { align-items: center; background: transparent; border: 0; color: rgba(218,228,230,.65); cursor: pointer; display: flex; justify-content: center; padding: 2px; }
+.cx-task { align-items: center; background: transparent; border: 1px solid transparent; border-radius: 8px; display: grid; gap: 7px; grid-template-columns: 23px minmax(0,1fr); padding: 5px 2px; }
+.cx-task:hover { background: rgba(217,227,229,.045); border-color: rgba(228,236,238,.075); }
+.cx-shell button.cx-task-check { align-items: center; appearance: none; background: transparent !important; border: 1px solid transparent !important; border-radius: 8px; box-shadow: none !important; color: rgba(218,228,230,.65); cursor: pointer; display: flex; height: 23px; justify-content: center; min-height: 0; min-width: 0; padding: 2px; width: 23px; }
+.cx-shell button.cx-task-check:hover { background: rgba(217,227,229,.08) !important; border-color: rgba(228,236,238,.1) !important; }
 .cx-task-check svg { height: 15px; width: 15px; }
-.cx-task-content { min-width: 0; }
-.cx-task-content small { color: rgba(235,241,243,.29); display: block; font-size: .48rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-task-label { color: #edf3f5; font-size: .63rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-shell .cx-task-project-select { appearance: none; background: transparent !important; border: 1px solid rgba(255,255,255,.1); border-radius: 8px; box-shadow: none !important; color: rgba(239,244,246,.78); cursor: pointer; font-size: .52rem; max-width: 48%; overflow: hidden; padding: 5px 22px 5px 9px; text-overflow: ellipsis; white-space: nowrap; }
+.cx-task-project-select:focus { border-color: rgba(207,220,224,.35); outline: none; }
+.cx-task-project-select option { color: #172127; }
+.cx-task-more { color: rgba(232,239,241,.42); font-size: .55rem; padding: 1px 6px 0; text-align: right; }
 .cx-empty { color: rgba(235,241,243,.5); font-size: .64rem; font-style: italic; padding: 20px 0; text-align: center; }
 
 .cx-route { align-items: center; display: grid; gap: 10px; grid-template-columns: auto minmax(280px,1fr) auto; min-height: 52px; padding: 7px 13px; }

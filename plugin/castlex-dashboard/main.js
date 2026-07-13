@@ -143,6 +143,20 @@ function stripTaskSyntax(text) {
     .trim();
 }
 
+function progressSections(value) {
+  const entries = Array.isArray(value)
+    ? value.map((item) => {
+        const match = String(item).match(/^(.+?)\s*=\s*(-?\d+(?:\.\d+)?)$/);
+        return match ? [match[1].trim(), Number(match[2])] : null;
+      }).filter(Boolean)
+    : value && typeof value === "object"
+      ? Object.entries(value)
+      : [];
+  return entries
+    .map(([section, weight]) => ({ section: String(section).trim(), weight: Number(weight) }))
+    .filter(({ section, weight }) => section && Number.isFinite(weight) && weight > 0);
+}
+
 function createSvgElement(parent, tag, attributes = {}) {
   const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
   Object.entries(attributes).forEach(([key, value]) => node.setAttribute(key, String(value)));
@@ -350,6 +364,7 @@ class CastleXHomeView extends ItemView {
     this.trendMode = "energy";
     this.calendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     this.currentDateISO = localISO();
+    this.taskProjectPath = null;
     this.renderTimer = null;
     this.heatmapObserver = null;
   }
@@ -466,27 +481,59 @@ class CastleXHomeView extends ItemView {
       .filter((file) => file.path.startsWith(`${PROJECT_ROOT}/`))
       .map((file) => ({ file, frontmatter: this.frontmatter(file) }))
       .filter((page) => page.frontmatter.type === "project" && page.frontmatter.status === "active")
-      .sort((a, b) => Number(b.frontmatter.progress ?? 0) - Number(a.frontmatter.progress ?? 0));
+      .sort((a, b) => {
+        const priority = (page) => {
+          const raw = page.frontmatter.priority;
+          const value = raw === null || raw === undefined || raw === "" ? Number.MAX_SAFE_INTEGER : Number(raw);
+          return Number.isFinite(value) ? value : Number.MAX_SAFE_INTEGER;
+        };
+        return priority(a) - priority(b) || a.file.path.localeCompare(b.file.path);
+      });
   }
 
   async collectProjectTasks(projects) {
-    const tasks = [];
-    await Promise.all(projects.map(async ({ file }) => {
+    return Promise.all(projects.map(async (project) => {
+      const { file, frontmatter } = project;
       const content = await this.app.vault.cachedRead(file);
+      const bySection = new Map();
+      let currentSection = "";
       content.split("\n").forEach((line, lineNumber) => {
-        const open = line.match(/^\s*- \[ \] (.+)$/);
-        if (!open) return;
-        const due = open[1].match(/📅 ?(\d{4}-\d{2}-\d{2})/)?.[1] ?? null;
-        tasks.push({ file, line, lineNumber, text: stripTaskSyntax(open[1]), due });
+        const heading = line.match(/^##\s+(.+?)\s*$/);
+        if (heading) currentSection = heading[1];
+        const checkbox = line.match(/^\s*- \[([ xX])\] (.+)$/);
+        if (!checkbox) return;
+        const checked = checkbox[1].toLowerCase() === "x";
+        const due = checkbox[2].match(/📅 ?(\d{4}-\d{2}-\d{2})/)?.[1] ?? null;
+        const item = { file, line, lineNumber, text: stripTaskSyntax(checkbox[2]), due, checked };
+        if (!bySection.has(currentSection)) bySection.set(currentSection, []);
+        bySection.get(currentSection).push(item);
       });
+
+      const configuredSections = progressSections(frontmatter.progress_sections);
+      const progress = configuredSections.length
+        ? clamp(configuredSections.reduce((total, { section, weight }) => {
+            const items = bySection.get(section) ?? [];
+            if (!items.length) return total;
+            const completed = items.filter((item) => item.checked).length;
+            return total + completed / items.length * weight;
+          }, 0), 0, 100)
+        : null;
+
+      let tasks = [];
+      if (configuredSections.length) {
+        for (const { section } of configuredSections) {
+          const open = (bySection.get(section) ?? []).filter((item) => !item.checked);
+          if (open.length) {
+            tasks = open;
+            break;
+          }
+        }
+      } else {
+        const taskSection = String(frontmatter.task_section ?? "Tasks").trim();
+        tasks = (bySection.get(taskSection) ?? []).filter((item) => !item.checked);
+      }
+      return { project, tasks, progress };
     }));
-    tasks.sort((a, b) => {
-      if (a.due && b.due) return a.due.localeCompare(b.due);
-      if (a.due) return -1;
-      if (b.due) return 1;
-      return a.file.path.localeCompare(b.file.path);
-    });
-    return tasks;
   }
 
   calculateStreaks(pages) {
@@ -527,10 +574,11 @@ class CastleXHomeView extends ItemView {
 
   async completeTask(task) {
     const today = localISO();
+    const recordCompletionDate = this.frontmatter(task.file).record_task_completion_date !== false;
     await this.app.vault.process(task.file, (content) => {
       const lines = content.split("\n");
       if (lines[task.lineNumber] === task.line) {
-        lines[task.lineNumber] = task.line.replace("- [ ]", "- [x]") + ` ✅ ${today}`;
+        lines[task.lineNumber] = task.line.replace("- [ ]", "- [x]") + (recordCompletionDate ? ` ✅ ${today}` : "");
       }
       return lines.join("\n");
     });
@@ -610,7 +658,7 @@ class CastleXHomeView extends ItemView {
     });
   }
 
-  renderProjects(parent, projects) {
+  renderProjects(parent, projects, taskGroups) {
     const card = this.createCard(parent, `Active Projects · ${projects.length}`, "status: active");
     card.addClass("cx-project-card");
     const list = card.createDiv({ cls: "cx-project-list" });
@@ -619,36 +667,61 @@ class CastleXHomeView extends ItemView {
       return;
     }
     projects.slice(0, 6).forEach((project) => {
-      const progress = clamp(Number(project.frontmatter.progress ?? 0), 0, 100);
+      const derived = taskGroups.find((group) => group.project.file.path === project.file.path)?.progress;
+      const progress = clamp(derived ?? Number(project.frontmatter.progress ?? 0), 0, 100);
       const item = list.createDiv({ cls: "cx-project" });
       const line = item.createDiv({ cls: "cx-project-line" });
       const link = line.createEl("button", { text: project.file.basename, cls: "cx-text-link" });
       link.addEventListener("click", () => this.openFile(project.file));
-      line.createSpan({ text: `${progress}%` });
+      line.createSpan({ text: `${Math.round(progress * 10) / 10}%` });
       const track = item.createDiv({ cls: "cx-progress-track" });
       const bar = track.createSpan({ cls: "cx-progress-bar" });
       bar.style.width = `${progress}%`;
     });
   }
 
-  renderTasks(parent, tasks) {
-    const card = this.createCard(parent, `Project Tasks · ${tasks.length}`, "仅显示 active projects");
+  renderTasks(parent, taskGroups) {
+    const card = this.createCard(parent, "Upcoming Tasks", "Focused Project");
     card.addClass("cx-task-card");
+    const header = card.querySelector(".cx-card-header");
     const list = card.createDiv({ cls: "cx-task-list" });
-    if (!tasks.length) {
-      list.createDiv({ text: "当前没有 Project Task", cls: "cx-empty" });
+    if (!taskGroups.length) {
+      list.createDiv({ text: "尚无 Focus Project", cls: "cx-empty" });
       return;
     }
-    tasks.slice(0, 7).forEach((task) => {
+
+    const selectedGroup = taskGroups.find((group) => group.project.file.path === this.taskProjectPath) ?? taskGroups[0];
+    this.taskProjectPath = selectedGroup.project.file.path;
+    const select = header.createEl("select", {
+      cls: "cx-task-project-select",
+      attr: { "aria-label": "选择 Upcoming Tasks 的 Project", title: "选择 Focus Project" },
+    });
+    taskGroups.forEach((group) => {
+      select.createEl("option", {
+        text: group.project.file.basename,
+        attr: { value: group.project.file.path },
+      });
+    });
+    select.value = this.taskProjectPath;
+    select.addEventListener("change", () => {
+      this.taskProjectPath = select.value;
+      this.renderDashboard();
+    });
+
+    if (!selectedGroup.tasks.length) {
+      list.createDiv({ text: "该 Project 暂无未完成任务", cls: "cx-empty" });
+      return;
+    }
+
+    selectedGroup.tasks.slice(0, 3).forEach((task) => {
       const row = list.createDiv({ cls: "cx-task" });
       const check = row.createEl("button", { cls: "cx-task-check", attr: { "aria-label": "完成任务" } });
       setIcon(check, "circle");
       check.addEventListener("click", () => this.completeTask(task));
-      const content = row.createDiv({ cls: "cx-task-content" });
-      const link = content.createEl("button", { text: task.text || "Untitled task", cls: "cx-text-link" });
-      link.addEventListener("click", () => this.openFile(task.file));
-      content.createEl("small", { text: task.due ? `Due ${task.due}` : task.file.basename });
+      row.createDiv({ text: task.text || "Untitled task", cls: "cx-task-label" });
     });
+    const remaining = selectedGroup.tasks.length - 3;
+    if (remaining > 0) list.createDiv({ text: `+${remaining}`, cls: "cx-task-more" });
   }
 
   renderRoute(shell, streaks) {
@@ -978,7 +1051,8 @@ class CastleXHomeView extends ItemView {
     const pages = this.dailyPages();
     const todayFrontmatter = this.frontmatter(todayFile);
     const projects = this.projectPages();
-    const tasks = await this.collectProjectTasks(projects);
+    const taskGroups = await this.collectProjectTasks(projects);
+    const focusTaskGroups = taskGroups.filter((group) => group.project.frontmatter.focus === true);
     const streaks = this.calculateStreaks(pages);
 
     this.contentEl.empty();
@@ -991,8 +1065,8 @@ class CastleXHomeView extends ItemView {
     const left = top.createDiv({ cls: "cx-top-left" });
     this.renderHero(left, todayFile);
     this.renderKpis(left, todayFrontmatter, streaks);
-    this.renderProjects(top, projects);
-    this.renderTasks(top, tasks);
+    this.renderProjects(top, projects, taskGroups);
+    this.renderTasks(top, focusTaskGroups);
 
     this.renderRoute(shell, streaks);
 

@@ -19,12 +19,13 @@ plugin="$SYSTEM_ROOT/plugin/castlex-dashboard"
 template="$SYSTEM_ROOT/templates/010-Daily-Dashboard.md"
 schema="$SYSTEM_ROOT/schemas/CastleX-Data-Schema.md"
 manifest="$plugin/manifest.json"
+project_template="$SYSTEM_ROOT/templates/100-Project.md"
 
 node --check "$plugin/main.js"
 pass "plugin JavaScript syntax"
 
 jq -e '.id == "castlex-dashboard" and (.version | type == "string") and (.name | type == "string") and (.minAppVersion | type == "string")' "$manifest" >/dev/null
-node -e 'const m=require(process.argv[1]); const p=m.version.split(".").map(Number); if (p[0] < 1 && (p[1] || 0) < 7) process.exit(1)' "$manifest" || fail "plugin version must be at least 0.7.0"
+node -e 'const m=require(process.argv[1]); const p=m.version.split(".").map(Number); if (p[0] < 1 && (p[1] || 0) < 8) process.exit(1)' "$manifest" || fail "plugin version must be at least 0.8.0"
 pass "manifest fields and version"
 
 fields=(sleep_quality physical_state stress energy agency appetite_stability project_minutes admin_minutes workout_minutes personal_enrichment_minutes project_minutes_origin admin_minutes_origin workout_minutes_origin personal_enrichment_minutes_origin time_data_reviewed)
@@ -33,6 +34,17 @@ for field in "${fields[@]}"; do
   rg -q "\`${field}\`|${field}:" "$schema" || fail "Schema missing $field"
 done
 pass "Daily template and Schema core fields"
+
+rg -q '^focus: false$' "$project_template" || fail "Project template missing focus default"
+rg -q '^progress_sections:$' "$project_template" || fail "Project template missing progress sections"
+rg -q '^  Tasks: 100$' "$project_template" || fail "Project template missing default Tasks weight"
+rg -q '`focus`|focus:' "$schema" || fail "Schema missing Project focus field"
+rg -q '`progress_sections`|progress_sections:' "$schema" || fail "Schema missing Project progress sections"
+rg -q 'Upcoming Tasks' "$schema" || fail "Schema missing Upcoming Tasks behavior"
+if rg -q '^task_section:|^progress:' "$project_template"; then
+  fail "Project template contains deprecated task_section or manual progress"
+fi
+pass "Project focus, weighted progress sections, and Upcoming Tasks fields"
 
 rg -q '^```castlex-time-rings$' "$template" || fail "Daily template missing time-ring block"
 previous_line=0

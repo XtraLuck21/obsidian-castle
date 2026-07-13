@@ -125,8 +125,12 @@ All Project notes live under `30_Projects/`. Status is controlled only by YAML:
 ```yaml
 type: project
 status: active
+focus: true
 area: Learning
-progress: 0
+priority: 1
+progress_sections:
+  Execution: 90
+  Retrospective: 10
 started:
 target:
 ```
@@ -139,15 +143,31 @@ Allowed status values:
 - `someday`
 - `cancelled`
 
-Dashboard Project Tasks are read only from Projects with `status: active`.
-Changing Project status never requires moving the file.
+Dashboard Active Projects includes every Project with `status: active`, whether
+focused or not. `priority` controls Project order; lower numbers appear first.
+Upcoming Tasks reads only active Projects with `focus: true`, groups tasks by
+Project, lets the user select the source Project, and displays only the first
+three unchecked Markdown checkboxes from the first unfinished section declared
+in `progress_sections`. A `+n` indicator shows how many unchecked items remain
+hidden. Dashboard completion appends `✅ YYYY-MM-DD`, matching checkbox
+completion inside the Project note. Changing Project status never requires
+moving the file.
 
 ## Project progress
 
-Project progress is based on weighted Milestones, not the raw number of Tasks.
-Daily Project Contributions provide evidence for updating Task completion and
-Milestone progress. Codex may update these fields, while preserving a dated
-Progress Log and source Daily Note link.
+`progress_sections` maps level-two Markdown headings to fixed percentage
+weights. Weights should total 100. Within each configured section, all
+checkboxes share that section's weight equally:
+
+```text
+progress = Σ (checked items in section / all items in section × section weight)
+```
+
+Adding a checkpoint expands scope and automatically recalculates only that
+section's denominator; section weights do not change. A configured section with
+no checkboxes contributes zero progress. This model supports numeric work,
+qualitative deliverables, and retrospectives without Project-specific fields or
+double counting.
 
 ## Provenance
 

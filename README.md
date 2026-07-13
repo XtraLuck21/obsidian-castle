@@ -150,16 +150,26 @@ Project notes live under `30_Projects/` and use frontmatter to control state:
 ---
 type: project
 status: active
+focus: true
 area: Example Area
-progress: 35
+priority: 1
+progress_sections:
+  Execution: 90
+  Retrospective: 10
 started: 2099-01-01
 target: 2099-03-31
 ---
 ```
 
+The Dashboard displays every active Project with its progress bar. Upcoming
+Tasks are limited to active Projects with `focus: true`, grouped by selected
+Focus Project, and show the first three unchecked checkboxes from the Project's
+first unfinished `progress_sections` entry in file order, with `+n` for
+remaining hidden tasks. Each section has a fixed share of total progress; its
+checkboxes divide that share equally and are recalculated when scope changes.
+
 Supported status values are `active`, `on-hold`, `completed`, `someday`, and
-`cancelled`. The Dashboard only lists tasks from Projects whose status is
-`active`.
+`cancelled`. The `focus` property only controls Upcoming Tasks visibility.
 
 ### Time Allocation Heatmap and AI provenance
 

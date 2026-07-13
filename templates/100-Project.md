@@ -1,8 +1,11 @@
 ---
 type: project
 status: active
+focus: false
 area:
-progress: 0
+priority:
+progress_sections:
+  Tasks: 100
 started: {{date:YYYY-MM-DD}}
 target:
 origin: human
@@ -16,14 +19,15 @@ origin: human
 
 ## Milestones
 
-<!-- Milestone weights should total 100. Progress is 0–100. -->
+<!-- Optional outcome checkpoints. Keep execution checkboxes in weighted progress sections. -->
 
-- [ ] Milestone 1 [weight:: 50] [progress:: 0]
-- [ ] Milestone 2 [weight:: 50] [progress:: 0]
+- Milestone 1
+- Milestone 2
 
 ## Tasks
 
-<!-- Only concrete next actions. Daily notes do not duplicate these tasks. -->
+<!-- Ordered checklist. This section has 100% weight by default. -->
+<!-- For a Focus Project, Dashboard shows its first three unchecked items. -->
 
 - [ ]
 
@@ -38,4 +42,3 @@ origin: human
 > **Sources:** —
 >
 > 尚未生成。
-

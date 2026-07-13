@@ -1,8 +1,12 @@
 ---
 type: project
 status: active
+focus: true
 area: Example Area
-progress: 35
+priority: 1
+progress_sections:
+  Draft: 80
+  Review: 20
 started: 2099-01-01
 target: 2099-03-31
 origin: human
@@ -13,16 +17,15 @@ origin: human
 
 Publish a fictional ten-page field guide for testing CastleX project views.
 
-## Milestones
+## Draft
 
-- [x] Define structure [weight:: 25] [progress:: 100]
-- [ ] Draft example chapters [weight:: 50] [progress:: 20]
-- [ ] Review and publish [weight:: 25] [progress:: 0]
+- [x] Define the fictional structure
+- [ ] Draft the fictional chapters
 
-## Tasks
+## Review
 
-- [ ] Draft the next fictional chapter
 - [ ] Review the example layout 📅 2099-02-01
+- [ ] Publish the fictional guide
 
 ## Progress Log
 
@@ -35,4 +38,3 @@ Publish a fictional ten-page field guide for testing CastleX project views.
 > **Sources:** —
 >
 > This section intentionally contains no real project information.
-
