@@ -136,6 +136,70 @@ function completion(frontmatter) {
   return REQUIRED.filter((key) => rating(frontmatter?.[key]) !== null).length;
 }
 
+function localTimestamp(date = new Date()) {
+  const offsetMinutes = -date.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? "+" : "-";
+  const offset = Math.abs(offsetMinutes);
+  return `${localISO(date)}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}${sign}${pad(Math.floor(offset / 60))}:${pad(offset % 60)}`;
+}
+
+function isoDateValue(value) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return localISO(value);
+  return String(value ?? "").match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
+}
+
+function calendarDayDifference(fromValue, toValue) {
+  const from = isoDateValue(fromValue)?.split("-").map(Number);
+  const to = isoDateValue(toValue)?.split("-").map(Number);
+  if (!from || !to) return null;
+  return Math.round((Date.UTC(to[0], to[1] - 1, to[2]) - Date.UTC(from[0], from[1] - 1, from[2])) / 86400000);
+}
+
+function stateEntryType(frontmatter) {
+  if (completion(frontmatter) !== REQUIRED.length) return "incomplete";
+  if (!frontmatter?.state_recorded_at) return "legacy";
+  const difference = calendarDayDifference(frontmatter.date, frontmatter.state_recorded_at);
+  if (difference === 0) return "same-day";
+  if (difference === 1) return "late";
+  return "retrospective";
+}
+
+function isVoyageDay(frontmatter) {
+  return ["same-day", "late", "legacy"].includes(stateEntryType(frontmatter));
+}
+
+function applyRating(frontmatter, key, value, now = new Date()) {
+  const wasComplete = completion(frontmatter) === REQUIRED.length;
+  frontmatter[key] = Number(value);
+  if (!wasComplete && completion(frontmatter) === REQUIRED.length && !frontmatter.state_recorded_at) {
+    frontmatter.state_recorded_at = localTimestamp(now);
+  }
+}
+
+function stateStatusPresentation(frontmatter, now = new Date()) {
+  const type = stateEntryType(frontmatter);
+  const recordedDate = isoDateValue(frontmatter?.state_recorded_at);
+  if (type === "late") {
+    return { type, label: "航行日 · Late entry", detail: `补录于 ${recordedDate}，计入连续航行` };
+  }
+  if (type === "retrospective") {
+    return { type, label: "休整日 · Retrospective", detail: `补录于 ${recordedDate}；保留状态趋势，不计入连续航行` };
+  }
+  if (type === "legacy") {
+    return { type, label: "航行日 · 历史记录", detail: "既有完整记录继续计入连续航行" };
+  }
+  if (type === "incomplete") {
+    const difference = calendarDayDifference(frontmatter?.date, localISO(now));
+    if (difference === 1) {
+      return { type: "late-pending", label: "Late entry 窗口", detail: "今天完成六项状态，仍计入连续航行" };
+    }
+    if (difference !== null && difference >= 2) {
+      return { type: "retrospective-pending", label: "休整日 · Retrospective", detail: "补录数据会进入状态趋势，但不会点亮航行记录" };
+    }
+  }
+  return null;
+}
+
 function stripTaskSyntax(text) {
   return text
     .replace(/\s+[📅⏳🛫✅] ?\d{4}-\d{2}-\d{2}/g, "")
@@ -179,18 +243,31 @@ function miniGaugePath(index) {
   return `M ${points.join(" L ")}`;
 }
 
-function renderReadonlyStatus(app, file, container) {
+function renderDailyStatus(app, file, container, onSelect) {
   const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter ?? {};
   const wrap = container.createDiv({ cls: "cx-daily-status" });
+  const presentation = stateStatusPresentation(frontmatter);
+  if (presentation) {
+    const status = wrap.createDiv({ cls: `cx-daily-status-meta is-${presentation.type}` });
+    status.createSpan({ text: presentation.label, cls: "cx-daily-status-badge" });
+    status.createSpan({ text: presentation.detail, cls: "cx-daily-status-detail" });
+  }
   METRICS.forEach((metric) => {
     const item = wrap.createDiv({ cls: "cx-daily-status-item" });
     const svg = createSvgElement(item, "svg", { viewBox: "0 0 104 65", class: "cx-daily-status-svg" });
     const selected = rating(frontmatter[metric.key]);
     for (let index = 0; index < 5; index += 1) {
       const value = index + 1;
-      createSvgElement(svg, "path", {
+      const segment = createSvgElement(svg, "path", {
         d: miniGaugePath(index),
-        class: `cx-daily-status-segment${selected !== null && value <= selected ? " is-active" : ""}${value === selected ? " is-selected" : ""}`,
+        class: `cx-daily-status-segment is-interactive${selected !== null && value <= selected ? " is-active" : ""}${value === selected ? " is-selected" : ""}`,
+        role: "button",
+        tabindex: "0",
+        "aria-label": `${metric.label} ${value}/5`,
+      });
+      segment.addEventListener("click", () => onSelect(metric, value));
+      segment.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") onSelect(metric, value);
       });
     }
     const valueText = createSvgElement(svg, "text", { x: 52, y: 48, class: "cx-daily-status-value", "text-anchor": "middle" });
@@ -204,6 +281,7 @@ class DailyStatusChild extends MarkdownRenderChild {
     super(container);
     this.app = app;
     this.file = file;
+    this.writeQueue = Promise.resolve();
   }
 
   onload() {
@@ -213,9 +291,20 @@ class DailyStatusChild extends MarkdownRenderChild {
     }));
   }
 
+  async setRating(metric, value) {
+    const write = async () => {
+      await this.app.fileManager.processFrontMatter(this.file, (frontmatter) => {
+        applyRating(frontmatter, metric.key, value);
+      });
+      new Notice(`${metric.label}: ${value}/5`);
+    };
+    this.writeQueue = this.writeQueue.then(write, write);
+    await this.writeQueue;
+  }
+
   render() {
     this.containerEl.empty();
-    renderReadonlyStatus(this.app, this.file, this.containerEl);
+    renderDailyStatus(this.app, this.file, this.containerEl, (metric, value) => this.setRating(metric, value));
   }
 }
 
@@ -540,24 +629,24 @@ class CastleXHomeView extends ItemView {
     const byDate = new Map(pages.map((page) => [String(page.frontmatter.date).slice(0, 10), page]));
     const todayISO = localISO();
     const yesterdayISO = localISO(addDays(new Date(), -1));
-    const completeAt = (iso) => completion(byDate.get(iso)?.frontmatter) === REQUIRED.length;
+    const voyageAt = (iso) => isVoyageDay(byDate.get(iso)?.frontmatter);
     const streakAt = (iso) => {
       let cursor = dateFromISO(iso);
       let count = 0;
-      while (cursor && completeAt(localISO(cursor))) {
+      while (cursor && voyageAt(localISO(cursor))) {
         count += 1;
         cursor = addDays(cursor, -1);
       }
       return count;
     };
-    const active = completeAt(todayISO) ? streakAt(todayISO) : streakAt(yesterdayISO);
+    const active = voyageAt(todayISO) ? streakAt(todayISO) : streakAt(yesterdayISO);
     let longest = 0;
     let running = 0;
     let previous = null;
     for (const page of pages) {
       const iso = String(page.frontmatter.date).slice(0, 10);
       const contiguous = previous && localISO(addDays(dateFromISO(previous), 1)) === iso;
-      running = completion(page.frontmatter) === REQUIRED.length ? (contiguous ? running + 1 : 1) : 0;
+      running = isVoyageDay(page.frontmatter) ? (contiguous ? running + 1 : 1) : 0;
       longest = Math.max(longest, running);
       previous = iso;
     }
@@ -566,7 +655,7 @@ class CastleXHomeView extends ItemView {
 
   async setRating(file, key, value) {
     await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
-      frontmatter[key] = Number(value);
+      applyRating(frontmatter, key, value);
     });
     new Notice(`${METRICS.find((metric) => metric.key === key)?.label ?? key}: ${value}/5`);
     await this.renderDashboard();
@@ -732,12 +821,16 @@ class CastleXHomeView extends ItemView {
     for (let offset = -13; offset <= 0; offset += 1) {
       const date = addDays(new Date(), offset);
       const iso = localISO(date);
-      const count = completion(streaks.byDate.get(iso)?.frontmatter);
-      if (count === REQUIRED.length) voyageDays += 1;
-      const day = track.createDiv({ cls: `cx-route-day cx-level-${count}${offset === 0 ? " is-today" : ""}` });
+      const frontmatter = streaks.byDate.get(iso)?.frontmatter;
+      const count = completion(frontmatter);
+      const voyage = isVoyageDay(frontmatter);
+      const entryType = stateEntryType(frontmatter);
+      if (voyage) voyageDays += 1;
+      const level = entryType === "retrospective" ? 0 : count;
+      const day = track.createDiv({ cls: `cx-route-day cx-level-${level}${offset === 0 ? " is-today" : ""}` });
       day.createSpan({ cls: "cx-route-node" });
       day.createSpan({ text: new Intl.DateTimeFormat("en-US", { weekday: "narrow" }).format(date), cls: "cx-route-weekday" });
-      day.setAttr("aria-label", `${iso}: ${count}/6`);
+      day.setAttr("aria-label", entryType === "retrospective" ? `${iso}: 休整日 · Retrospective` : `${iso}: ${count}/6`);
     }
     const sailingRate = Math.round(voyageDays / 14 * 100);
     route.createDiv({ text: `近14日航行 ${voyageDays}天 · 出海率 ${sailingRate}%`, cls: "cx-route-milestone" });
@@ -859,6 +952,9 @@ class CastleXHomeView extends ItemView {
     } else {
       legend.createSpan({ text: "至少 3 个完整记录日后显示平均", cls: "is-pending" });
     }
+    if (completePages.some((page) => stateEntryType(page.frontmatter) === "retrospective")) {
+      legend.createSpan({ text: "含休整日补录", cls: "is-retrospective" });
+    }
   }
 
   renderCalendar(parent, streaks) {
@@ -897,12 +993,21 @@ class CastleXHomeView extends ItemView {
       const iso = localISO(date);
       const page = streaks.byDate.get(iso);
       const count = completion(page?.frontmatter);
+      const entryType = stateEntryType(page?.frontmatter);
+      const voyage = isVoyageDay(page?.frontmatter);
       const cell = grid.createDiv({ cls: "cx-calendar-cell" });
-      const state = !page ? " is-uncreated" : count === REQUIRED.length ? " is-complete" : count > 0 ? " is-partial" : " has-note";
+      const state = !page ? " is-uncreated" : voyage ? " is-complete" : entryType === "retrospective" ? " cx-rest-day" : count > 0 ? " is-partial" : " has-note";
+      const description = !page
+        ? "click to create"
+        : entryType === "retrospective"
+          ? "休整日 · Retrospective data"
+          : voyage
+            ? "Voyage Day"
+            : `${count}/6 recorded`;
       const button = cell.createEl("button", {
         text: String(day),
         cls: `cx-calendar-day${state}${iso === localISO() ? " is-today" : ""}`,
-        attr: { "aria-label": `${iso}: ${page ? `${count}/6 recorded` : "create Daily Note"}`, title: `${iso}: ${page ? `${count}/6 recorded` : "click to create"}` },
+        attr: { "aria-label": `${iso}: ${description}` },
       });
       button.addEventListener("click", async () => {
         const file = page?.file ?? await this.ensureDaily(date);
@@ -988,7 +1093,8 @@ class CastleXHomeView extends ItemView {
     const byDate = new Map(pages.map((page) => [String(page.frontmatter.date).slice(0, 10), page.frontmatter]));
     return Array.from({ length: 14 }, (_, index) => {
       const date = addDays(new Date(), index - 13);
-      return { date, iso: localISO(date), value: rating(byDate.get(localISO(date))?.[key]) };
+      const frontmatter = byDate.get(localISO(date));
+      return { date, iso: localISO(date), value: rating(frontmatter?.[key]), entryType: stateEntryType(frontmatter) };
     });
   }
 
@@ -1031,7 +1137,10 @@ class CastleXHomeView extends ItemView {
       const x = xAt(index);
       const y = yAt(item.value);
       segment.push(`${x},${y}`);
-      this.createSvg(svg, "circle", { cx: x, cy: y, r: 4.5, class: "cx-trend-point" });
+      const retrospective = item.entryType === "retrospective";
+      const point = this.createSvg(svg, "circle", { cx: x, cy: y, r: 4.5, class: `cx-trend-point${retrospective ? " is-retrospective" : ""}` });
+      const title = this.createSvg(point, "title");
+      title.textContent = retrospective ? `${item.iso}: ${item.value}/5 · 休整日 Retrospective` : `${item.iso}: ${item.value}/5`;
     });
     flush();
     [0, 6, 13].forEach((index) => {
@@ -1040,7 +1149,8 @@ class CastleXHomeView extends ItemView {
     });
     const summary = card.createDiv({ cls: "cx-trend-summary" });
     summary.createSpan({ text: average === null ? "14 天暂无数据" : `14 天平均 ${average.toFixed(2)}` });
-    summary.createSpan({ text: `${values.length}/14 days recorded` });
+    const includesRetrospective = series.some((item) => item.value !== null && item.entryType === "retrospective");
+    summary.createSpan({ text: `${values.length}/14 days recorded${includesRetrospective ? " · 含休整日补录" : ""}` });
   }
 
   async renderDashboard() {

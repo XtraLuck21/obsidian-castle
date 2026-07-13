@@ -1,9 +1,9 @@
-# CastleX Data Schema v0.4
+# CastleX Data Schema v0.5
 
 ## Daily tracker
 
-A Daily Note becomes a **Voyage Day / 航行日** when all six required tracker
-fields contain a numeric value from 1 to 5:
+A Daily Note has a complete Daily State when all six required tracker fields
+contain a numeric value from 1 to 5:
 
 | Field | Meaning | Scale |
 | --- | --- | --- |
@@ -17,12 +17,35 @@ fields contain a numeric value from 1 to 5:
 Radar charts convert `stress` to `calmness = 6 - stress`, so every Radar axis
 uses the same “larger is better” direction.
 
+When the six fields first become complete, CastleX writes one source timestamp:
+
+```yaml
+state_recorded_at: 2026-07-13T21:30:00-07:00
+```
+
+The timestamp is preserved when a completed state is corrected later. Entry
+timing is derived from the Daily Note `date` and `state_recorded_at`; no separate
+status property is stored.
+
 ## Voyage streak
 
 - All six tracker values are required for a Voyage Day.
+- Same-day entries completed on the Daily Note date are Voyage Days.
+- A **Late entry** completed during the following local calendar day is also a
+  Voyage Day and counts toward the streak.
+- An entry completed from the second following day onward is Retrospective: its
+  values remain available to Radar and trend charts, but the date is a
+  **休整日**, is not illuminated in Calendar or the 14-day route, and does not
+  count toward current or longest streaks.
+- Complete legacy notes without `state_recorded_at` remain Voyage Days. CastleX
+  does not fabricate historical timestamps.
 - An incomplete current day does not break the streak before the day ends.
 - Missing or partial historical days break a streak.
 - Heatmap metrics do not affect the Voyage streak.
+
+The `castlex-status` block is interactive in every Daily Note. Opening an older
+note allows Late or Retrospective entry while displaying the resulting timing
+classification before and after completion.
 
 ## Daily sections
 

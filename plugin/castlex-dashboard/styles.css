@@ -149,6 +149,7 @@
 .cx-radar-legend .is-today { color: #e0e3dc; }
 .cx-radar-legend .is-average { color: #91b5c8; }
 .cx-radar-legend .is-pending { color: rgba(235,242,244,.4); }
+.cx-radar-legend .is-retrospective { color: rgba(210,190,160,.58); }
 
 .cx-calendar-nav { align-items: center; display: flex; gap: 3px; }
 .cx-calendar-nav button { align-items: center; background: transparent !important; border: 0 !important; box-shadow: none !important; color: rgba(239,244,245,.48); cursor: pointer; display: flex; font-size: .5rem; justify-content: center; min-height: 24px; padding: 3px 5px; }
@@ -159,10 +160,13 @@
 .cx-calendar-cell { align-items: center; display: flex; justify-content: center; min-height: 34px; min-width: 0; }
 .cx-calendar-cell.is-weekday { min-height: 24px; }
 .cx-calendar-weekday { color: rgba(239,244,245,.31); font-size: .53rem; line-height: 1; text-align: center; }
-.cx-calendar-day { align-items: center; background: rgba(255,255,255,.035); border: 1px solid transparent; border-radius: 8px; color: rgba(239,245,246,.61); cursor: pointer; display: flex; font-size: .58rem; height: clamp(30px,3.1vw,42px); justify-content: center; padding: 0; position: relative; width: clamp(30px,3.1vw,42px); }
+.cx-calendar-day { align-items: center; background: rgba(255,255,255,.035); border: 1px solid transparent; border-radius: 8px; color: rgba(239,245,246,.61); cursor: pointer; display: flex; font-size: .58rem; height: clamp(30px,3.1vw,42px); justify-content: center; padding: 0; position: relative; transition: background-color .15s ease, border-color .15s ease, color .15s ease; width: clamp(30px,3.1vw,42px); }
 .cx-calendar-day.has-note { background: rgba(255,255,255,.065); }
 .cx-calendar-day.is-partial { background: rgba(123,163,179,.23); }
 .cx-calendar-day.is-complete { background: rgba(216,223,219,.78); color: #172126; font-weight: 750; }
+.cx-calendar-day.cx-rest-day { background: rgba(123,163,179,.13) !important; border-color: rgba(181,204,213,.16) !important; box-shadow: none !important; color: rgba(239,245,246,.72); }
+.cx-calendar-day.cx-rest-day::after { bottom: 3px; color: rgba(205,220,225,.72); content: "R"; font-size: .36rem; font-weight: 750; line-height: 1; position: absolute; right: 4px; }
+.cx-calendar-day.cx-rest-day:hover { background: rgba(217,227,229,.14) !important; border-color: rgba(228,236,238,.2) !important; color: rgba(245,248,248,.9); }
 .cx-calendar-day.is-uncreated { background: rgba(255,255,255,.018); color: rgba(239,245,246,.38); }
 .cx-calendar-day.is-uncreated::after { color: rgba(240,246,246,0); content: "+"; font-size: .48rem; position: absolute; right: 3px; top: 0; transition: color .15s ease; }
 .cx-calendar-day.is-uncreated:hover::after { color: rgba(240,246,246,.48); }
@@ -197,6 +201,7 @@
 .cx-trend-axis, .cx-trend-date { fill: rgba(237,243,244,.42); font-size: 9px; }
 .cx-trend-line { fill: none; filter: drop-shadow(0 0 5px rgba(158,193,205,.2)); stroke: #a9c4ce; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2.6; }
 .cx-trend-point { fill: #e1e5e1; stroke: rgba(12,27,36,.9); stroke-width: 2; }
+.cx-trend-point.is-retrospective { fill: rgba(14,28,39,.95); stroke: rgba(218,198,164,.82); stroke-width: 2.2; }
 .cx-trend-summary { color: rgba(238,244,245,.48); display: flex; font-size: .54rem; justify-content: space-between; padding: 0 7px; }
 
 .daily-voyage .metadata-container,
@@ -213,9 +218,19 @@
   margin: 8px 0 20px;
   padding: 10px;
 }
+.cx-daily-status-meta { align-items: center; color: rgba(237,243,244,.52); display: flex; font-size: .58rem; gap: 9px; grid-column: 1 / -1; justify-content: space-between; padding: 0 3px 2px; }
+.cx-daily-status-badge { border: 1px solid rgba(220,229,231,.14); border-radius: 999px; color: rgba(238,244,244,.74); font-weight: 650; padding: 3px 8px; white-space: nowrap; }
+.cx-daily-status-meta.is-late .cx-daily-status-badge,
+.cx-daily-status-meta.is-late-pending .cx-daily-status-badge { border-color: rgba(151,190,205,.28); color: #a9ccd9; }
+.cx-daily-status-meta.is-retrospective .cx-daily-status-badge,
+.cx-daily-status-meta.is-retrospective-pending .cx-daily-status-badge { border-color: rgba(205,177,137,.27); color: #d2b98f; }
+.cx-daily-status-detail { overflow: hidden; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
 .cx-daily-status-item { min-width: 0; text-align: center; }
 .cx-daily-status-svg { display: block; height: 64px; margin: 0 auto -7px; max-width: 104px; width: 100%; }
 .cx-daily-status-segment { fill: none; stroke: rgba(225,235,238,.1); stroke-linecap: round; stroke-width: 9; }
+.cx-daily-status-segment.is-interactive { cursor: pointer; outline: none; }
+.cx-daily-status-segment.is-interactive:hover,
+.cx-daily-status-segment.is-interactive:focus { filter: drop-shadow(0 0 4px rgba(181,211,220,.38)); stroke: rgba(178,205,214,.75); }
 .cx-daily-status-segment.is-active { stroke: rgba(145,180,194,.6); }
 .cx-daily-status-segment.is-selected { filter: drop-shadow(0 0 4px rgba(224,230,226,.38)); stroke: #dce2df; }
 .cx-daily-status-value { fill: #edf2ef; font-size: 16px; font-weight: 700; }
@@ -309,6 +324,8 @@
 }
 
 @media (max-width: 520px) {
+  .cx-daily-status-meta { align-items: flex-start; flex-direction: column; gap: 5px; }
+  .cx-daily-status-detail { text-align: left; white-space: normal; }
   .cx-time-editor { grid-template-columns: 1fr; }
   .cx-time-controls { grid-template-columns: auto minmax(54px,1fr) auto auto auto; }
 }

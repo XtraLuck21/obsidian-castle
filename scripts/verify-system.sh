@@ -25,15 +25,20 @@ node --check "$plugin/main.js"
 pass "plugin JavaScript syntax"
 
 jq -e '.id == "castlex-dashboard" and (.version | type == "string") and (.name | type == "string") and (.minAppVersion | type == "string")' "$manifest" >/dev/null
-node -e 'const m=require(process.argv[1]); const p=m.version.split(".").map(Number); if (p[0] < 1 && (p[1] || 0) < 8) process.exit(1)' "$manifest" || fail "plugin version must be at least 0.8.0"
+node -e 'const m=require(process.argv[1]); const p=m.version.split(".").map(Number); if (p[0] < 1 && (p[1] || 0) < 9) process.exit(1)' "$manifest" || fail "plugin version must be at least 0.9.0"
 pass "manifest fields and version"
 
-fields=(sleep_quality physical_state stress energy agency appetite_stability project_minutes admin_minutes workout_minutes personal_enrichment_minutes project_minutes_origin admin_minutes_origin workout_minutes_origin personal_enrichment_minutes_origin time_data_reviewed)
+fields=(sleep_quality physical_state stress energy agency appetite_stability state_recorded_at project_minutes admin_minutes workout_minutes personal_enrichment_minutes project_minutes_origin admin_minutes_origin workout_minutes_origin personal_enrichment_minutes_origin time_data_reviewed)
 for field in "${fields[@]}"; do
   rg -q "^${field}:" "$template" || fail "Daily template missing $field"
   rg -q "\`${field}\`|${field}:" "$schema" || fail "Schema missing $field"
 done
 pass "Daily template and Schema core fields"
+
+rg -q 'Late entry' "$schema" || fail "Schema missing late-entry rule"
+rg -q '休整日' "$schema" || fail "Schema missing retrospective rest-day rule"
+rg -q 'state_recorded_at' "$plugin/main.js" || fail "Dashboard missing Daily State timestamp support"
+pass "Daily State timing and voyage eligibility rules"
 
 rg -q '^focus: false$' "$project_template" || fail "Project template missing focus default"
 rg -q '^progress_sections:$' "$project_template" || fail "Project template missing progress sections"

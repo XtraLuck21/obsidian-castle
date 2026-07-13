@@ -29,7 +29,7 @@ committed to this repository.
 
 - Full-screen night-voyage Dashboard with glass panels
 - Six-dimension Daily check-in stored in YAML
-- Read-only Daily status gauges and radar chart
+- Editable Daily status gauges with Late entry and Retrospective provenance
 - 14-day Energy/Sleep trend chart
 - Responsive time-driven Heatmap with Project/Admin/Workout/Personal Enrichment views
 - Four editable Apple Fitness-inspired time rings in each Daily Note
@@ -128,11 +128,20 @@ stress: 2
 energy: 4
 agency: 3
 appetite_stability: 4
+state_recorded_at: 2099-01-01T20:00:00-08:00
 ```
 
-A day counts as a Voyage Day when all six fields contain values from `1` to
-`5`. The note keeps `Raw Notes` at the end so AI processing never needs to
-replace the original human writing.
+A day counts as a Voyage Day when all six fields contain values from `1` to `5`
+and are completed either on the note date or during the following local calendar
+day. CastleX records the first complete time in `state_recorded_at`. Entries
+completed later are shown as **休整日 · Retrospective**: their values remain in
+Radar and trend charts but do not illuminate Calendar or count toward streaks.
+Complete legacy notes without a timestamp remain Voyage Days. Daily State can
+be edited from either the current Dashboard or the status gauges inside any
+Daily Note.
+
+The note keeps `Raw Notes` at the end so AI processing never needs to replace
+the original human writing.
 
 Daily Notes also include a `Time Allocation` card. Its four rings can be edited
 manually in 15-minute steps or filled by an AI-assisted review. After Raw Notes

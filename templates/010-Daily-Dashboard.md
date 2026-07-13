@@ -9,6 +9,7 @@ stress:
 energy:
 agency:
 appetite_stability:
+state_recorded_at:
 project_minutes:
 admin_minutes:
 workout_minutes:

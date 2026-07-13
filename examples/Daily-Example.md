@@ -9,6 +9,7 @@ stress: 2
 energy: 4
 agency: 3
 appetite_stability: 4
+state_recorded_at: 2099-01-01T20:00:00-08:00
 project_minutes: 120
 admin_minutes: 40
 workout_minutes: 50
