@@ -7,7 +7,7 @@ AI-assisted reviews, and long-term personal knowledge management.
 > AI 总结分离管理的 Obsidian 系统。这个公开仓库只包含系统代码与虚构示例，
 > 不包含作者的真实 Vault 或私人笔记。
 
-![Night-voyage visual direction](assets/night-voyage-modern.png)
+![Blue-hour rain-glass beach visual direction](assets/rain-glass-sunset-beach-v2.webp)
 
 ## What this repository is
 
@@ -27,7 +27,16 @@ committed to this repository.
 
 ## Dashboard features
 
-- Full-screen night-voyage Dashboard with glass panels
+- Full-screen blue-hour rain-glass Dashboard with separate 3072×2048 desktop and 1440×2560 mobile backgrounds
+- Viewport-sized sticky background layer prevents long mobile dashboards from upscaling one image across the full scroll height
+- Persistent mobile ship-wheel button returns directly to CastleX Home from notes and other views
+- Dashboard Check-in writes are serialized so rapid multi-field entry cannot overwrite earlier ratings
+- Daily State and Time Allocation render from the current Markdown file instead of relying on potentially stale cross-device metadata cache
+- Desktop remains the automatic Daily creator; mobile waits for the canonical iCloud file and requires explicit confirmation before creating a missing Daily
+- Same-device Daily creation is locked and Dashboard date queries prefer the canonical `YYYY-MM-DD.md` path over iCloud conflict copies
+- When a canonical Daily exists, device-local same-date conflict copies are moved into `99_Archive/Sync-Conflicts/<date>/` without deletion or automatic value merging
+- Desktop cards use a light background blur for contrast; mobile cards stay blur-free for sharp rendering
+- Deep-navy Obsidian color system for app chrome, notes, controls, and accents
 - Six-dimension Daily check-in stored in YAML
 - Editable Daily status gauges with Late entry and Retrospective provenance
 - 14-day Energy/Sleep trend chart

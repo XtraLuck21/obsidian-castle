@@ -1,3 +1,5 @@
 night-voyage-dashboard.png
 night-voyage-modern.png
-
+rain-glass-navy.webp
+rain-glass-sunset-beach-v2.webp
+rain-glass-sunset-mobile-v1.webp

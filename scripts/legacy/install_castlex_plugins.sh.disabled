@@ -42,6 +42,4 @@ install_latest() {
 
 install_latest "obsidian-tasks-group/obsidian-tasks" "obsidian-tasks-plugin"
 install_latest "SilentVoid13/Templater" "templater-obsidian"
-install_latest "mProjectsCode/obsidian-meta-bind-plugin" "obsidian-meta-bind-plugin"
 install_latest "chhoumann/quickadd" "quickadd"
-

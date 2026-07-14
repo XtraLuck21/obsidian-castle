@@ -25,8 +25,28 @@ node --check "$plugin/main.js"
 pass "plugin JavaScript syntax"
 
 jq -e '.id == "castlex-dashboard" and (.version | type == "string") and (.name | type == "string") and (.minAppVersion | type == "string")' "$manifest" >/dev/null
-node -e 'const m=require(process.argv[1]); const p=m.version.split(".").map(Number); if (p[0] < 1 && (p[1] || 0) < 9) process.exit(1)' "$manifest" || fail "plugin version must be at least 0.9.0"
+node -e 'const m=require(process.argv[1]); const p=m.version.split(".").map(Number); if (p[0] < 1 && (p[1] || 0) < 10) process.exit(1)' "$manifest" || fail "plugin version must be at least 0.10.0"
 pass "manifest fields and version"
+
+rg -q 'rain-glass-sunset-beach-v2.webp' "$plugin/main.js" || fail "Dashboard missing rain-glass sunset beach background"
+rg -q '^rain-glass-sunset-beach-v2.webp$' "$SYSTEM_ROOT/assets/allowlist.txt" || fail "Rain-glass sunset beach background missing from asset allowlist"
+rg -q 'rain-glass-sunset-mobile-v1.webp' "$plugin/main.js" || fail "Dashboard missing portrait mobile sunset background"
+rg -q '^rain-glass-sunset-mobile-v1.webp$' "$SYSTEM_ROOT/assets/allowlist.txt" || fail "Portrait mobile sunset background missing from asset allowlist"
+rg -q 'cx-background-layer' "$plugin/main.js" || fail "Dashboard missing viewport-sized background layer"
+pass "responsive desktop/mobile rain-glass backgrounds"
+
+rg -q 'Platform.isMobile' "$plugin/main.js" || fail "Dashboard missing mobile return entry"
+rg -q 'cx-mobile-home-button' "$plugin/main.js" || fail "Dashboard missing mobile home button"
+rg -Fq 'this.writeQueue = this.writeQueue.then(write, write)' "$plugin/main.js" || fail "Dashboard missing serialized Check-in writes"
+rg -q 'freshFrontmatter' "$plugin/main.js" || fail "Dashboard missing fresh frontmatter reads"
+rg -Fq 'await app.vault.read(file)' "$plugin/main.js" || fail "Dashboard fresh frontmatter reads do not bypass stale cache"
+pass "mobile Dashboard entry, serialized writes, and fresh frontmatter reads"
+
+rg -q 'dailyCreationPromises' "$plugin/main.js" || fail "Dashboard missing Daily creation lock"
+rg -q 'renderDailySyncPending' "$plugin/main.js" || fail "Dashboard missing mobile Daily sync gate"
+rg -Fq 'options.allowCreate ?? !Platform.isMobile' "$plugin/main.js" || fail "Mobile still auto-creates missing Daily files"
+rg -q 'archiveDailyConflicts' "$plugin/main.js" || fail "Dashboard missing device-local conflict archiving"
+pass "single canonical Daily creation and conflict-archiving policy"
 
 fields=(sleep_quality physical_state stress energy agency appetite_stability state_recorded_at project_minutes admin_minutes workout_minutes personal_enrichment_minutes project_minutes_origin admin_minutes_origin workout_minutes_origin personal_enrichment_minutes_origin time_data_reviewed)
 for field in "${fields[@]}"; do

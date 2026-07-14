@@ -2,16 +2,19 @@ const {
   ItemView,
   MarkdownRenderChild,
   Notice,
+  Platform,
   Plugin,
   TFile,
   normalizePath,
+  parseYaml,
   setIcon,
 } = require("obsidian");
 
 const VIEW_TYPE = "castlex-home";
 const DAILY_ROOT = "10_Journal/Daily";
 const PROJECT_ROOT = "30_Projects";
-const ASSET_PATH = "90_System/Assets/night-voyage-modern.png";
+const DESKTOP_ASSET_PATH = "90_System/Assets/rain-glass-sunset-beach-v2.webp";
+const MOBILE_ASSET_PATH = "90_System/Assets/rain-glass-sunset-mobile-v1.webp";
 const REQUIRED = [
   "sleep_quality",
   "physical_state",
@@ -176,6 +179,18 @@ function applyRating(frontmatter, key, value, now = new Date()) {
   }
 }
 
+async function freshFrontmatter(app, file) {
+  try {
+    const content = await app.vault.read(file);
+    const match = content.match(/^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+    if (!match) return {};
+    return parseYaml(match[1]) ?? {};
+  } catch (error) {
+    console.warn(`CastleX could not read fresh frontmatter for ${file.path}; using metadata cache`, error);
+    return app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+  }
+}
+
 function stateStatusPresentation(frontmatter, now = new Date()) {
   const type = stateEntryType(frontmatter);
   const recordedDate = isoDateValue(frontmatter?.state_recorded_at);
@@ -243,8 +258,7 @@ function miniGaugePath(index) {
   return `M ${points.join(" L ")}`;
 }
 
-function renderDailyStatus(app, file, container, onSelect) {
-  const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+function renderDailyStatus(frontmatter, container, onSelect) {
   const wrap = container.createDiv({ cls: "cx-daily-status" });
   const presentation = stateStatusPresentation(frontmatter);
   if (presentation) {
@@ -289,6 +303,9 @@ class DailyStatusChild extends MarkdownRenderChild {
     this.registerEvent(this.app.metadataCache.on("changed", (changedFile) => {
       if (changedFile.path === this.file.path) this.render();
     }));
+    this.registerEvent(this.app.vault.on("modify", (changedFile) => {
+      if (changedFile.path === this.file.path) this.render();
+    }));
   }
 
   async setRating(metric, value) {
@@ -302,9 +319,11 @@ class DailyStatusChild extends MarkdownRenderChild {
     await this.writeQueue;
   }
 
-  render() {
+  async render() {
+    const frontmatter = await freshFrontmatter(this.app, this.file);
+    if (!this.containerEl.isConnected) return;
     this.containerEl.empty();
-    renderDailyStatus(this.app, this.file, this.containerEl, (metric, value) => this.setRating(metric, value));
+    renderDailyStatus(frontmatter, this.containerEl, (metric, value) => this.setRating(metric, value));
   }
 }
 
@@ -321,10 +340,9 @@ class DailyTimeRingsChild extends MarkdownRenderChild {
     this.registerEvent(this.app.metadataCache.on("changed", (changedFile) => {
       if (changedFile.path === this.file.path) this.render();
     }));
-  }
-
-  frontmatter() {
-    return this.app.metadataCache.getFileCache(this.file)?.frontmatter ?? {};
+    this.registerEvent(this.app.vault.on("modify", (changedFile) => {
+      if (changedFile.path === this.file.path) this.render();
+    }));
   }
 
   async setMinutes(metric, nextValue) {
@@ -360,9 +378,10 @@ class DailyTimeRingsChild extends MarkdownRenderChild {
     await this.writeQueue;
   }
 
-  render() {
+  async render() {
+    const frontmatter = await freshFrontmatter(this.app, this.file);
+    if (!this.containerEl.isConnected) return;
     this.containerEl.empty();
-    const frontmatter = this.frontmatter();
     const values = TIME_METRICS.map((metric) => minutesValue(frontmatter[metric.key]));
     const wrap = this.containerEl.createDiv({ cls: "cx-time-allocation" });
     const visual = wrap.createDiv({ cls: "cx-time-rings-visual" });
@@ -456,6 +475,7 @@ class CastleXHomeView extends ItemView {
     this.taskProjectPath = null;
     this.renderTimer = null;
     this.heatmapObserver = null;
+    this.writeQueue = Promise.resolve();
   }
 
   getViewType() {
@@ -544,13 +564,35 @@ class CastleXHomeView extends ItemView {
     return content;
   }
 
-  async ensureDaily(date = new Date()) {
+  async ensureDaily(date = new Date(), options = {}) {
     const path = this.dailyPath(date);
     const existing = this.app.vault.getAbstractFileByPath(path);
     if (existing instanceof TFile) return existing;
-    await this.ensureFolder(path.split("/").slice(0, -1).join("/"));
-    const content = await this.createDailyContent(date);
-    return this.app.vault.create(path, content);
+    const allowCreate = options.allowCreate ?? !Platform.isMobile;
+    if (!allowCreate) return null;
+
+    const pending = this.plugin.dailyCreationPromises.get(path);
+    if (pending) return pending;
+
+    const creation = (async () => {
+      await this.ensureFolder(path.split("/").slice(0, -1).join("/"));
+      const afterFolder = this.app.vault.getAbstractFileByPath(path);
+      if (afterFolder instanceof TFile) return afterFolder;
+      const content = await this.createDailyContent(date);
+      try {
+        return await this.app.vault.create(path, content);
+      } catch (error) {
+        const concurrent = this.app.vault.getAbstractFileByPath(path);
+        if (concurrent instanceof TFile) return concurrent;
+        throw error;
+      }
+    })();
+    this.plugin.dailyCreationPromises.set(path, creation);
+    try {
+      return await creation;
+    } finally {
+      this.plugin.dailyCreationPromises.delete(path);
+    }
   }
 
   frontmatter(file) {
@@ -558,11 +600,55 @@ class CastleXHomeView extends ItemView {
   }
 
   dailyPages() {
-    return this.app.vault.getMarkdownFiles()
+    const pages = this.app.vault.getMarkdownFiles()
       .filter((file) => file.path.startsWith(`${DAILY_ROOT}/`))
       .map((file) => ({ file, frontmatter: this.frontmatter(file) }))
-      .filter((page) => page.frontmatter.type === "daily" && page.frontmatter.date)
+      .filter((page) => page.frontmatter.type === "daily" && page.frontmatter.date);
+    const byDate = new Map();
+    pages.forEach((page) => {
+      const iso = isoDateValue(page.frontmatter.date);
+      if (!iso) return;
+      const canonicalPath = `${DAILY_ROOT}/${iso.slice(0, 4)}/${iso.slice(5, 7)}/${iso}.md`;
+      const current = byDate.get(iso);
+      const pageIsCanonical = page.file.path === canonicalPath;
+      const currentIsCanonical = current?.file.path === canonicalPath;
+      if (!current || (pageIsCanonical && !currentIsCanonical) || (!currentIsCanonical && page.file.stat.mtime > current.file.stat.mtime)) {
+        byDate.set(iso, page);
+      }
+    });
+    return [...byDate.values()]
       .sort((a, b) => String(a.frontmatter.date).localeCompare(String(b.frontmatter.date)));
+  }
+
+  async archiveDailyConflicts(date = new Date()) {
+    const iso = localISO(date);
+    const canonicalPath = this.dailyPath(date);
+    const canonical = this.app.vault.getAbstractFileByPath(canonicalPath);
+    if (!(canonical instanceof TFile)) return 0;
+
+    const directory = canonicalPath.split("/").slice(0, -1).join("/");
+    const candidates = this.app.vault.getMarkdownFiles()
+      .filter((file) => file.parent?.path === directory && file.path !== canonicalPath);
+    const conflicts = [];
+    for (const file of candidates) {
+      const frontmatter = await freshFrontmatter(this.app, file);
+      if (isoDateValue(frontmatter.date) === iso && frontmatter.type === "daily") conflicts.push(file);
+    }
+    if (!conflicts.length) return 0;
+
+    const archiveRoot = `99_Archive/Sync-Conflicts/${iso}`;
+    await this.ensureFolder(archiveRoot);
+    for (const file of conflicts) {
+      let destination = `${archiveRoot}/${file.name}`;
+      let suffix = 2;
+      while (this.app.vault.getAbstractFileByPath(destination)) {
+        destination = `${archiveRoot}/${file.basename}-${suffix}.${file.extension}`;
+        suffix += 1;
+      }
+      await this.app.vault.rename(file, normalizePath(destination));
+    }
+    new Notice(`Archived ${conflicts.length} duplicate Daily file${conflicts.length === 1 ? "" : "s"} for ${iso}`);
+    return conflicts.length;
   }
 
   projectPages() {
@@ -654,11 +740,15 @@ class CastleXHomeView extends ItemView {
   }
 
   async setRating(file, key, value) {
-    await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
-      applyRating(frontmatter, key, value);
-    });
-    new Notice(`${METRICS.find((metric) => metric.key === key)?.label ?? key}: ${value}/5`);
-    await this.renderDashboard();
+    const write = async () => {
+      await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+        applyRating(frontmatter, key, value);
+      });
+      new Notice(`${METRICS.find((metric) => metric.key === key)?.label ?? key}: ${value}/5`);
+    };
+    this.writeQueue = this.writeQueue.then(write, write);
+    await this.writeQueue;
+    this.scheduleRender();
   }
 
   async completeTask(task) {
@@ -1153,39 +1243,75 @@ class CastleXHomeView extends ItemView {
     summary.createSpan({ text: `${values.length}/14 days recorded${includesRetrospective ? " · 含休整日补录" : ""}` });
   }
 
+  createDashboardCanvas() {
+    this.contentEl.empty();
+    this.contentEl.addClass("castlex-home-view");
+    const shell = this.contentEl.createDiv({ cls: "cx-shell" });
+    const desktopAsset = this.app.vault.getAbstractFileByPath(DESKTOP_ASSET_PATH);
+    const mobileAsset = this.app.vault.getAbstractFileByPath(MOBILE_ASSET_PATH);
+    if (desktopAsset instanceof TFile) shell.style.setProperty("--cx-background-desktop", `url("${this.app.vault.getResourcePath(desktopAsset)}")`);
+    if (mobileAsset instanceof TFile) shell.style.setProperty("--cx-background-mobile", `url("${this.app.vault.getResourcePath(mobileAsset)}")`);
+    shell.createDiv({ cls: "cx-background-layer", attr: { "aria-hidden": "true" } });
+    return shell.createDiv({ cls: "cx-dashboard-content" });
+  }
+
+  renderDailySyncPending(date) {
+    const dashboard = this.createDashboardCanvas();
+    const card = dashboard.createDiv({ cls: "cx-card cx-daily-sync-pending" });
+    card.createEl("h2", { text: `${localISO(date)} Daily 尚未同步` });
+    card.createEl("p", { text: "手机不会自动创建第二份 Daily。请先等待 iCloud；如果今天确实还没有文件，再确认在本机创建。" });
+    const actions = card.createDiv({ cls: "cx-daily-sync-actions" });
+    const retry = actions.createEl("button", { text: "重新检查 iCloud", cls: "cx-button cx-button-primary" });
+    retry.addEventListener("click", () => this.renderDashboard());
+    const create = actions.createEl("button", { text: "确认在本机创建", cls: "cx-button" });
+    create.addEventListener("click", async () => {
+      create.disabled = true;
+      try {
+        await this.ensureDaily(date, { allowCreate: true });
+        await this.renderDashboard();
+      } finally {
+        create.disabled = false;
+      }
+    });
+  }
+
   async renderDashboard() {
     this.heatmapObserver?.disconnect();
     const now = new Date();
     this.currentDateISO = localISO(now);
+    await this.archiveDailyConflicts(now);
     const todayFile = await this.ensureDaily(now);
-    const pages = this.dailyPages();
-    const todayFrontmatter = this.frontmatter(todayFile);
+    if (!(todayFile instanceof TFile)) {
+      this.renderDailySyncPending(now);
+      return;
+    }
+    const todayFrontmatter = await freshFrontmatter(this.app, todayFile);
+    const pages = [
+      ...this.dailyPages().filter((page) => page.file.path !== todayFile.path),
+      { file: todayFile, frontmatter: todayFrontmatter },
+    ].sort((a, b) => String(a.frontmatter.date).localeCompare(String(b.frontmatter.date)));
     const projects = this.projectPages();
     const taskGroups = await this.collectProjectTasks(projects);
     const focusTaskGroups = taskGroups.filter((group) => group.project.frontmatter.focus === true);
     const streaks = this.calculateStreaks(pages);
 
-    this.contentEl.empty();
-    this.contentEl.addClass("castlex-home-view");
-    const shell = this.contentEl.createDiv({ cls: "cx-shell" });
-    const asset = this.app.vault.getAbstractFileByPath(ASSET_PATH);
-    if (asset instanceof TFile) shell.style.setProperty("--cx-background", `url("${this.app.vault.getResourcePath(asset)}")`);
+    const dashboard = this.createDashboardCanvas();
 
-    const top = shell.createDiv({ cls: "cx-top-grid" });
+    const top = dashboard.createDiv({ cls: "cx-top-grid" });
     const left = top.createDiv({ cls: "cx-top-left" });
     this.renderHero(left, todayFile);
     this.renderKpis(left, todayFrontmatter, streaks);
     this.renderProjects(top, projects, taskGroups);
     this.renderTasks(top, focusTaskGroups);
 
-    this.renderRoute(shell, streaks);
+    this.renderRoute(dashboard, streaks);
 
-    const primary = shell.createDiv({ cls: "cx-primary-grid" });
+    const primary = dashboard.createDiv({ cls: "cx-primary-grid" });
     this.renderCheckin(primary, todayFile, todayFrontmatter);
     this.renderRadar(primary, todayFrontmatter, pages);
     this.renderCalendar(primary, streaks);
 
-    const secondary = shell.createDiv({ cls: "cx-secondary-grid" });
+    const secondary = dashboard.createDiv({ cls: "cx-secondary-grid" });
     this.renderHeatmap(secondary, streaks);
     this.renderTrend(secondary, pages);
   }
@@ -1193,6 +1319,8 @@ class CastleXHomeView extends ItemView {
 
 module.exports = class CastleXDashboardPlugin extends Plugin {
   async onload() {
+    this.mobileHomeButton = null;
+    this.dailyCreationPromises = new Map();
     this.registerView(VIEW_TYPE, (leaf) => new CastleXHomeView(leaf, this));
     this.registerMarkdownCodeBlockProcessor("castlex-status", (_source, element, context) => {
       const file = this.app.vault.getAbstractFileByPath(context.sourcePath);
@@ -1204,7 +1332,28 @@ module.exports = class CastleXDashboardPlugin extends Plugin {
     });
     this.addRibbonIcon("ship-wheel", "Open CastleX Home", () => this.activateView());
     this.addCommand({ id: "open-home", name: "Open CastleX Home", callback: () => this.activateView() });
-    this.app.workspace.onLayoutReady(() => this.activateView());
+    this.app.workspace.onLayoutReady(() => {
+      this.activateView();
+      this.setupMobileHomeButton();
+    });
+  }
+
+  setupMobileHomeButton() {
+    if (!Platform.isMobile || this.mobileHomeButton) return;
+    const button = this.app.workspace.containerEl.createEl("button", {
+      cls: "cx-mobile-home-button",
+      attr: { type: "button", "aria-label": "返回 CastleX Dashboard" },
+    });
+    setIcon(button, "ship-wheel");
+    this.mobileHomeButton = button;
+    this.registerDomEvent(button, "click", () => this.activateView());
+    this.registerEvent(this.app.workspace.on("active-leaf-change", (leaf) => this.updateMobileHomeButton(leaf)));
+    this.updateMobileHomeButton(this.app.workspace.getMostRecentLeaf?.() ?? this.app.workspace.activeLeaf);
+  }
+
+  updateMobileHomeButton(leaf) {
+    const onDashboard = leaf?.view?.getViewType?.() === VIEW_TYPE;
+    this.mobileHomeButton?.classList.toggle("is-hidden", onDashboard);
   }
 
   async activateView() {
@@ -1217,6 +1366,8 @@ module.exports = class CastleXDashboardPlugin extends Plugin {
   }
 
   onunload() {
+    this.mobileHomeButton?.remove();
+    this.mobileHomeButton = null;
     this.app.workspace.detachLeavesOfType(VIEW_TYPE);
   }
 };
