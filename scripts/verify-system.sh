@@ -17,6 +17,7 @@ pass() { echo "✓ $*"; }
 
 plugin="$SYSTEM_ROOT/plugin/castlex-dashboard"
 template="$SYSTEM_ROOT/templates/010-Daily-Dashboard.md"
+weekly_template="$SYSTEM_ROOT/templates/020-Weekly-Review.md"
 schema="$SYSTEM_ROOT/schemas/CastleX-Data-Schema.md"
 manifest="$plugin/manifest.json"
 project_template="$SYSTEM_ROOT/templates/100-Project.md"
@@ -89,6 +90,17 @@ for deprecated in project_contribution admin_load activity_origin activity_revie
   fi
 done
 pass "time-ring block and four-section Daily synthesis structure"
+
+rg -q '^```castlex-weekly-snapshot$' "$weekly_template" || fail "Weekly template missing weekly snapshot block"
+for field in period_start period_end; do
+  rg -q "^${field}:" "$weekly_template" || fail "Weekly template missing $field"
+done
+rg -q 'castlex-weekly-snapshot' "$plugin/main.js" || fail "Dashboard missing Weekly Snapshot processor"
+if rg -q 'cx-weekly-review|Verify AI review|Weekly AI review' "$plugin/main.js" "$plugin/styles.css" "$weekly_template"; then
+  fail "Weekly Snapshot still contains AI review controls"
+fi
+rg -q 'Weekly Review' "$schema" || fail "Schema missing Weekly Review rules"
+pass "Weekly Snapshot, source period, and read-only derived data"
 
 for script in "$SYSTEM_ROOT"/scripts/*.sh; do bash -n "$script"; done
 pass "shell script syntax"

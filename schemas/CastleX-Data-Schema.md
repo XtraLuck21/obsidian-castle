@@ -65,6 +65,10 @@ only in Project notes. All four synthesis sections use flat bullet lists.
 `Today’s Wins` must not repeat the accomplishment list: it recognizes how the
 day was handled, while `Completed Today` records what was finished. AI must not
 invent an Open Loop or Backlog item when the source provides no evidence.
+`Today’s Wins` contains three to five highest-priority observations. Overlapping
+observations are consolidated rather than expanded into an exhaustive list. Cross-day
+patterns are not repeated in Daily Notes; Weekly Review decides whether the
+accumulated evidence supports a pattern.
 
 Daily Notes do not contain an `AI Summary` or `Decisions & Insights` section.
 Cross-day AI synthesis belongs in the Weekly Review under `AI Weekly Summary`,
@@ -97,6 +101,11 @@ time_data_reviewed: false
   user's source record.
 - `time_data_reviewed: false` means one or more AI-filled values still await
   human confirmation. Review status does not change their origin.
+- The interactive Time Allocation card displays AI values as
+  `AI · Unreviewed` until the human selects `Verify AI time`. Verification
+  changes only `time_data_reviewed` to `true`; the provenance remains `ai` and
+  the badge becomes `AI · Verified`. `Reopen review` reverses only the review
+  flag.
 - Original human text remains the source of truth.
 
 ### Category boundaries
@@ -192,10 +201,44 @@ no checkboxes contributes zero progress. This model supports numeric work,
 qualitative deliverables, and retrospectives without Project-specific fields or
 double counting.
 
+## Weekly Review
+
+Weekly Review files live under `10_Journal/Weekly/` and declare their source
+period explicitly. Standard review periods run from Sunday through Saturday so
+adjacent Weekly Reviews remain continuous and non-overlapping:
+
+```yaml
+type: weekly-review
+period_start: 2026-07-12
+period_end: 2026-07-18
+origin: mixed
+```
+
+The `castlex-weekly-snapshot` block reads the canonical Daily Notes inside that
+inclusive period. It renders one aligned state chart for Sleep, Energy, and
+Agency plus one stacked daily chart for the four Time Allocation categories.
+The snapshot is computed from Daily YAML and never writes derived totals back
+to the Weekly file. It is read-only derived information and does not require a
+separate review status. When a human changes a Daily value after AI assistance,
+the current Daily YAML value and its human origin take precedence in every
+subsequent Weekly Snapshot. Human additions belong in `My Reflection` or
+`Next Week · My Decision`; they do not silently become AI text.
+
+Weekly AI output is intentionally brief:
+
+- `AI Weekly Summary`: at most three highest-priority evidence-backed bullets.
+- `AI Week-over-Week Comparison`: at most two bullets; no comparison without a
+  reliable earlier Weekly Review.
+- `AI Navigation Advice`: at most two suggestions, clearly labeled as advice.
+
 ## Provenance
 
 - Unmarked prose is human-authored by default.
 - AI text must use an AI callout or `origin: ai`.
-- AI must include generation time, sources, and review status.
+- AI must include generation time and sources. Workflows that support a review
+  state must also show that status.
 - Reviewing AI output does not change its origin.
 - Codex must never silently rewrite `Raw Notes`.
+- Raw Notes remain in chronological insertion order from earliest to latest.
+  Later additions and corrections are appended after existing content; they are
+  never prepended or used to reorder earlier entries.

@@ -89,6 +89,29 @@ function dateFromISO(value) {
   return match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : null;
 }
 
+function dailyPathFromISO(value) {
+  const iso = isoDateValue(value);
+  return iso ? `${DAILY_ROOT}/${iso.slice(0, 4)}/${iso.slice(5, 7)}/${iso}.md` : null;
+}
+
+function dateRange(startValue, endValue, maximumDays = 31) {
+  const start = dateFromISO(isoDateValue(startValue));
+  const end = dateFromISO(isoDateValue(endValue));
+  if (!start || !end || start > end) return [];
+  const dates = [];
+  let cursor = start;
+  while (cursor <= end && dates.length < maximumDays) {
+    dates.push(new Date(cursor));
+    cursor = addDays(cursor, 1);
+  }
+  return dates;
+}
+
+function average(values) {
+  const numeric = values.filter((value) => Number.isFinite(value));
+  return numeric.length ? numeric.reduce((sum, value) => sum + value, 0) / numeric.length : null;
+}
+
 function isoWeek(date) {
   const utc = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const day = utc.getUTCDay() || 7;
@@ -367,12 +390,12 @@ class DailyTimeRingsChild extends MarkdownRenderChild {
     await this.writeQueue;
   }
 
-  async confirmAIValues() {
+  async setAIReviewStatus(reviewed) {
     const write = async () => {
       await this.app.fileManager.processFrontMatter(this.file, (frontmatter) => {
-        frontmatter.time_data_reviewed = true;
+        frontmatter.time_data_reviewed = reviewed;
       });
-      new Notice("AI time values marked as reviewed");
+      new Notice(reviewed ? "AI time values verified" : "AI time review reopened");
     };
     this.writeQueue = this.writeQueue.then(write, write);
     await this.writeQueue;
@@ -383,6 +406,7 @@ class DailyTimeRingsChild extends MarkdownRenderChild {
     if (!this.containerEl.isConnected) return;
     this.containerEl.empty();
     const values = TIME_METRICS.map((metric) => minutesValue(frontmatter[metric.key]));
+    const timeDataReviewed = frontmatter.time_data_reviewed === true;
     const wrap = this.containerEl.createDiv({ cls: "cx-time-allocation" });
     const visual = wrap.createDiv({ cls: "cx-time-rings-visual" });
     const svg = createSvgElement(visual, "svg", { viewBox: "0 0 250 250", class: "cx-time-rings-svg" });
@@ -431,7 +455,11 @@ class DailyTimeRingsChild extends MarkdownRenderChild {
         cls: "cx-time-level",
       });
       if (origin === "human" || origin === "ai") {
-        meta.createSpan({ text: origin === "ai" ? "AI" : "Human", cls: `cx-time-origin is-${origin}` });
+        const originText = origin === "ai"
+          ? `AI · ${timeDataReviewed ? "Verified" : "Unreviewed"}`
+          : "Human";
+        const reviewClass = origin === "ai" ? ` is-${timeDataReviewed ? "verified" : "unreviewed"}` : "";
+        meta.createSpan({ text: originText, cls: `cx-time-origin is-${origin}${reviewClass}` });
       }
 
       const controls = row.createDiv({ cls: "cx-time-controls" });
@@ -455,12 +483,218 @@ class DailyTimeRingsChild extends MarkdownRenderChild {
     });
 
     const hasAI = TIME_METRICS.some((metric) => frontmatter[metric.originKey] === "ai");
-    if (hasAI && frontmatter.time_data_reviewed !== true) {
-      const review = wrap.createDiv({ cls: "cx-time-review" });
-      review.createSpan({ text: "AI-filled time values are awaiting review." });
-      const confirm = review.createEl("button", { text: "Confirm values", cls: "cx-time-confirm" });
-      confirm.addEventListener("click", () => this.confirmAIValues());
+    if (hasAI) {
+      const reviewState = timeDataReviewed ? "verified" : "unreviewed";
+      const review = wrap.createDiv({ cls: `cx-time-review is-${reviewState}` });
+      review.createSpan({
+        text: timeDataReviewed
+          ? "AI-filled time values have been verified by you."
+          : "AI-filled time values are awaiting your review.",
+        cls: "cx-time-review-state",
+      });
+      const action = review.createEl("button", {
+        text: timeDataReviewed ? "Reopen review" : "Verify AI time",
+        cls: `cx-time-confirm${timeDataReviewed ? " is-secondary" : ""}`,
+        attr: {
+          type: "button",
+          "aria-label": timeDataReviewed ? "Reopen AI time review" : "Verify AI time values",
+        },
+      });
+      action.addEventListener("click", () => this.setAIReviewStatus(!timeDataReviewed));
     }
+  }
+}
+
+class WeeklySnapshotChild extends MarkdownRenderChild {
+  constructor(container, app, file) {
+    super(container);
+    this.app = app;
+    this.file = file;
+    this.periodPaths = new Set();
+    this.renderTimer = null;
+  }
+
+  onload() {
+    this.render();
+    const schedule = (changedFile) => {
+      if (changedFile.path !== this.file.path && !this.periodPaths.has(changedFile.path)) return;
+      if (this.renderTimer) window.clearTimeout(this.renderTimer);
+      this.renderTimer = window.setTimeout(() => this.render(), 180);
+    };
+    this.registerEvent(this.app.metadataCache.on("changed", schedule));
+    this.registerEvent(this.app.vault.on("modify", schedule));
+  }
+
+  onunload() {
+    if (this.renderTimer) window.clearTimeout(this.renderTimer);
+  }
+
+  renderStateChart(parent, days) {
+    const section = parent.createDiv({ cls: "cx-weekly-section cx-weekly-state-section" });
+    const heading = section.createDiv({ cls: "cx-weekly-section-heading" });
+    heading.createEl("h4", { text: "State relationship" });
+    heading.createSpan({ text: "Sleep · Energy · Agency", cls: "cx-weekly-section-subtitle" });
+    const svg = createSvgElement(section, "svg", {
+      viewBox: "0 0 760 244",
+      class: "cx-weekly-state-chart",
+      role: "img",
+      "aria-label": "Daily sleep quality, energy, and agency from one to five across the weekly period",
+    });
+    const left = 48;
+    const right = 720;
+    const top = 24;
+    const bottom = 184;
+    const denominator = Math.max(1, days.length - 1);
+    const xAt = (index) => left + index * ((right - left) / denominator);
+    const yAt = (value) => bottom - ((value - 1) / 4) * (bottom - top);
+    for (let value = 1; value <= 5; value += 1) {
+      const y = yAt(value);
+      createSvgElement(svg, "line", { x1: left, y1: y, x2: right, y2: y, class: "cx-weekly-grid-line" });
+      const label = createSvgElement(svg, "text", { x: 27, y: y + 4, class: "cx-weekly-axis-label", "text-anchor": "middle" });
+      label.textContent = String(value);
+    }
+    const series = [
+      { key: "sleep_quality", label: "Sleep", cls: "is-sleep" },
+      { key: "energy", label: "Energy", cls: "is-energy" },
+      { key: "agency", label: "Agency", cls: "is-agency" },
+    ];
+    series.forEach((definition) => {
+      let segment = [];
+      const flush = () => {
+        if (segment.length > 1) createSvgElement(svg, "polyline", {
+          points: segment.join(" "),
+          class: `cx-weekly-state-line ${definition.cls}`,
+        });
+        segment = [];
+      };
+      days.forEach((day, index) => {
+        const value = rating(day.frontmatter?.[definition.key]);
+        if (value === null) {
+          flush();
+          return;
+        }
+        const x = xAt(index);
+        const y = yAt(value);
+        segment.push(`${x},${y}`);
+        const point = createSvgElement(svg, "circle", {
+          cx: x,
+          cy: y,
+          r: 4.5,
+          class: `cx-weekly-state-point ${definition.cls}`,
+        });
+        const title = createSvgElement(point, "title");
+        title.textContent = `${day.iso} · ${definition.label}: ${value}/5`;
+      });
+      flush();
+    });
+    days.forEach((day, index) => {
+      const label = createSvgElement(svg, "text", {
+        x: xAt(index),
+        y: 216,
+        class: "cx-weekly-date-label",
+        "text-anchor": "middle",
+      });
+      label.textContent = day.iso.slice(5).replace("-", "/");
+    });
+    const legend = section.createDiv({ cls: "cx-weekly-legend" });
+    series.forEach((definition) => {
+      const item = legend.createSpan({ cls: `cx-weekly-legend-item ${definition.cls}` });
+      item.createSpan({ cls: "cx-weekly-legend-mark" });
+      item.createSpan({ text: definition.label });
+    });
+  }
+
+  renderAllocationChart(parent, days) {
+    const section = parent.createDiv({ cls: "cx-weekly-section cx-weekly-allocation-section" });
+    const heading = section.createDiv({ cls: "cx-weekly-section-heading" });
+    heading.createEl("h4", { text: "Engaged time" });
+    heading.createSpan({ text: "Daily total and allocation", cls: "cx-weekly-section-subtitle" });
+    const maximum = Math.max(1, ...days.map((day) => day.totalMinutes));
+    const chart = section.createDiv({
+      cls: "cx-weekly-allocation-chart",
+      attr: { role: "img", "aria-label": "Stacked daily engaged time by Project, Personal Enrichment, Workout, and Admin" },
+    });
+    days.forEach((day) => {
+      const row = chart.createDiv({ cls: "cx-weekly-allocation-row" });
+      row.createSpan({ text: day.iso.slice(5).replace("-", "/"), cls: "cx-weekly-allocation-date" });
+      const track = row.createDiv({ cls: "cx-weekly-allocation-track" });
+      const fill = track.createDiv({ cls: "cx-weekly-allocation-fill" });
+      fill.style.width = `${day.totalMinutes / maximum * 100}%`;
+      TIME_METRICS.forEach((metric) => {
+        const minutes = minutesValue(day.frontmatter?.[metric.key]) ?? 0;
+        if (!minutes || !day.totalMinutes) return;
+        const segment = fill.createSpan({ cls: `cx-weekly-allocation-segment is-${metric.id}` });
+        segment.style.width = `${minutes / day.totalMinutes * 100}%`;
+        segment.setAttr("title", `${day.iso} · ${metric.label}: ${formatDuration(minutes)}`);
+        segment.setAttr("aria-label", `${metric.label}: ${formatDuration(minutes)}`);
+      });
+      if (!day.totalMinutes) track.createSpan({ text: "0", cls: "cx-weekly-allocation-zero" });
+      row.createSpan({ text: formatDuration(day.totalMinutes), cls: "cx-weekly-allocation-total" });
+    });
+    const legend = section.createDiv({ cls: "cx-weekly-legend cx-weekly-time-legend" });
+    TIME_METRICS.forEach((metric) => {
+      const item = legend.createSpan({ cls: `cx-weekly-legend-item is-${metric.id}` });
+      item.createSpan({ cls: "cx-weekly-legend-mark" });
+      item.createSpan({ text: metric.label });
+    });
+  }
+
+  async render() {
+    const weeklyFrontmatter = await freshFrontmatter(this.app, this.file);
+    const dates = dateRange(weeklyFrontmatter.period_start, weeklyFrontmatter.period_end);
+    this.periodPaths = new Set(dates.map((date) => dailyPathFromISO(localISO(date))).filter(Boolean));
+    const days = await Promise.all(dates.map(async (date) => {
+      const iso = localISO(date);
+      const path = dailyPathFromISO(iso);
+      const file = path ? this.app.vault.getAbstractFileByPath(path) : null;
+      const frontmatter = file instanceof TFile ? await freshFrontmatter(this.app, file) : {};
+      const values = TIME_METRICS.map((metric) => minutesValue(frontmatter?.[metric.key]));
+      return {
+        iso,
+        file,
+        frontmatter,
+        totalMinutes: values.filter((value) => value !== null).reduce((sum, value) => sum + value, 0),
+        hasTimeData: values.some((value) => value !== null),
+      };
+    }));
+    if (!this.containerEl.isConnected) return;
+    this.containerEl.empty();
+    if (!dates.length) {
+      this.containerEl.createDiv({ text: "Set valid period_start and period_end values to render the Weekly Snapshot.", cls: "cx-weekly-empty" });
+      return;
+    }
+
+    const totalMinutes = days.reduce((sum, day) => sum + day.totalMinutes, 0);
+    const recordedDays = days.filter((day) => day.hasTimeData).length;
+    const wrap = this.containerEl.createDiv({ cls: "cx-weekly-snapshot" });
+    const header = wrap.createDiv({ cls: "cx-weekly-header" });
+    const headerCopy = header.createDiv();
+    headerCopy.createEl("h3", { text: "Weekly Data Snapshot" });
+    headerCopy.createSpan({
+      text: `${isoDateValue(weeklyFrontmatter.period_start)} → ${isoDateValue(weeklyFrontmatter.period_end)}`,
+      cls: "cx-weekly-period",
+    });
+
+    const stats = wrap.createDiv({ cls: "cx-weekly-stats" });
+    [
+      [formatDuration(totalMinutes), "Engaged time"],
+      [formatDuration(Math.round(totalMinutes / days.length)), "Daily average"],
+      [`${recordedDays}/${days.length}`, "Days with time data"],
+    ].forEach(([value, label]) => {
+      const stat = stats.createDiv({ cls: "cx-weekly-stat" });
+      stat.createDiv({ text: value, cls: "cx-weekly-stat-value" });
+      stat.createDiv({ text: label, cls: "cx-weekly-stat-label" });
+    });
+
+    const charts = wrap.createDiv({ cls: "cx-weekly-charts" });
+    this.renderStateChart(charts, days);
+    this.renderAllocationChart(charts, days);
+    const sleepAverage = average(days.map((day) => rating(day.frontmatter?.sleep_quality)));
+    const energyAverage = average(days.map((day) => rating(day.frontmatter?.energy)));
+    const agencyAverage = average(days.map((day) => rating(day.frontmatter?.agency)));
+    const footer = wrap.createDiv({ cls: "cx-weekly-snapshot-footer" });
+    footer.createSpan({ text: `Sleep ${sleepAverage?.toFixed(1) ?? "—"} · Energy ${energyAverage?.toFixed(1) ?? "—"} · Agency ${agencyAverage?.toFixed(1) ?? "—"}` });
+    footer.createSpan({ text: "Current Daily Note YAML · human corrections take precedence" });
   }
 }
 
@@ -1329,6 +1563,10 @@ module.exports = class CastleXDashboardPlugin extends Plugin {
     this.registerMarkdownCodeBlockProcessor("castlex-time-rings", (_source, element, context) => {
       const file = this.app.vault.getAbstractFileByPath(context.sourcePath);
       if (file instanceof TFile) context.addChild(new DailyTimeRingsChild(element, this.app, file));
+    });
+    this.registerMarkdownCodeBlockProcessor("castlex-weekly-snapshot", (_source, element, context) => {
+      const file = this.app.vault.getAbstractFileByPath(context.sourcePath);
+      if (file instanceof TFile) context.addChild(new WeeklySnapshotChild(element, this.app, file));
     });
     this.addRibbonIcon("ship-wheel", "Open CastleX Home", () => this.activateView());
     this.addCommand({ id: "open-home", name: "Open CastleX Home", callback: () => this.activateView() });

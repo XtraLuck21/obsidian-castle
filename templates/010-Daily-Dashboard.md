@@ -37,7 +37,7 @@ cssclasses:
 
 ## Today’s Wins
 
-<!-- 鼓励有效习惯、选择与应对方式；不要复述 Completed Today 的成果。仅使用 Raw Notes 中有证据的内容。 -->
+<!-- 鼓励有效习惯、选择与应对方式；不要复述 Completed Today 的成果。仅保留最重要的 3–5 条，并只使用 Raw Notes 中有证据的内容。 -->
 
 ## Completed Today
 
@@ -53,4 +53,4 @@ cssclasses:
 
 ## Raw Notes
 
-<!-- 你的原始记录放在最后；Codex 整理时不得静默改写。 -->
+<!-- 你的原始记录放在最后；Codex 整理时不得静默改写。按写入时间从早到晚保留，后续补充或更正一律追加在已有内容之后。 -->

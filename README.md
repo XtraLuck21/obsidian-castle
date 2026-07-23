@@ -150,7 +150,9 @@ be edited from either the current Dashboard or the status gauges inside any
 Daily Note.
 
 The note keeps `Raw Notes` at the end so AI processing never needs to replace
-the original human writing.
+the original human writing. Raw Notes preserve chronological insertion order:
+later additions and corrections are appended after existing entries rather
+than prepended or reordered.
 
 Daily Notes also include a `Time Allocation` card. Its four rings can be edited
 manually in 15-minute steps or filled by an AI-assisted review. After Raw Notes
@@ -158,7 +160,8 @@ are provided, AI may populate four non-overlapping flat bullet lists: `Today’s
 Wins` recognizes effective habits and choices, `Completed Today` records factual
 finished work, `Open Loops` tracks unresolved follow-ups, and `Backlog` records
 explicitly deferred work. Daily Notes do not contain an AI Summary; cross-day
-synthesis belongs in the Weekly Review.
+synthesis belongs in the Weekly Review. `Today’s Wins` is limited to the three
+to five most important observations.
 
 ### Projects
 
@@ -215,6 +218,23 @@ AI-generated content must remain visibly marked. Per-category `*_origin: ai`
 records who filled the current value, while `time_data_reviewed: false` means AI
 values still await human review. AI may categorize and total explicit durations
 from the source record, but it must not invent minutes from vague descriptions.
+Inside a Daily Note, pending values display `AI · Unreviewed` with a prominent
+`Verify AI time` action. Verification preserves the AI provenance, changes only
+`time_data_reviewed` to `true`, and displays `AI · Verified`; `Reopen review`
+returns the values to the pending-review state.
+
+### Weekly Reviews
+
+Weekly Reviews live under `10_Journal/Weekly/`. Standard periods run Sunday
+through Saturday and use explicit `period_start` and `period_end` fields. The
+`castlex-weekly-snapshot` block reads those Daily Notes and renders a compact
+period-specific view: Sleep, Energy, and Agency on one aligned state chart, and
+the four Time Allocation categories as one stacked chart per day.
+
+The snapshot is read-only derived data and has no review button. It always reads
+the current Daily YAML, so a later human correction takes precedence over an
+earlier AI-filled value. Human reflection and decisions remain normal prose,
+while AI summary, comparison, and advice remain visibly marked callouts.
 
 See [`examples/`](examples/) for deliberately fictional Daily, Project, and
 Weekly Review notes.
