@@ -11,10 +11,13 @@ const {
 } = require("obsidian");
 
 const VIEW_TYPE = "castlex-home";
+const HEALTH_VIEW_TYPE = "castlex-health";
 const DAILY_ROOT = "10_Journal/Daily";
 const PROJECT_ROOT = "30_Projects";
 const DESKTOP_ASSET_PATH = "90_System/Assets/rain-glass-sunset-beach-v2.webp";
 const MOBILE_ASSET_PATH = "90_System/Assets/rain-glass-sunset-mobile-v1.webp";
+const HEALTH_DESKTOP_ASSET_PATH = "90_System/Assets/rain-glass-outdoor-pool-desktop-v1.webp";
+const HEALTH_MOBILE_ASSET_PATH = "90_System/Assets/rain-glass-outdoor-pool-mobile-v1.webp";
 const REQUIRED = [
   "sleep_quality",
   "physical_state",
@@ -43,9 +46,9 @@ const TIME_METRICS = [
   },
   {
     id: "enrichment",
-    key: "personal_enrichment_minutes",
-    originKey: "personal_enrichment_minutes_origin",
-    label: "Personal Enrichment",
+    key: "enrichment_minutes",
+    originKey: "enrichment_minutes_origin",
+    label: "Enrichment",
     labelZh: "个人充实",
     unit: 60,
     goal: 180,
@@ -69,6 +72,126 @@ const TIME_METRICS = [
     goal: 90,
   },
 ];
+const HEALTH_ROTATION = ["pool", "back", "pool", "upper", "legs"];
+const HEALTH_WORKOUTS = {
+  pool: {
+    label: "水中慢跑",
+    shortLabel: "Pool",
+    duration: 60,
+    purpose: "降低压力，帮助恢复与睡眠。",
+    plans: {
+      standard: {
+        summary: "Pool Running · 60 分钟",
+        exercises: [],
+      },
+      light: {
+        summary: "Pool Running · 30–45 分钟",
+        exercises: [],
+      },
+    },
+  },
+  back: {
+    label: "背部训练",
+    shortLabel: "Back",
+    duration: 60,
+    purpose: "改善圆肩与上背紧绷，建立背部力量。",
+    plans: {
+      standard: {
+        exercises: [
+          { id: "lat_pulldown", label: "高位下拉", english: "Lat Pulldown", warmup: true, sets: 3, reps: "8–12" },
+          { id: "seated_cable_row", label: "坐姿绳索划船", english: "Seated Cable Row", warmup: true, sets: 3, reps: "8–12" },
+          { id: "face_pull", label: "面拉", english: "Face Pull", warmup: true, sets: 3, reps: "12–15" },
+          { id: "dumbbell_curl", label: "哑铃弯举", english: "Dumbbell Curl", warmup: true, sets: 3, reps: "10–12" },
+          { id: "back_extension", label: "山羊挺身", english: "Back Extension", warmup: false, sets: 3, reps: "12–15" },
+        ],
+      },
+      light: {
+        exercises: [
+          { id: "lat_pulldown", label: "高位下拉", english: "Lat Pulldown", warmup: true, sets: 3, reps: "8–12" },
+          { id: "seated_cable_row", label: "坐姿绳索划船", english: "Seated Cable Row", warmup: true, sets: 3, reps: "8–12" },
+          { id: "face_pull", label: "面拉", english: "Face Pull", warmup: false, sets: 3, reps: "12–15" },
+          { id: "back_extension", label: "山羊挺身", english: "Back Extension", warmup: false, sets: 2, reps: "12–15" },
+        ],
+      },
+    },
+  },
+  upper: {
+    label: "上肢训练",
+    shortLabel: "Upper",
+    duration: 60,
+    purpose: "肩部与手臂优先，胸部保持适量。",
+    plans: {
+      standard: {
+        exercises: [
+          { id: "dumbbell_bench_press", label: "哑铃卧推", english: "Dumbbell Bench Press", warmup: true, sets: 3, reps: "8–10" },
+          { id: "dumbbell_shoulder_press", label: "哑铃肩推", english: "Dumbbell Shoulder Press", warmup: true, sets: 3, reps: "8–10" },
+          { id: "dumbbell_lateral_raise", label: "哑铃侧平举", english: "Dumbbell Lateral Raise", warmup: true, sets: 3, reps: "12–15" },
+          { id: "cable_triceps_pushdown", label: "绳索下压", english: "Cable Triceps Pushdown", warmup: true, sets: 3, reps: "10–12" },
+        ],
+      },
+      light: {
+        exercises: [
+          { id: "dumbbell_bench_press", label: "哑铃卧推", english: "Dumbbell Bench Press", warmup: true, sets: 3, reps: "8–10" },
+          { id: "dumbbell_shoulder_press", label: "哑铃肩推", english: "Dumbbell Shoulder Press", warmup: true, sets: 3, reps: "8–10" },
+          { id: "dumbbell_lateral_raise", label: "哑铃侧平举", english: "Dumbbell Lateral Raise", warmup: false, sets: 3, reps: "12–15" },
+        ],
+      },
+    },
+  },
+  legs: {
+    label: "腿部训练",
+    shortLabel: "Legs",
+    duration: 60,
+    purpose: "维持下肢力量，不追逐极限重量。",
+    plans: {
+      standard: {
+        exercises: [
+          { id: "barbell_back_squat", label: "杠铃深蹲", english: "Barbell Back Squat", warmup: true, sets: 3, reps: "6–8" },
+          { id: "bulgarian_split_squat", label: "保加利亚分腿蹲", english: "Bulgarian Split Squat", warmup: true, sets: 3, reps: "每侧 8–10" },
+          { id: "leg_curl", label: "腿弯举", english: "Leg Curl", warmup: true, sets: 3, reps: "10–12" },
+          { id: "dumbbell_romanian_deadlift", label: "哑铃罗马尼亚硬拉", english: "Dumbbell Romanian Deadlift", warmup: true, sets: 3, reps: "8–12" },
+          { id: "back_extension", label: "山羊挺身", english: "Back Extension", warmup: false, sets: 3, reps: "12–15" },
+        ],
+      },
+      light: {
+        exercises: [
+          { id: "barbell_back_squat", label: "杠铃深蹲", english: "Barbell Back Squat", warmup: true, sets: 3, reps: "6–8" },
+          { id: "bulgarian_split_squat", label: "保加利亚分腿蹲", english: "Bulgarian Split Squat", warmup: false, sets: 3, reps: "每侧 8–10" },
+          { id: "leg_curl", label: "腿弯举", english: "Leg Curl", warmup: false, sets: 3, reps: "10–12" },
+          { id: "back_extension", label: "山羊挺身", english: "Back Extension", warmup: false, sets: 2, reps: "12–15" },
+        ],
+      },
+    },
+  },
+  stretch: {
+    label: "轻柔拉伸",
+    shortLabel: "Stretch",
+    duration: 15,
+    purpose: "降低身体紧绷，不设置完成压力。",
+    plans: { recovery: { summary: "轻柔拉伸 · 10–15 分钟", exercises: [] } },
+  },
+  rest: {
+    label: "今日休息",
+    shortLabel: "Rest",
+    duration: 0,
+    purpose: "恢复本身就是训练计划的一部分。",
+    plans: { recovery: { summary: "完整休息", exercises: [] } },
+  },
+};
+const HEALTH_SIGNAL_LABELS = {
+  sleep: ["很差", "偏差", "一般", "不错", "很好"],
+  recovery: ["精疲力尽", "很疲惫", "普通", "有恢复", "很清醒"],
+  body: ["很沉重", "偏沉重", "一般", "比较舒展", "状态很好"],
+  outlook: ["很抗拒", "有些沉重", "中性", "愿意开始", "很期待"],
+  energy: ["几乎没有精力", "精力偏低", "精力一般", "比较有精力", "精力充足"],
+  calmness: ["非常紧绷", "压力较高", "一般", "比较平稳", "很平静"],
+  sleepiness: ["完全不困", "有一点困", "开始有睡意", "已经很困", "随时可以入睡"],
+  nightCalmness: ["思绪很亢奋", "比较活跃", "一般", "逐渐安静", "非常平静"],
+  clarity: ["脑雾很重", "比较模糊", "一般", "比较清晰", "很清晰"],
+  change: ["明显变差", "稍微变差", "没有变化", "稍微好转", "明显好转"],
+  eveningBody: ["很不舒服", "偏疲惫", "一般", "比较舒服", "很舒服"],
+  postWorkout: ["消耗过大", "有些透支", "一般", "感觉不错", "恢复良好"],
+};
 
 function pad(value) {
   return String(value).padStart(2, "0");
@@ -156,6 +279,330 @@ function formatDuration(value) {
 function timeThresholdLabel(metric) {
   if (metric.unit === 60) return "≤1h · ≤2h · ≤3h · >3h";
   return "≤30m · ≤60m · ≤90m · >90m";
+}
+
+function healthWorkout(id) {
+  return HEALTH_WORKOUTS[id] ?? HEALTH_WORKOUTS.pool;
+}
+
+function healthStageForTime(date = new Date()) {
+  const hour = date.getHours();
+  if (hour < 9) return "night";
+  if (hour >= 9 && hour < 17) return "morning";
+  if (hour >= 17 && hour < 22) return "afternoon";
+  return "evening";
+}
+
+function healthSignal(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 1 && number <= 5 ? number : null;
+}
+
+function healthAfternoonEnergy(frontmatter) {
+  return healthSignal(frontmatter.health_afternoon_energy_signal);
+}
+
+function healthArray(value) {
+  return Array.isArray(value) ? value.map(String) : value ? [String(value)] : [];
+}
+
+function healthWorkoutIsStrength(id) {
+  return ["back", "upper", "legs"].includes(id);
+}
+
+function healthWorkoutSupportsModes(id) {
+  return ["pool", "back", "upper", "legs"].includes(id);
+}
+
+function healthModeLabel(mode) {
+  if (mode === "light") return "Light";
+  if (mode === "recovery") return "Recovery";
+  return "Standard";
+}
+
+function healthWorkoutPlan(workoutId, mode = "standard") {
+  const workout = healthWorkout(workoutId);
+  const normalizedMode = mode === "light" ? "light" : mode === "recovery" ? "recovery" : "standard";
+  return workout.plans?.[normalizedMode]
+    ?? workout.plans?.standard
+    ?? workout.plans?.recovery
+    ?? { exercises: [] };
+}
+
+function healthPlanSetCounts(workoutId, mode = "standard") {
+  return healthWorkoutPlan(workoutId, mode).exercises.reduce((counts, exercise) => {
+    counts.working += exercise.sets;
+    if (exercise.warmup) counts.warmup += 1;
+    return counts;
+  }, { working: 0, warmup: 0 });
+}
+
+function healthCompletedSetCounts(values) {
+  return healthArray(values).reduce((counts, key) => {
+    if (String(key).endsWith(":warmup")) counts.warmup += 1;
+    else counts.working += 1;
+    return counts;
+  }, { working: 0, warmup: 0 });
+}
+
+function healthRotationSlot(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isInteger(number) && number >= 0 && number < HEALTH_ROTATION.length ? number : null;
+}
+
+function healthTotalSets(workoutId, mode = "standard") {
+  const plan = healthWorkoutPlan(workoutId, mode);
+  return plan.exercises.reduce((total, exercise) => {
+    return total + exercise.sets + (exercise.warmup ? 1 : 0);
+  }, 0);
+}
+
+function healthSetKeys(workoutId, mode = "standard") {
+  const keys = [];
+  healthWorkoutPlan(workoutId, mode).exercises.forEach((exercise) => {
+    if (exercise.warmup) keys.push(`${exercise.id}:warmup`);
+    for (let index = 1; index <= exercise.sets; index += 1) keys.push(`${exercise.id}:set_${index}`);
+  });
+  return keys;
+}
+
+function healthWorkoutSessions(frontmatter) {
+  const stored = Array.isArray(frontmatter.health_workout_sessions)
+    ? frontmatter.health_workout_sessions.filter((session) => session && typeof session === "object")
+    : [];
+  if (stored.length) {
+    const primaryId = String(frontmatter.health_primary_session_id || "");
+    return stored.map((session, index) => {
+      const id = String(session.id || `legacy-session-${index + 1}`);
+      const explicitRole = ["primary", "additional"].includes(String(session.role))
+        ? String(session.role)
+        : "";
+      return {
+        ...session,
+        id,
+        workout: String(session.workout || "pool"),
+        mode: String(session.mode || "standard"),
+        role: explicitRole || (primaryId ? (id === primaryId ? "primary" : "additional") : index === 0 ? "primary" : "additional"),
+        source: String(session.source || (index === 0 ? frontmatter.health_primary_source || "" : "additional")),
+        completed_sets: healthArray(session.completed_sets),
+      };
+    });
+  }
+  if (String(frontmatter.health_workout_status || "") !== "completed" || !frontmatter.health_workout_type) return [];
+  return [{
+    id: String(frontmatter.health_workout_session_id || "legacy-session"),
+    workout: String(frontmatter.health_workout_type),
+    mode: String(frontmatter.health_workout_mode || "standard"),
+    role: "primary",
+    source: String(frontmatter.health_primary_source || ""),
+    started_at: frontmatter.health_workout_started_at || null,
+    completed_at: frontmatter.health_workout_completed_at || null,
+    completed_sets: healthArray(frontmatter.health_workout_completed_sets),
+    total_sets: healthWorkoutIsStrength(frontmatter.health_workout_type)
+      ? healthTotalSets(frontmatter.health_workout_type, frontmatter.health_workout_mode)
+      : 0,
+    minutes: minutesValue(frontmatter.workout_minutes),
+  }];
+}
+
+function healthPrimarySession(frontmatter, sessions = healthWorkoutSessions(frontmatter)) {
+  const primaryId = String(frontmatter.health_primary_session_id || "");
+  return sessions.find((session) => primaryId && String(session.id) === primaryId)
+    ?? sessions.find((session) => session.role === "primary")
+    ?? sessions[0]
+    ?? null;
+}
+
+function healthSessionTotalSets(session) {
+  const stored = Number(session.total_sets);
+  return Number.isInteger(stored) && stored >= 0
+    ? stored
+    : healthTotalSets(session.workout, session.mode);
+}
+
+function healthSessionSetCounts(session) {
+  const current = healthPlanSetCounts(session.workout, session.mode);
+  const working = Number(session.planned_working_sets);
+  const warmup = Number(session.planned_warmup_sets);
+  return {
+    working: Number.isInteger(working) && working >= 0 ? working : current.working,
+    warmup: Number.isInteger(warmup) && warmup >= 0 ? warmup : current.warmup,
+  };
+}
+
+function healthSessionProgress(sessions) {
+  return sessions.reduce((summary, session) => {
+    if (!healthWorkoutIsStrength(session.workout)) return summary;
+    summary.completed += healthArray(session.completed_sets).length;
+    summary.total += healthSessionTotalSets(session);
+    return summary;
+  }, { completed: 0, total: 0 });
+}
+
+function healthWeightedPercentage(entries) {
+  let weightedTotal = 0;
+  let availableWeight = 0;
+  let answered = 0;
+  entries.forEach(([value, weight]) => {
+    if (value === null) return;
+    weightedTotal += value / 5 * 100 * weight;
+    availableWeight += weight;
+    answered += 1;
+  });
+  return {
+    value: availableWeight ? Math.round(weightedTotal / availableWeight) : null,
+    answered,
+  };
+}
+
+function healthMorningCapacity(frontmatter) {
+  return healthWeightedPercentage([
+    [healthSignal(frontmatter.health_morning_sleep), 30],
+    [healthSignal(frontmatter.health_morning_recovery), 40],
+    [healthSignal(frontmatter.health_morning_body), 20],
+    [healthSignal(frontmatter.health_morning_outlook), 10],
+  ]);
+}
+
+function healthAfternoonState(frontmatter) {
+  const result = healthWeightedPercentage([
+    [healthAfternoonEnergy(frontmatter), 40],
+    [healthSignal(frontmatter.health_afternoon_calmness), 20],
+    [healthSignal(frontmatter.health_afternoon_clarity), 20],
+    [healthSignal(frontmatter.health_afternoon_body_change), 20],
+  ]);
+  if (result.value === null) return { ...result, penalty: 0 };
+  const feelings = new Set(healthArray(frontmatter.health_afternoon_discomfort));
+  const penalty = (feelings.has("tightness") ? 8 : 0) + (feelings.has("soreness") ? 12 : 0);
+  return { ...result, value: clamp(result.value - penalty, 0, 100), penalty };
+}
+
+function healthStateLabel(value) {
+  if (value === null) return "尚未记录";
+  if (value < 25) return "需要休息";
+  if (value < 45) return "状态偏低";
+  if (value < 60) return "谨慎可动";
+  if (value < 75) return "状态稳定";
+  if (value < 90) return "状态良好";
+  return "状态充足";
+}
+
+function healthRecommendation(frontmatter, plannedWorkout, now = new Date()) {
+  const morning = healthMorningCapacity(frontmatter);
+  const afternoon = healthAfternoonState(frontmatter);
+  const hasAfternoon = afternoon.answered > 0;
+  const capacity = morning.value !== null && afternoon.value !== null
+    ? Math.round(morning.value * .4 + afternoon.value * .6)
+    : afternoon.value ?? morning.value;
+  const answered = morning.answered + afternoon.answered;
+  const energy = healthAfternoonEnergy(frontmatter);
+  const bodyChange = healthSignal(frontmatter.health_afternoon_body_change);
+  const feelings = new Set([
+    ...healthArray(frontmatter.health_afternoon_discomfort),
+    ...healthArray(frontmatter.health_morning_discomfort),
+  ]);
+  const regions = new Set([
+    ...healthArray(frontmatter.health_morning_regions),
+    ...healthArray(frontmatter.health_afternoon_regions),
+  ]);
+  const hasSoreness = feelings.has("soreness");
+  const wholeBodySore = hasSoreness && regions.has("whole_body");
+  const soreFor = (workoutId) => hasSoreness && (
+    (workoutId === "legs" && ["legs", "lower_back"].some((item) => regions.has(item)))
+    || (workoutId === "back" && ["shoulders", "upper_back", "lower_back", "arms"].some((item) => regions.has(item)))
+    || (workoutId === "upper" && ["shoulders", "upper_back", "arms"].some((item) => regions.has(item)))
+  );
+  const preference = String(frontmatter.health_afternoon_preference || "none");
+  const reasons = [];
+  let workout = plannedWorkout;
+  let mode = "standard";
+  let intensity = "standard";
+
+  if (morning.value !== null) reasons.push(`今日恢复容量 ${morning.value}%`);
+  if (afternoon.value !== null) reasons.push(`傍晚身体状态 ${afternoon.value}% · ${healthStateLabel(afternoon.value)}`);
+
+  if (hasAfternoon) {
+    if (energy === 1 || (capacity !== null && capacity < 35)) {
+      intensity = "rest";
+    } else if (energy === 2 || bodyChange === 1 || (capacity !== null && capacity < 55)) {
+      intensity = "stretch";
+    } else if (energy === 3 || bodyChange === 2 || (capacity !== null && capacity < 75)) {
+      intensity = "light";
+    }
+  } else if (capacity !== null) {
+    if (capacity < 55) intensity = "stretch";
+    else if (capacity < 75) intensity = "light";
+  }
+
+  if (wholeBodySore && intensity !== "rest") {
+    intensity = "stretch";
+    reasons.push("全身仍有训练酸痛，今天不安排力量训练");
+  }
+
+  if (intensity === "rest") {
+    workout = "rest";
+    mode = "recovery";
+    reasons.push(energy === 1 ? "傍晚精力处于最低档" : "综合训练准备度低于 35%");
+  } else if (intensity === "stretch") {
+    workout = "stretch";
+    mode = "recovery";
+    reasons.push(hasAfternoon ? "今天更适合低负荷活动" : "早晨信息暂定为低负荷，傍晚后会再判断");
+  } else {
+    mode = intensity;
+    reasons.push(intensity === "standard"
+      ? "训练准备度支持完整训练量"
+      : "保留原定方向，但降低动作与总组数");
+  }
+
+  if (healthWorkoutIsStrength(workout) && soreFor(workout)) {
+    const alternatives = {
+      back: ["legs", "upper"],
+      upper: ["legs", "back"],
+      legs: ["upper", "back"],
+    };
+    const substitute = alternatives[workout]?.find((candidate) => !soreFor(candidate));
+    if (substitute && capacity !== null && capacity >= 55) {
+      workout = substitute;
+      reasons.push(`原定部位仍有酸痛，改练${healthWorkout(substitute).label}`);
+    } else {
+      workout = "stretch";
+      mode = "recovery";
+      reasons.push("原定部位仍有酸痛，且没有合适的力量替代项目");
+    }
+  }
+
+  if (preference !== "none" && intensity !== "rest") {
+    if (["pool", "stretch", "rest"].includes(preference)) {
+      workout = preference;
+      mode = preference === "pool" ? (intensity === "standard" ? "standard" : "light") : "recovery";
+      reasons.push(`身体当前更想选择${healthWorkout(preference).label}`);
+    } else if (healthWorkoutIsStrength(preference) && ["standard", "light"].includes(intensity) && !soreFor(preference)) {
+      workout = preference;
+      mode = intensity;
+      reasons.push(`身体当前更想选择${healthWorkout(preference).label}`);
+    }
+  }
+
+  if (soreFor(workout) && healthWorkoutIsStrength(workout)) {
+    workout = "stretch";
+    mode = "recovery";
+    reasons.push("身体偏好的部位仍有训练酸痛");
+  }
+
+  if (!reasons.length) reasons.push("当前先依照训练轮换");
+  const completeness = `${answered}/8`;
+  const status = frontmatter.health_afternoon_completed_at ? "final" : answered ? "provisional" : "planned";
+  return {
+    workout,
+    mode,
+    capacity,
+    morningCapacity: morning.value,
+    afternoonState: afternoon.value,
+    completeness,
+    status,
+    reasons,
+  };
 }
 
 function completion(frontmatter) {
@@ -612,7 +1059,7 @@ class WeeklySnapshotChild extends MarkdownRenderChild {
     const maximum = Math.max(1, ...days.map((day) => day.totalMinutes));
     const chart = section.createDiv({
       cls: "cx-weekly-allocation-chart",
-      attr: { role: "img", "aria-label": "Stacked daily engaged time by Project, Personal Enrichment, Workout, and Admin" },
+      attr: { role: "img", "aria-label": "Stacked daily engaged time by Project, Enrichment, Workout, and Admin" },
     });
     days.forEach((day) => {
       const row = chart.createDiv({ cls: "cx-weekly-allocation-row" });
@@ -695,6 +1142,105 @@ class WeeklySnapshotChild extends MarkdownRenderChild {
     const footer = wrap.createDiv({ cls: "cx-weekly-snapshot-footer" });
     footer.createSpan({ text: `Sleep ${sleepAverage?.toFixed(1) ?? "—"} · Energy ${energyAverage?.toFixed(1) ?? "—"} · Agency ${agencyAverage?.toFixed(1) ?? "—"}` });
     footer.createSpan({ text: "Current Daily Note YAML · human corrections take precedence" });
+  }
+}
+
+class DailyHealthSummaryChild extends MarkdownRenderChild {
+  constructor(container, app, file) {
+    super(container);
+    this.app = app;
+    this.file = file;
+  }
+
+  onload() {
+    this.render();
+    this.registerEvent(this.app.metadataCache.on("changed", (changedFile) => {
+      if (changedFile.path === this.file.path) this.render();
+    }));
+    this.registerEvent(this.app.vault.on("modify", (changedFile) => {
+      if (changedFile.path === this.file.path) this.render();
+    }));
+  }
+
+  async render() {
+    const frontmatter = await freshFrontmatter(this.app, this.file);
+    if (!this.containerEl.isConnected) return;
+    this.containerEl.empty();
+    const wrap = this.containerEl.createDiv({ cls: "cx-health-daily-summary" });
+    const planned = String(frontmatter.health_planned_workout || "pool");
+    const recommendation = String(frontmatter.health_recommended_workout || planned);
+    const recommendationMode = String(frontmatter.health_recommended_mode || "standard");
+    const selected = String(frontmatter.health_selected_workout || "");
+    const status = String(frontmatter.health_workout_status || "");
+    const workoutId = String(frontmatter.health_workout_type || selected || recommendation);
+    const workoutMode = String(frontmatter.health_workout_mode || frontmatter.health_selected_mode || recommendationMode);
+    const sessions = healthWorkoutSessions(frontmatter);
+    const primarySession = healthPrimarySession(frontmatter, sessions);
+    const additionalSessions = sessions.filter((session) => session !== primarySession);
+    const currentRole = String(frontmatter.health_current_session_role || "");
+    const primaryWorkout = String(primarySession?.workout || frontmatter.health_primary_workout || selected || recommendation);
+    const primaryMode = String(primarySession?.mode || frontmatter.health_primary_mode || frontmatter.health_selected_mode || recommendationMode);
+    const primaryCompleted = Boolean(primarySession) || status === "rest";
+    const progressSummary = primarySession
+      ? healthSessionProgress([primarySession])
+      : { completed: 0, total: 0 };
+    if (!primaryCompleted && status === "active" && healthWorkoutIsStrength(workoutId)) {
+      progressSummary.completed += healthArray(frontmatter.health_workout_completed_sets).length;
+      progressSummary.total += healthTotalSets(workoutId, workoutMode);
+    }
+    const morning = healthMorningCapacity(frontmatter);
+    const afternoon = healthAfternoonState(frontmatter);
+    const header = wrap.createDiv({ cls: "cx-health-summary-header" });
+    header.createEl("h3", { text: "Health Snapshot" });
+    header.createSpan({ text: "与 Home Check-in 分开记录" });
+    const grid = wrap.createDiv({ cls: "cx-health-summary-grid" });
+    const recommendationChanged = recommendation !== planned || recommendationMode !== "standard";
+    const manuallyChanged = String(frontmatter.health_primary_source || "") === "manual"
+      || (!primaryCompleted && frontmatter.health_manual_override === true);
+    const displayWorkout = status === "rest" ? "rest" : primaryWorkout;
+    const displayMode = primaryMode;
+    const workoutValue = displayWorkout === "rest"
+      ? "今日休息"
+      : `${healthWorkout(displayWorkout).label}${healthWorkoutSupportsModes(displayWorkout) ? ` · ${healthModeLabel(displayMode)}` : ""}${!primaryCompleted && status === "active" ? " · 进行中" : ""}`;
+    const workoutTag = primaryCompleted
+      ? "已完成"
+      : manuallyChanged
+        ? "手动修改"
+        : selected || recommendationChanged
+          ? "建议"
+          : "原计划";
+    [
+      { label: "今日恢复容量", value: morning.value === null ? "—" : `${morning.value}%` },
+      { label: "傍晚身体状态", value: afternoon.value === null ? "—" : `${afternoon.value}% · ${healthStateLabel(afternoon.value)}` },
+      {
+        label: "训练状态",
+        value: workoutValue,
+        tag: workoutTag,
+        meta: currentRole === "additional" && status === "active"
+          ? `追加：${healthWorkout(workoutId).label}进行中`
+          : additionalSessions.length
+            ? `另有 ${additionalSessions.map((session) => healthWorkout(session.workout).label).join("、")} · 今日共 ${minutesValue(frontmatter.workout_minutes) ?? 0} 分钟`
+            : primaryCompleted && minutesValue(frontmatter.workout_minutes) !== null
+              ? `今日共 ${minutesValue(frontmatter.workout_minutes)} 分钟`
+              : "",
+      },
+    ].forEach(({ label, value, tag, meta }) => {
+      const item = grid.createDiv({ cls: "cx-health-summary-item" });
+      item.createSpan({ text: label, cls: "cx-health-summary-label" });
+      item.createSpan({ text: value, cls: "cx-health-summary-value" });
+      if (tag) {
+        item.addClass("has-tag");
+        item.createSpan({ text: tag, cls: "cx-health-summary-tag" });
+      }
+      if (meta) item.createSpan({ text: meta, cls: "cx-health-summary-meta" });
+    });
+    if (progressSummary.total) {
+      const progress = wrap.createDiv({ cls: "cx-health-summary-progress" });
+      progress.createSpan({ text: `训练组数 ${progressSummary.completed} / ${progressSummary.total}` });
+      const track = progress.createDiv({ cls: "cx-health-progress-track" });
+      const fill = track.createSpan({ cls: "cx-health-progress-fill" });
+      fill.style.width = `${progressSummary.completed / progressSummary.total * 100}%`;
+    }
   }
 }
 
@@ -1035,9 +1581,11 @@ class CastleXHomeView extends ItemView {
     this.clockEl = copy.createEl("div", { cls: "cx-clock" });
     this.updateClock();
     copy.createEl("p", { text: "青山一道同云雨，明月何曾是两乡。", cls: "cx-hero-note" });
-    const actions = hero.createDiv({ cls: "cx-hero-actions" });
-    const today = actions.createEl("button", { text: "打开今日 Daily", cls: "cx-button cx-button-primary" });
+    const actions = hero.createDiv({ cls: "cx-hero-actions cx-home-hero-actions" });
+    const today = actions.createEl("button", { text: "今日 Daily", cls: "cx-button cx-button-primary" });
     today.addEventListener("click", () => this.openFile(todayFile));
+    const health = actions.createEl("button", { text: "Health Dashboard", cls: "cx-button" });
+    health.addEventListener("click", () => this.plugin.activateHealthView());
     const refresh = actions.createEl("button", { text: "刷新", cls: "cx-button" });
     refresh.addEventListener("click", () => this.renderDashboard());
   }
@@ -1548,6 +2096,1153 @@ class CastleXHomeView extends ItemView {
     const secondary = dashboard.createDiv({ cls: "cx-secondary-grid" });
     this.renderHeatmap(secondary, streaks);
     this.renderTrend(secondary, pages);
+    dashboard.createDiv({
+      cls: "cx-mobile-scroll-spacer",
+      attr: { "aria-hidden": "true" },
+    });
+  }
+}
+
+class CastleXHealthView extends ItemView {
+  constructor(leaf, plugin) {
+    super(leaf);
+    this.plugin = plugin;
+    this.currentDateISO = localISO();
+    this.stageOverride = null;
+    this.renderTimer = null;
+    this.writeQueue = Promise.resolve();
+    this.textTimers = new Map();
+    this.plannedWorkout = "pool";
+    this.plannedSlot = 0;
+    this.addingWorkout = false;
+    this.nightRitualAnimationUntil = 0;
+  }
+
+  getViewType() {
+    return HEALTH_VIEW_TYPE;
+  }
+
+  getDisplayText() {
+    return "Health Dashboard";
+  }
+
+  getIcon() {
+    return "heart-pulse";
+  }
+
+  async onOpen() {
+    this.contentEl.addClass("castlex-health-view");
+    this.registerEvent(this.app.metadataCache.on("changed", () => this.scheduleRender()));
+    this.registerEvent(this.app.vault.on("modify", () => this.scheduleRender()));
+    this.registerInterval(window.setInterval(() => this.updateClock(), 30000));
+    await this.renderDashboard();
+  }
+
+  async onClose() {
+    if (this.renderTimer) window.clearTimeout(this.renderTimer);
+    this.textTimers.forEach((timer) => window.clearTimeout(timer));
+    this.textTimers.clear();
+  }
+
+  scheduleRender() {
+    if (this.renderTimer) window.clearTimeout(this.renderTimer);
+    this.renderTimer = window.setTimeout(() => this.renderDashboard(), 260);
+  }
+
+  updateClock() {
+    const now = new Date();
+    if (this.clockEl) {
+      this.clockEl.setText(new Intl.DateTimeFormat("zh-CN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).format(now));
+    }
+    if (this.timerEl?.dataset.startedAt) {
+      const started = new Date(this.timerEl.dataset.startedAt);
+      const elapsed = Math.max(0, Math.floor((now - started) / 60000));
+      this.timerEl.setText(`已进行 ${formatDuration(elapsed)}`);
+    }
+    const todayISO = localISO(now);
+    if (todayISO !== this.currentDateISO) {
+      this.currentDateISO = todayISO;
+      this.stageOverride = null;
+      this.scheduleRender();
+      return;
+    }
+    if (!this.stageOverride && this.renderedStage !== healthStageForTime(now)) this.scheduleRender();
+  }
+
+  async ensureFolder(path) {
+    const normalized = normalizePath(path);
+    if (this.app.vault.getAbstractFileByPath(normalized)) return;
+    const parts = normalized.split("/");
+    let current = "";
+    for (const part of parts) {
+      current = current ? `${current}/${part}` : part;
+      if (!this.app.vault.getAbstractFileByPath(current)) await this.app.vault.createFolder(current);
+    }
+  }
+
+  dailyPath(date = new Date()) {
+    return `${DAILY_ROOT}/${date.getFullYear()}/${pad(date.getMonth() + 1)}/${localISO(date)}.md`;
+  }
+
+  async createDailyContent(date) {
+    const iso = localISO(date);
+    const weekday = new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(date);
+    const templatePath = "90_System/Templates/010-Daily-Dashboard.md";
+    const templateFile = this.app.vault.getAbstractFileByPath(templatePath);
+    if (!(templateFile instanceof TFile)) throw new Error(`Missing Daily template: ${templatePath}`);
+    let content = await this.app.vault.cachedRead(templateFile);
+    [
+      ["{{date:YYYY-MM-DD · dddd}}", `${iso} · ${weekday}`],
+      ["{{date:gggg-[W]ww}}", isoWeek(date)],
+      ["{{date:YYYY-MM-DD}}", iso],
+      ["{{date:YYYY-MM}}", iso.slice(0, 7)],
+      ["{{date:dddd}}", weekday],
+    ].forEach(([token, value]) => {
+      content = content.split(token).join(value);
+    });
+    return content;
+  }
+
+  async ensureDaily(date = new Date(), options = {}) {
+    const path = this.dailyPath(date);
+    const existing = this.app.vault.getAbstractFileByPath(path);
+    if (existing instanceof TFile) return existing;
+    const allowCreate = options.allowCreate ?? !Platform.isMobile;
+    if (!allowCreate) return null;
+    const pending = this.plugin.dailyCreationPromises.get(path);
+    if (pending) return pending;
+    const creation = (async () => {
+      await this.ensureFolder(path.split("/").slice(0, -1).join("/"));
+      const afterFolder = this.app.vault.getAbstractFileByPath(path);
+      if (afterFolder instanceof TFile) return afterFolder;
+      return this.app.vault.create(path, await this.createDailyContent(date));
+    })();
+    this.plugin.dailyCreationPromises.set(path, creation);
+    try {
+      return await creation;
+    } finally {
+      this.plugin.dailyCreationPromises.delete(path);
+    }
+  }
+
+  dailyPages() {
+    const pages = this.app.vault.getMarkdownFiles()
+      .filter((file) => file.path.startsWith(`${DAILY_ROOT}/`))
+      .map((file) => ({ file, frontmatter: this.app.metadataCache.getFileCache(file)?.frontmatter ?? {} }))
+      .filter((page) => page.frontmatter.type === "daily" && page.frontmatter.date);
+    const byDate = new Map();
+    pages.forEach((page) => {
+      const iso = isoDateValue(page.frontmatter.date);
+      if (!iso) return;
+      const canonicalPath = dailyPathFromISO(iso);
+      const current = byDate.get(iso);
+      const pageIsCanonical = page.file.path === canonicalPath;
+      const currentIsCanonical = current?.file.path === canonicalPath;
+      if (!current || (pageIsCanonical && !currentIsCanonical) || (!currentIsCanonical && page.file.stat.mtime > current.file.stat.mtime)) {
+        byDate.set(iso, page);
+      }
+    });
+    return [...byDate.values()]
+      .sort((a, b) => String(a.frontmatter.date).localeCompare(String(b.frontmatter.date)));
+  }
+
+  rotationFromHistory(pages, todayISO) {
+    const previous = [...pages].reverse().find((page) => {
+      const iso = isoDateValue(page.frontmatter.date);
+      if (!iso || iso >= todayISO) return false;
+      const advanced = page.frontmatter.health_rotation_advanced === true
+        && healthRotationSlot(page.frontmatter.health_rotation_slot) !== null;
+      const skipped = page.frontmatter.health_rotation_skipped === true
+        && healthRotationSlot(page.frontmatter.health_rotation_skipped_slot) !== null;
+      return advanced || skipped;
+    });
+    if (!previous) return { slot: 0, workout: HEALTH_ROTATION[0] };
+    const previousSlot = previous.frontmatter.health_rotation_advanced === true
+      ? healthRotationSlot(previous.frontmatter.health_rotation_slot)
+      : healthRotationSlot(previous.frontmatter.health_rotation_skipped_slot);
+    const slot = (previousSlot + 1) % HEALTH_ROTATION.length;
+    return { slot, workout: HEALTH_ROTATION[slot] };
+  }
+
+  async initializePlannedWorkout(file, frontmatter, pages) {
+    const savedSlot = healthRotationSlot(frontmatter.health_planned_rotation_slot);
+    if (HEALTH_WORKOUTS[frontmatter.health_planned_workout] && savedSlot !== null) {
+      this.plannedWorkout = String(frontmatter.health_planned_workout);
+      this.plannedSlot = savedSlot;
+      return frontmatter;
+    }
+    const planned = this.rotationFromHistory(pages, localISO());
+    this.plannedWorkout = planned.workout;
+    this.plannedSlot = planned.slot;
+    await this.app.fileManager.processFrontMatter(file, (next) => {
+      if (!HEALTH_WORKOUTS[next.health_planned_workout]) next.health_planned_workout = planned.workout;
+      if (healthRotationSlot(next.health_planned_rotation_slot) === null) next.health_planned_rotation_slot = planned.slot;
+    });
+    return freshFrontmatter(this.app, file);
+  }
+
+  async normalizePrimaryWorkout(file, frontmatter) {
+    const stored = Array.isArray(frontmatter.health_workout_sessions)
+      ? frontmatter.health_workout_sessions
+      : [];
+    if (!stored.length) return frontmatter;
+    const sessions = healthWorkoutSessions(frontmatter);
+    const primary = healthPrimarySession(frontmatter, sessions);
+    if (!primary) return frontmatter;
+    const source = String(primary.source || frontmatter.health_primary_source || (
+      primary.workout === this.plannedWorkout && primary.mode === "standard"
+        ? "planned"
+        : primary.workout === frontmatter.health_recommended_workout
+          && primary.mode === frontmatter.health_recommended_mode
+          ? "recommended"
+          : "manual"
+    ));
+    const normalizedSessions = sessions.map((session) => ({
+      ...session,
+      role: String(session.id) === String(primary.id) ? "primary" : "additional",
+      source: String(session.id) === String(primary.id)
+        ? source
+        : "additional",
+    }));
+    const primaryComplete = ["completed", "rest"].includes(String(frontmatter.health_workout_status || ""))
+      && String(frontmatter.health_current_session_role || "") !== "additional";
+    const needsUpdate = String(frontmatter.health_primary_session_id || "") !== String(primary.id)
+      || String(frontmatter.health_primary_workout || "") !== String(primary.workout)
+      || String(frontmatter.health_primary_mode || "") !== String(primary.mode)
+      || String(frontmatter.health_primary_source || "") !== source
+      || stored.length !== normalizedSessions.length
+      || stored.some((session, index) => (
+        !normalizedSessions[index]
+        || String(session.role || "") !== normalizedSessions[index].role
+        || String(session.source || "") !== normalizedSessions[index].source
+      ))
+      || (primaryComplete && (
+        String(frontmatter.health_selected_workout || "") !== String(primary.workout)
+        || String(frontmatter.health_selected_mode || "") !== String(primary.mode)
+        || String(frontmatter.health_actual_workout || "") !== String(primary.workout)
+        || String(frontmatter.health_actual_workout_mode || "") !== String(primary.mode)
+        || String(frontmatter.health_workout_type || "") !== String(primary.workout)
+        || String(frontmatter.health_workout_mode || "") !== String(primary.mode)
+      ));
+    if (!needsUpdate) return frontmatter;
+    await this.app.fileManager.processFrontMatter(file, (next) => {
+      next.health_workout_sessions = normalizedSessions;
+      next.health_primary_session_id = String(primary.id);
+      next.health_primary_workout = String(primary.workout);
+      next.health_primary_mode = String(primary.mode || "standard");
+      next.health_primary_source = source;
+      if (primaryComplete) {
+        next.health_selected_workout = String(primary.workout);
+        next.health_selected_mode = String(primary.mode || "standard");
+        next.health_actual_workout = String(primary.workout);
+        next.health_actual_workout_mode = String(primary.mode || "standard");
+        next.health_workout_type = String(primary.workout);
+        next.health_workout_mode = String(primary.mode || "standard");
+        next.health_manual_override = source === "manual";
+        next.health_rotation_advance = String(primary.workout) === this.plannedWorkout;
+      }
+    });
+    return freshFrontmatter(this.app, file);
+  }
+
+  async updateHealth(file, mutator, notice = "") {
+    const write = async () => {
+      await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+        mutator(frontmatter);
+        const recommendation = healthRecommendation(frontmatter, this.plannedWorkout);
+        frontmatter.health_recommended_workout = recommendation.workout;
+        frontmatter.health_recommended_mode = recommendation.mode;
+        frontmatter.health_recommendation_status = recommendation.status;
+        frontmatter.health_recommendation_capacity = recommendation.capacity;
+        frontmatter.health_morning_capacity = recommendation.morningCapacity;
+        frontmatter.health_afternoon_state = recommendation.afternoonState;
+        frontmatter.health_recommendation_completeness = recommendation.completeness;
+        frontmatter.health_recommendation_reasons = recommendation.reasons;
+        frontmatter.health_recommendation_updated_at = localTimestamp();
+      });
+      if (notice) new Notice(notice);
+    };
+    this.writeQueue = this.writeQueue.then(write, write);
+    await this.writeQueue;
+    await this.renderDashboard();
+  }
+
+  queueTextUpdate(file, key, value) {
+    const previous = this.textTimers.get(key);
+    if (previous) window.clearTimeout(previous);
+    const timer = window.setTimeout(() => {
+      this.textTimers.delete(key);
+      this.updateHealth(file, (frontmatter) => {
+        if (value.trim()) frontmatter[key] = value.trim();
+        else delete frontmatter[key];
+      });
+    }, 700);
+    this.textTimers.set(key, timer);
+  }
+
+  createCanvas() {
+    this.contentEl.empty();
+    this.contentEl.addClass("castlex-health-view");
+    const shell = this.contentEl.createDiv({ cls: "cx-shell cx-health-shell" });
+    const desktopAsset = this.app.vault.getAbstractFileByPath(HEALTH_DESKTOP_ASSET_PATH);
+    const mobileAsset = this.app.vault.getAbstractFileByPath(HEALTH_MOBILE_ASSET_PATH);
+    if (desktopAsset instanceof TFile) shell.style.setProperty("--cx-background-desktop", `url("${this.app.vault.getResourcePath(desktopAsset)}")`);
+    if (mobileAsset instanceof TFile) shell.style.setProperty("--cx-background-mobile", `url("${this.app.vault.getResourcePath(mobileAsset)}")`);
+    shell.createDiv({ cls: "cx-background-layer", attr: { "aria-hidden": "true" } });
+    return shell.createDiv({ cls: "cx-health-dashboard-content" });
+  }
+
+  renderSyncPending(date) {
+    const dashboard = this.createCanvas();
+    const card = dashboard.createDiv({ cls: "cx-card cx-daily-sync-pending" });
+    card.createEl("h2", { text: `${localISO(date)} Daily 尚未同步` });
+    card.createEl("p", { text: "Health Dashboard 不会在手机上自动创建第二份 Daily。请等待 iCloud，或确认在本机创建。" });
+    const actions = card.createDiv({ cls: "cx-daily-sync-actions" });
+    const home = actions.createEl("button", { text: "返回 CastleX Home", cls: "cx-button" });
+    home.addEventListener("click", () => this.plugin.activateView());
+    const retry = actions.createEl("button", { text: "重新检查", cls: "cx-button cx-button-primary" });
+    retry.addEventListener("click", () => this.renderDashboard());
+    const create = actions.createEl("button", { text: "确认在本机创建", cls: "cx-button" });
+    create.addEventListener("click", async () => {
+      await this.ensureDaily(date, { allowCreate: true });
+      await this.renderDashboard();
+    });
+  }
+
+  renderHeader(parent) {
+    const hero = parent.createDiv({ cls: "cx-health-hero cx-glass" });
+    const copy = hero.createDiv({ cls: "cx-health-hero-copy" });
+    copy.createEl("p", {
+      text: new Intl.DateTimeFormat("zh-CN", { weekday: "long", year: "numeric", month: "long", day: "numeric" }).format(new Date()),
+      cls: "cx-overline",
+    });
+    this.clockEl = copy.createDiv({ cls: "cx-health-clock" });
+    this.updateClock();
+    copy.createEl("p", { text: "我与我的身体并肩作战", cls: "cx-health-signature" });
+    const actions = hero.createDiv({ cls: "cx-hero-actions" });
+    const home = actions.createEl("button", { text: "返回 CastleX Home", cls: "cx-button cx-button-primary" });
+    home.addEventListener("click", () => this.plugin.activateView());
+    const daily = actions.createEl("button", { text: "打开今日 Daily", cls: "cx-button" });
+    daily.addEventListener("click", async () => {
+      const file = await this.ensureDaily(new Date(), { allowCreate: true });
+      if (file instanceof TFile) await this.app.workspace.getLeaf("tab").openFile(file);
+    });
+  }
+
+  renderSignal(parent, file, frontmatter, key, label, labelSet) {
+    const field = parent.createDiv({ cls: "cx-health-field" });
+    field.createDiv({ text: label, cls: "cx-health-field-label" });
+    const selected = healthSignal(frontmatter[key]);
+    const control = field.createDiv({ cls: "cx-health-signal", attr: { role: "radiogroup", "aria-label": label } });
+    for (let value = 1; value <= 5; value += 1) {
+      const bar = control.createEl("button", {
+        cls: `cx-health-signal-bar${selected !== null && value <= selected ? " is-active" : ""}${value === selected ? " is-selected" : ""}`,
+        attr: {
+          type: "button",
+          role: "radio",
+          "aria-checked": String(value === selected),
+          "aria-label": `${label}：${labelSet[value - 1]}`,
+          title: labelSet[value - 1],
+        },
+      });
+      bar.style.setProperty("--cx-signal-height", `${12 + value * 6}px`);
+      bar.addEventListener("click", () => this.updateHealth(file, (next) => {
+        next[key] = value;
+      }, `${label}：${labelSet[value - 1]}`));
+    }
+    field.createDiv({ text: selected ? `${selected}/5 · ${labelSet[selected - 1]}` : "尚未记录", cls: "cx-health-field-value" });
+    return field;
+  }
+
+  renderChoice(parent, file, frontmatter, key, label, choices) {
+    const field = parent.createDiv({ cls: "cx-health-field" });
+    field.createDiv({ text: label, cls: "cx-health-field-label" });
+    const selected = String(frontmatter[key] ?? "");
+    const options = field.createDiv({ cls: "cx-health-choice-grid" });
+    choices.forEach(([value, text]) => {
+      const button = options.createEl("button", {
+        text,
+        cls: `cx-health-choice${selected === value ? " is-selected" : ""}`,
+        attr: { type: "button", "aria-pressed": String(selected === value) },
+      });
+      button.addEventListener("click", () => this.updateHealth(file, (next) => {
+        next[key] = value;
+      }, `${label}：${text}`));
+    });
+  }
+
+  renderMultiChoice(parent, file, frontmatter, key, label, choices) {
+    const field = parent.createDiv({ cls: "cx-health-field" });
+    field.createDiv({ text: label, cls: "cx-health-field-label" });
+    const selected = new Set(healthArray(frontmatter[key]));
+    const options = field.createDiv({ cls: "cx-health-choice-grid is-multi" });
+    choices.forEach(([value, text]) => {
+      const button = options.createEl("button", {
+        text,
+        cls: `cx-health-choice${selected.has(value) ? " is-selected" : ""}`,
+        attr: { type: "button", "aria-pressed": String(selected.has(value)) },
+      });
+      button.addEventListener("click", () => this.updateHealth(file, (next) => {
+        const values = new Set(healthArray(next[key]));
+        if (value === "none") {
+          values.clear();
+          values.add("none");
+        } else {
+          values.delete("none");
+          if (values.has(value)) values.delete(value);
+          else values.add(value);
+        }
+        next[key] = [...values];
+      }));
+    });
+    return field;
+  }
+
+  renderTextField(parent, file, frontmatter, key, label, placeholder) {
+    const field = parent.createDiv({ cls: "cx-health-field" });
+    field.createDiv({ text: label, cls: "cx-health-field-label" });
+    const input = field.createEl("textarea", {
+      cls: "cx-health-textarea",
+      attr: { placeholder, rows: "2", "aria-label": label },
+    });
+    input.value = String(frontmatter[key] ?? "");
+    input.addEventListener("input", () => this.queueTextUpdate(file, key, input.value));
+  }
+
+  renderMorning(parent, file, frontmatter) {
+    const fields = parent.createDiv({ cls: "cx-health-form-grid" });
+    this.renderSignal(fields, file, frontmatter, "health_morning_sleep", "睡眠质量", HEALTH_SIGNAL_LABELS.sleep);
+    this.renderSignal(fields, file, frontmatter, "health_morning_recovery", "醒来后的恢复感", HEALTH_SIGNAL_LABELS.recovery);
+    this.renderSignal(fields, file, frontmatter, "health_morning_body", "身体可用状态", HEALTH_SIGNAL_LABELS.body);
+    this.renderSignal(fields, file, frontmatter, "health_morning_outlook", "面对今天的感觉", HEALTH_SIGNAL_LABELS.outlook);
+    this.renderChoice(fields, file, frontmatter, "health_morning_dream", "昨晚的梦境", [
+      ["none", "没有印象"], ["dream", "普通梦境"], ["vivid", "明显梦境"], ["nightmare", "噩梦"],
+    ]);
+    this.renderMultiChoice(fields, file, frontmatter, "health_morning_regions", "身体哪里需要被看见", [
+      ["shoulders", "肩颈"], ["upper_back", "上背"], ["lower_back", "下背"], ["arms", "手臂"],
+      ["legs", "腿部"], ["whole_body", "全身"], ["none", "无明显不适"],
+    ]);
+    this.renderMultiChoice(fields, file, frontmatter, "health_morning_discomfort", "身体感受", [
+      ["none", "没有不适"], ["tightness", "紧绷"], ["soreness", "训练酸痛"],
+    ]);
+    this.renderChoice(fields, file, frontmatter, "health_morning_need", "今天最需要什么", [
+      ["rest", "休息"], ["movement", "活动"], ["quiet", "安静"], ["focus", "专注"], ["connection", "连接"], ["space", "空间"],
+    ]);
+  }
+
+  renderAfternoon(parent, file, frontmatter) {
+    const fields = parent.createDiv({ cls: "cx-health-form-grid" });
+    this.renderSignal(fields, file, frontmatter, "health_afternoon_energy_signal", "当前精力", HEALTH_SIGNAL_LABELS.energy);
+    this.renderSignal(fields, file, frontmatter, "health_afternoon_calmness", "当前平稳度", HEALTH_SIGNAL_LABELS.calmness);
+    this.renderSignal(fields, file, frontmatter, "health_afternoon_clarity", "当前清晰度", HEALTH_SIGNAL_LABELS.clarity);
+    this.renderSignal(fields, file, frontmatter, "health_afternoon_body_change", "身体相较早上", HEALTH_SIGNAL_LABELS.change);
+    this.renderChoice(fields, file, frontmatter, "health_afternoon_nap", "今天是否午睡", [
+      ["none", "没有"], ["15-30", "15–30 分钟"], ["30-45", "30–45 分钟"], ["45-60", "45–60 分钟"], ["60+", "超过 60 分钟"],
+    ]);
+    this.renderMultiChoice(fields, file, frontmatter, "health_afternoon_regions", "现在仍有感觉的部位", [
+      ["shoulders", "肩颈"], ["upper_back", "上背"], ["lower_back", "下背"], ["arms", "手臂"],
+      ["legs", "腿部"], ["whole_body", "全身"], ["none", "无明显不适"],
+    ]);
+    this.renderMultiChoice(fields, file, frontmatter, "health_afternoon_discomfort", "当前身体感受", [
+      ["none", "没有不适"], ["tightness", "紧绷"], ["soreness", "训练酸痛"],
+    ]);
+    this.renderChoice(fields, file, frontmatter, "health_afternoon_preference", "现在身体最想做什么", [
+      ["none", "没有特别偏好"], ["pool", "水中慢跑"], ["back", "背部"], ["upper", "上肢"],
+      ["legs", "腿部"], ["stretch", "拉伸"], ["rest", "休息"],
+    ]);
+    this.renderTextField(fields, file, frontmatter, "health_afternoon_challenge", "今天最大的挑战（可选）", "只记录你想留下的内容");
+  }
+
+  renderEvening(parent, file, frontmatter) {
+    const fields = parent.createDiv({ cls: "cx-health-form-grid" });
+    this.renderSignal(fields, file, frontmatter, "health_evening_body", "此刻的身体状态", HEALTH_SIGNAL_LABELS.eveningBody);
+    if (["active", "completed"].includes(String(frontmatter.health_workout_status || ""))) {
+      this.renderSignal(fields, file, frontmatter, "health_evening_post_workout", "运动后的身体状态", HEALTH_SIGNAL_LABELS.postWorkout);
+    }
+    this.renderTextField(fields, file, frontmatter, "health_evening_body_note", "身体备注（可选）", "例如：肩背更松、腿部偏重、今天需要更多恢复");
+  }
+
+  renderNight(parent, file, frontmatter) {
+    const fields = parent.createDiv({ cls: "cx-health-night-grid" });
+    const bedtimeAt = String(frontmatter.health_night_bedtime_at || "");
+    const bedtimeLabel = bedtimeAt ? bedtimeAt.slice(11, 16) : "";
+    const ritual = fields.createEl("button", {
+      cls: `cx-health-night-ritual${bedtimeAt ? " is-recorded" : ""}${Date.now() < this.nightRitualAnimationUntil ? " is-activating" : ""}`,
+      attr: {
+        type: "button",
+        "aria-pressed": String(Boolean(bedtimeAt)),
+        "aria-label": bedtimeAt ? `已记录准备入睡时间 ${bedtimeLabel}，点击可更新时间` : "关灯并记录准备入睡时间",
+      },
+    });
+    const sky = ritual.createDiv({ cls: "cx-health-night-sky", attr: { "aria-hidden": "true" } });
+    sky.createSpan({ cls: "cx-health-night-star is-one" });
+    sky.createSpan({ cls: "cx-health-night-star is-two" });
+    sky.createSpan({ cls: "cx-health-night-star is-three" });
+    const moon = sky.createSpan({ cls: "cx-health-night-moon" });
+    setIcon(moon, "moon-star");
+    const ritualCopy = ritual.createDiv({ cls: "cx-health-night-ritual-copy" });
+    ritualCopy.createSpan({ text: bedtimeAt ? `已关灯 · ${bedtimeLabel}` : "关灯 · 准备入睡", cls: "cx-health-night-ritual-title" });
+    ritualCopy.createSpan({
+      text: bedtimeAt ? "时间已经保存；再次点击可以更新" : "点击记录此刻，让房间慢慢安静下来",
+      cls: "cx-health-night-ritual-note",
+    });
+    ritual.addEventListener("click", () => {
+      const recordedAt = localTimestamp();
+      this.nightRitualAnimationUntil = Date.now() + 1400;
+      ritual.addClass("is-activating");
+      window.setTimeout(() => {
+        if (Date.now() >= this.nightRitualAnimationUntil) this.scheduleRender();
+      }, 1450);
+      this.updateHealth(file, (next) => {
+        next.health_night_bedtime_at = recordedAt;
+        next.health_night_completed_at = recordedAt;
+      }, `晚安 · 已记录 ${recordedAt.slice(11, 16)} 准备入睡`);
+    });
+
+    this.renderSignal(fields, file, frontmatter, "health_night_sleepiness", "当前睡意", HEALTH_SIGNAL_LABELS.sleepiness);
+    this.renderSignal(fields, file, frontmatter, "health_night_calmness", "精神平稳度", HEALTH_SIGNAL_LABELS.nightCalmness);
+    const reasons = this.renderMultiChoice(fields, file, frontmatter, "health_night_awake_reasons", "仍未入睡的原因", [
+      ["not_sleepy", "还不困"], ["active_mind", "思绪活跃"], ["screen", "手机或娱乐"],
+      ["work", "工作学习"], ["social", "社交"], ["late_workout", "晚间运动"], ["other", "其他"],
+    ]);
+    reasons.addClass("cx-health-night-reasons");
+  }
+
+  renderCheckin(parent, file, frontmatter) {
+    const card = parent.createDiv({ cls: "cx-card cx-health-checkin-card" });
+    const timedStage = healthStageForTime();
+    const stage = this.stageOverride || timedStage;
+    this.renderedStage = timedStage;
+    const stageNames = {
+      night: "夜间状态",
+      morning: "早晨 Check-in",
+      afternoon: "傍晚 Check-in",
+      evening: "晚间身体回顾",
+    };
+    const timestampKeys = {
+      night: "health_night_completed_at",
+      morning: "health_morning_completed_at",
+      afternoon: "health_afternoon_completed_at",
+      evening: "health_evening_completed_at",
+    };
+    const header = card.createDiv({ cls: "cx-health-card-header" });
+    const title = header.createDiv();
+    title.createEl("h2", { text: stageNames[stage] });
+    title.createSpan({ text: this.stageOverride ? "补填模式 · 所有输入仍写入今日 Daily" : "当前时段 · 输入后立即保存并更新建议" });
+    const reset = header.createEl("button", {
+      text: this.stageOverride ? "回到当前时段" : "补填",
+      cls: "cx-button",
+    });
+    reset.addEventListener("click", () => {
+      if (this.stageOverride) this.stageOverride = null;
+      else this.stageOverride = stage === "morning" ? "afternoon" : "morning";
+      this.renderDashboard();
+    });
+
+    const tracker = card.createDiv({ cls: "cx-health-stage-tracker" });
+    ["night", "morning", "afternoon", "evening"].forEach((item) => {
+      const complete = Boolean(frontmatter[timestampKeys[item]]);
+      const button = tracker.createEl("button", {
+        cls: `cx-health-stage${item === stage ? " is-active" : ""}${complete ? " is-complete" : ""}`,
+        attr: { type: "button", "aria-pressed": String(item === stage) },
+      });
+      const labels = { night: "夜间", morning: "早晨", afternoon: "傍晚", evening: "晚间" };
+      button.createSpan({ text: labels[item] });
+      button.createSpan({ text: complete ? "已记录" : item === timedStage ? "当前" : "待记录", cls: "cx-health-stage-state" });
+      button.addEventListener("click", () => {
+        this.stageOverride = item === timedStage ? null : item;
+        this.renderDashboard();
+      });
+    });
+
+    const form = card.createDiv({ cls: "cx-health-form" });
+    if (stage === "night") this.renderNight(form, file, frontmatter);
+    else if (stage === "morning") this.renderMorning(form, file, frontmatter);
+    else if (stage === "afternoon") this.renderAfternoon(form, file, frontmatter);
+    else this.renderEvening(form, file, frontmatter);
+    const footer = card.createDiv({ cls: "cx-health-form-footer" });
+    if (stage === "night") {
+      footer.createSpan({ text: "每一项都会单独保存；“关灯”会记录准确时间并完成夜间状态。" });
+    } else {
+      footer.createSpan({ text: "不必填完；每一项都会单独保存。" });
+      const complete = footer.createEl("button", { text: `完成${stageNames[stage]}`, cls: "cx-button cx-button-primary" });
+      complete.addEventListener("click", () => this.updateHealth(file, (next) => {
+        next[timestampKeys[stage]] = localTimestamp();
+      }, `${stageNames[stage]}已记录`));
+    }
+  }
+
+  async selectWorkout(file, workoutId, mode, manual) {
+    const current = await freshFrontmatter(this.app, file);
+    const isAdditional = String(current.health_current_session_role || "") === "additional";
+    if (healthPrimarySession(current) && !isAdditional) {
+      new Notice("今日主训练已经完成；请使用“再加入一个训练”添加其他项目");
+      return;
+    }
+    await this.updateHealth(file, (frontmatter) => {
+      if (!isAdditional) {
+        frontmatter.health_selected_workout = workoutId;
+        frontmatter.health_selected_mode = mode;
+        frontmatter.health_manual_override = manual;
+        frontmatter.health_rotation_advance = workoutId === this.plannedWorkout;
+      }
+      if (frontmatter.health_workout_status === "ready") {
+        frontmatter.health_workout_type = workoutId;
+        frontmatter.health_workout_mode = mode;
+        frontmatter.health_workout_completed_sets = [];
+      }
+    }, isAdditional
+      ? `追加训练调整为：${healthWorkout(workoutId).label} · ${healthModeLabel(mode)}`
+      : manual ? `已手动选择：${healthWorkout(workoutId).label}` : `已接受建议：${healthWorkout(workoutId).label}`);
+  }
+
+  async skipRotation(file, frontmatter) {
+    if (["ready", "active", "completed", "rest"].includes(String(frontmatter.health_workout_status || ""))) {
+      new Notice("训练已经开始或保存，不能再跳过本次轮换");
+      return;
+    }
+    if (frontmatter.health_rotation_skipped === true) {
+      new Notice("今天已经跳过一次轮换");
+      return;
+    }
+    const skippedSlot = this.plannedSlot;
+    const skippedWorkout = this.plannedWorkout;
+    const nextSlot = (skippedSlot + 1) % HEALTH_ROTATION.length;
+    this.plannedSlot = nextSlot;
+    this.plannedWorkout = HEALTH_ROTATION[nextSlot];
+    await this.updateHealth(file, (next) => {
+      next.health_rotation_skipped = true;
+      next.health_rotation_skipped_slot = skippedSlot;
+      next.health_rotation_skipped_workout = skippedWorkout;
+      next.health_rotation_skipped_at = localTimestamp();
+      next.health_planned_rotation_slot = nextSlot;
+      next.health_planned_workout = this.plannedWorkout;
+      delete next.health_selected_workout;
+      delete next.health_selected_mode;
+      delete next.health_manual_override;
+      delete next.health_rotation_advance;
+    }, `已跳过${healthWorkout(skippedWorkout).label}，当前轮换为${healthWorkout(this.plannedWorkout).label}`);
+  }
+
+  renderDirection(parent, file, frontmatter, recommendation) {
+    const card = parent.createDiv({ cls: "cx-card cx-health-direction-card" });
+    const header = card.createDiv({ cls: "cx-health-card-header" });
+    const title = header.createDiv();
+    title.createEl("h2", { text: "今日身体方向" });
+    const statusLabels = { planned: "轮换计划", provisional: "实时暂定", final: "傍晚确认" };
+    title.createSpan({ text: `${statusLabels[recommendation.status]} · 信息 ${recommendation.completeness}` });
+    const primarySession = healthPrimarySession(frontmatter);
+    const primaryWorkout = String(primarySession?.workout || frontmatter.health_primary_workout || frontmatter.health_selected_workout || "");
+    const primaryMode = String(primarySession?.mode || frontmatter.health_primary_mode || frontmatter.health_selected_mode || "standard");
+    const comparison = card.createDiv({ cls: "cx-health-direction-grid" });
+    [
+      ["原定训练", healthWorkout(this.plannedWorkout).label, "planned"],
+      ["当前建议", `${healthWorkout(recommendation.workout).label} · ${recommendation.mode === "light" ? "轻量" : recommendation.mode === "recovery" ? "恢复" : "标准"}`, "recommended"],
+      ["我的选择", primaryWorkout
+        ? `${healthWorkout(primaryWorkout).label} · ${primaryMode === "light" ? "轻量" : primaryMode === "recovery" ? "恢复" : "标准"}`
+        : "尚未确认", "selected"],
+    ].forEach(([label, value, state]) => {
+      const item = comparison.createDiv({ cls: `cx-health-direction-item is-${state}` });
+      item.createSpan({ text: label, cls: "cx-health-direction-label" });
+      item.createEl("strong", { text: value });
+    });
+    const reasons = card.createDiv({ cls: "cx-health-reasons" });
+    reasons.createDiv({ text: "为什么", cls: "cx-health-field-label" });
+    const list = reasons.createEl("ul");
+    recommendation.reasons.slice(0, 4).forEach((reason) => list.createEl("li", { text: reason }));
+    card.createDiv({
+      text: primarySession
+        ? "今日主训练已经完成并锁定。追加项目请在“今日训练”中使用“再加入一个训练”。"
+        : "不需要提前确认；点击“开始训练”时会自动采用当时的建议。下面的选择用于手动修改。",
+      cls: "cx-health-direction-hint",
+    });
+    const choices = card.createDiv({ cls: "cx-health-workout-choices" });
+    Object.entries(HEALTH_WORKOUTS).forEach(([id, workout]) => {
+      const selected = primaryWorkout === id;
+      const button = choices.createEl("button", {
+        text: workout.label,
+        cls: `cx-health-choice${selected ? " is-selected" : ""}`,
+        attr: { type: "button", title: `手动选择${workout.label}` },
+      });
+      button.disabled = Boolean(primarySession);
+      button.addEventListener("click", () => this.selectWorkout(
+        file,
+        id,
+        ["stretch", "rest"].includes(id) ? "recovery" : "standard",
+        true,
+      ));
+    });
+    this.renderTextField(card, file, frontmatter, "health_override_reason", "手动调整原因（选择休息时建议填写）", "例如：今天只想游泳，或今天决定完全休息");
+  }
+
+  async startWorkout(file, frontmatter, recommendation) {
+    const sessions = healthWorkoutSessions(frontmatter);
+    const isAdditional = String(frontmatter.health_current_session_role || "") === "additional"
+      || Boolean(healthPrimarySession(frontmatter, sessions));
+    const role = isAdditional ? "additional" : "primary";
+    const workoutId = String(isAdditional
+      ? frontmatter.health_workout_type
+      : frontmatter.health_selected_workout || recommendation.workout);
+    const mode = String(isAdditional
+      ? frontmatter.health_workout_mode || "standard"
+      : frontmatter.health_selected_mode || recommendation.mode);
+    if (workoutId === "rest") {
+      await this.recordRest(file);
+      return;
+    }
+    const sessionId = `session-${Date.now()}`;
+    await this.updateHealth(file, (next) => {
+      if (role === "primary") {
+        const source = next.health_manual_override === true
+          ? "manual"
+          : workoutId !== this.plannedWorkout || mode !== "standard" ? "recommended" : "planned";
+        next.health_selected_workout = workoutId;
+        next.health_selected_mode = mode;
+        if (next.health_manual_override !== true) next.health_manual_override = false;
+        next.health_rotation_advance = workoutId === this.plannedWorkout;
+        next.health_primary_session_id = sessionId;
+        next.health_primary_workout = workoutId;
+        next.health_primary_mode = mode;
+        next.health_primary_source = source;
+      }
+      next.health_workout_type = workoutId;
+      next.health_workout_mode = mode;
+      next.health_workout_status = "active";
+      next.health_workout_session_id = sessionId;
+      next.health_current_session_role = role;
+      next.health_workout_started_at = localTimestamp();
+      next.health_workout_completed_sets = [];
+      delete next.health_workout_completed_at;
+    }, `${healthWorkout(workoutId).label}已开始`);
+  }
+
+  async prepareAdditionalWorkout(file, workoutId) {
+    const mode = healthWorkoutSupportsModes(workoutId) ? "standard" : "recovery";
+    this.addingWorkout = false;
+    await this.updateHealth(file, (next) => {
+      next.health_workout_sessions = healthWorkoutSessions(next);
+      next.health_workout_type = workoutId;
+      next.health_workout_mode = mode;
+      next.health_workout_status = "ready";
+      next.health_current_session_role = "additional";
+      next.health_workout_completed_sets = [];
+      delete next.health_workout_session_id;
+      delete next.health_workout_started_at;
+      delete next.health_workout_completed_at;
+    }, `已选择${healthWorkout(workoutId).label}，点击开始训练后才会计时`);
+  }
+
+  async toggleWorkoutSet(file, key, checked) {
+    await this.updateHealth(file, (frontmatter) => {
+      const values = new Set(healthArray(frontmatter.health_workout_completed_sets));
+      if (checked) values.add(key);
+      else values.delete(key);
+      frontmatter.health_workout_completed_sets = [...values];
+    });
+  }
+
+  async upsertCompletionSummary(file, frontmatter) {
+    const reason = String(frontmatter.health_override_reason || "").trim();
+    const sessions = healthWorkoutSessions(frontmatter);
+    const details = sessions.map((session) => {
+      const completed = healthArray(session.completed_sets).length;
+      const total = healthSessionTotalSets(session);
+      const minutes = minutesValue(session.minutes);
+      return healthWorkoutIsStrength(session.workout)
+        ? `${healthWorkout(session.workout).label} · ${healthModeLabel(session.mode)} · ${completed}/${total} 组${minutes !== null ? ` · ${minutes} 分钟` : ""}`
+        : `${healthWorkout(session.workout).label} · ${healthModeLabel(session.mode)}${minutes !== null ? ` · ${minutes} 分钟` : ""}`;
+    });
+    if (!details.length && String(frontmatter.health_workout_status || "") === "rest") {
+      details.push(`今日休息${reason ? ` · ${reason}` : ""}`);
+    }
+    if (!details.length) return;
+    const marker = "<!-- castlex-health-completion -->";
+    const line = `- 身体照顾 · ${details.join("；")} ${marker}`;
+    await this.app.vault.process(file, (content) => {
+      const lines = content.split("\n");
+      const existing = lines.findIndex((item) => item.includes(marker));
+      if (existing >= 0) {
+        lines[existing] = line;
+        return lines.join("\n");
+      }
+      const heading = lines.findIndex((item) => item.trim() === "## Completed Today");
+      if (heading < 0) return content;
+      let insertAt = heading + 1;
+      while (insertAt < lines.length && (!lines[insertAt].trim() || lines[insertAt].trim().startsWith("<!--"))) insertAt += 1;
+      lines.splice(insertAt, 0, line, "");
+      return lines.join("\n");
+    });
+  }
+
+  async finishWorkout(file) {
+    const current = await freshFrontmatter(this.app, file);
+    const existingSessions = healthWorkoutSessions(current);
+    const started = new Date(current.health_workout_started_at);
+    const elapsed = Number.isNaN(started.getTime()) ? null : Math.max(1, Math.round((Date.now() - started.getTime()) / 60000));
+    const workoutId = String(current.health_workout_type || current.health_selected_workout || "pool");
+    const mode = String(current.health_workout_mode || "standard");
+    const sessionId = String(current.health_workout_session_id || `session-${Date.now()}`);
+    const role = String(current.health_current_session_role || "") === "additional"
+      || (healthPrimarySession(current, existingSessions) && String(current.health_primary_session_id || "") !== sessionId)
+      ? "additional"
+      : "primary";
+    const plannedCounts = healthPlanSetCounts(workoutId, mode);
+    const completedAt = localTimestamp();
+    const session = {
+      id: sessionId,
+      workout: workoutId,
+      mode,
+      role,
+      source: role === "primary" ? String(current.health_primary_source || "") : "additional",
+      started_at: current.health_workout_started_at || null,
+      completed_at: completedAt,
+      completed_sets: healthArray(current.health_workout_completed_sets),
+      total_sets: healthWorkoutIsStrength(workoutId) ? healthTotalSets(workoutId, mode) : 0,
+      planned_working_sets: healthWorkoutIsStrength(workoutId) ? plannedCounts.working : 0,
+      planned_warmup_sets: healthWorkoutIsStrength(workoutId) ? plannedCounts.warmup : 0,
+      minutes: elapsed,
+    };
+    await this.updateHealth(file, (frontmatter) => {
+      const sessions = healthWorkoutSessions(frontmatter)
+        .filter((item) => String(item.id) !== session.id);
+      sessions.push(session);
+      frontmatter.health_workout_sessions = sessions;
+      frontmatter.health_workout_status = "completed";
+      frontmatter.health_workout_completed_at = completedAt;
+      if (elapsed !== null) {
+        const previousMinutes = sessions.slice(0, -1)
+          .reduce((total, item) => total + (minutesValue(item.minutes) || 0), 0);
+        frontmatter.workout_minutes = previousMinutes + elapsed;
+        frontmatter.workout_minutes_origin = "human";
+        frontmatter.time_data_reviewed = true;
+      }
+      if (role === "primary") {
+        if (frontmatter.health_rotation_advance === true) {
+          frontmatter.health_rotation_slot = this.plannedSlot;
+          frontmatter.health_rotation_advanced = true;
+        } else if (frontmatter.health_rotation_advanced !== true) {
+          delete frontmatter.health_rotation_slot;
+          frontmatter.health_rotation_advanced = false;
+        }
+        frontmatter.health_primary_session_id = session.id;
+        frontmatter.health_primary_workout = workoutId;
+        frontmatter.health_primary_mode = mode;
+        frontmatter.health_selected_workout = workoutId;
+        frontmatter.health_selected_mode = mode;
+        frontmatter.health_actual_workout = workoutId;
+        frontmatter.health_actual_workout_mode = mode;
+      }
+      const primary = healthPrimarySession(frontmatter, sessions);
+      if (primary) {
+        frontmatter.health_workout_type = String(primary.workout);
+        frontmatter.health_workout_mode = String(primary.mode || "standard");
+        frontmatter.health_selected_workout = String(primary.workout);
+        frontmatter.health_selected_mode = String(primary.mode || "standard");
+        frontmatter.health_actual_workout = String(primary.workout);
+        frontmatter.health_actual_workout_mode = String(primary.mode || "standard");
+        frontmatter.health_manual_override = String(primary.source || frontmatter.health_primary_source || "") === "manual";
+      }
+      delete frontmatter.health_current_session_role;
+    }, "训练已完成");
+    await this.upsertCompletionSummary(file, await freshFrontmatter(this.app, file));
+    await this.renderDashboard();
+  }
+
+  async recordRest(file) {
+    await this.updateHealth(file, (frontmatter) => {
+      const source = frontmatter.health_manual_override === true ? "manual" : "recommended";
+      frontmatter.health_selected_workout = "rest";
+      frontmatter.health_selected_mode = "recovery";
+      frontmatter.health_workout_type = "rest";
+      frontmatter.health_actual_workout = "rest";
+      frontmatter.health_actual_workout_mode = "recovery";
+      frontmatter.health_primary_workout = "rest";
+      frontmatter.health_primary_mode = "recovery";
+      frontmatter.health_primary_source = source;
+      frontmatter.health_workout_mode = "recovery";
+      frontmatter.health_workout_status = "rest";
+      frontmatter.health_workout_completed_at = localTimestamp();
+      frontmatter.health_rotation_advanced = false;
+      frontmatter.workout_minutes = 0;
+      frontmatter.workout_minutes_origin = "human";
+      frontmatter.time_data_reviewed = true;
+      delete frontmatter.health_current_session_role;
+    }, "今日已记录为休息");
+    await this.upsertCompletionSummary(file, await freshFrontmatter(this.app, file));
+    await this.renderDashboard();
+  }
+
+  renderWorkoutPreview(parent, workoutId, mode) {
+    const template = healthWorkout(workoutId);
+    const plan = healthWorkoutPlan(workoutId, mode);
+    if (!plan.exercises.length) {
+      const empty = parent.createDiv({ cls: "cx-health-workout-empty" });
+      empty.createEl("strong", { text: plan.summary || template.purpose });
+      if (plan.accessory) empty.createSpan({ text: plan.accessory });
+      return;
+    }
+    const list = parent.createDiv({ cls: "cx-health-preview-list" });
+    plan.exercises.forEach((exercise) => {
+      const row = list.createDiv({ cls: "cx-health-preview-row" });
+      const copy = row.createDiv();
+      copy.createEl("strong", { text: exercise.label });
+      copy.createSpan({ text: exercise.english });
+      row.createSpan({ text: `${exercise.warmup ? "热身 1 组 + " : ""}正式 ${exercise.sets} 组 · ${exercise.reps}`, cls: "cx-health-preview-meta" });
+    });
+  }
+
+  renderActiveWorkout(parent, file, frontmatter) {
+    const workoutId = String(frontmatter.health_workout_type);
+    const mode = String(frontmatter.health_workout_mode || "standard");
+    const template = healthWorkout(workoutId);
+    const plan = healthWorkoutPlan(workoutId, mode);
+    const completed = new Set(healthArray(frontmatter.health_workout_completed_sets));
+    const completedCounts = healthCompletedSetCounts([...completed]);
+    const plannedCounts = healthPlanSetCounts(workoutId, mode);
+    const total = healthTotalSets(workoutId, mode);
+    const progress = total ? completed.size / total * 100 : 0;
+    const header = parent.createDiv({ cls: "cx-health-workout-progress-header" });
+    header.createEl("strong", { text: healthWorkoutIsStrength(workoutId) ? `已完成 ${completed.size} / ${total} 组` : `${template.label}进行中` });
+    this.timerEl = header.createSpan({ text: "已进行 0m", cls: "cx-health-workout-timer" });
+    this.timerEl.dataset.startedAt = String(frontmatter.health_workout_started_at || "");
+    this.updateClock();
+    if (healthWorkoutIsStrength(workoutId)) {
+      parent.createDiv({
+        text: `正式 ${completedCounts.working} / ${plannedCounts.working} · 热身 ${completedCounts.warmup} / ${plannedCounts.warmup} · ${healthModeLabel(mode)} ${mode === "light" ? "保留约 4–5 次余力" : "保留约 2–3 次余力"}`,
+        cls: "cx-health-set-breakdown",
+      });
+    }
+    const track = parent.createDiv({ cls: "cx-health-progress-track is-large" });
+    const fill = track.createSpan({ cls: "cx-health-progress-fill" });
+    fill.style.width = `${progress}%`;
+
+    if (healthWorkoutIsStrength(workoutId)) {
+      const exercises = parent.createDiv({ cls: "cx-health-exercise-list" });
+      plan.exercises.forEach((exercise) => {
+        const card = exercises.createDiv({ cls: "cx-health-exercise" });
+        const exerciseHeader = card.createDiv({ cls: "cx-health-exercise-header" });
+        const copy = exerciseHeader.createDiv();
+        copy.createEl("strong", { text: exercise.label });
+        copy.createSpan({ text: `${exercise.english} · ${exercise.reps}` });
+        const setRows = card.createDiv({ cls: "cx-health-set-list" });
+        const rows = [];
+        if (exercise.warmup) rows.push(["warmup", "热身组"]);
+        for (let index = 1; index <= exercise.sets; index += 1) rows.push([`set_${index}`, `第 ${index} 组`]);
+        rows.forEach(([setId, label]) => {
+          const key = `${exercise.id}:${setId}`;
+          const row = setRows.createEl("label", { cls: `cx-health-set${completed.has(key) ? " is-complete" : ""}` });
+          const checkbox = row.createEl("input", { attr: { type: "checkbox" } });
+          checkbox.checked = completed.has(key);
+          row.createSpan({ text: label });
+          checkbox.addEventListener("change", () => this.toggleWorkoutSet(file, key, checkbox.checked));
+        });
+      });
+    } else {
+      const empty = parent.createDiv({ cls: "cx-health-workout-empty" });
+      empty.createEl("strong", { text: plan.summary || template.purpose });
+      if (plan.accessory) empty.createSpan({ text: plan.accessory });
+      empty.createSpan({ text: "使用开始与结束时间记录，不设置分段 checkbox。" });
+    }
+    const actions = parent.createDiv({ cls: "cx-health-workout-actions" });
+    const finish = actions.createEl("button", { text: "完成训练", cls: "cx-button cx-button-primary" });
+    finish.addEventListener("click", () => this.finishWorkout(file));
+  }
+
+  renderSessionHistory(parent, sessions) {
+    if (!sessions.length) return;
+    const section = parent.createDiv({ cls: "cx-health-session-history" });
+    section.createDiv({ text: `今日已完成 · ${sessions.length} 项`, cls: "cx-health-field-label" });
+    const list = section.createDiv({ cls: "cx-health-session-list" });
+    sessions.forEach((session) => {
+      const item = list.createDiv({ cls: "cx-health-session-item" });
+      const header = item.createDiv({ cls: "cx-health-session-header" });
+      header.createEl("strong", {
+        text: `${session.role === "primary" ? "主训练" : "追加"} · ${healthWorkout(session.workout).label} · ${healthModeLabel(session.mode)}`,
+      });
+      const completedAt = String(session.completed_at || "");
+      header.createSpan({ text: completedAt ? completedAt.slice(11, 16) : "" });
+      const completed = healthArray(session.completed_sets).length;
+      const completedCounts = healthCompletedSetCounts(session.completed_sets);
+      const plannedCounts = healthSessionSetCounts(session);
+      const total = healthSessionTotalSets(session);
+      const minutes = minutesValue(session.minutes);
+      item.createSpan({
+        text: healthWorkoutIsStrength(session.workout)
+          ? `${completed} / ${total} 组 · 正式 ${completedCounts.working}/${plannedCounts.working} · 热身 ${completedCounts.warmup}/${plannedCounts.warmup}${minutes !== null ? ` · ${minutes} 分钟` : ""}`
+          : `${minutes !== null ? `${minutes} 分钟` : "已完成"}`,
+        cls: "cx-health-session-meta",
+      });
+      if (healthWorkoutIsStrength(session.workout)) {
+        const track = item.createDiv({ cls: "cx-health-progress-track" });
+        const fill = track.createSpan({ cls: "cx-health-progress-fill" });
+        fill.style.width = `${total ? completed / total * 100 : 0}%`;
+      }
+    });
+  }
+
+  renderAdditionalWorkoutPicker(parent, file) {
+    const picker = parent.createDiv({ cls: "cx-health-add-workout" });
+    picker.createDiv({ text: "选择追加训练", cls: "cx-health-field-label" });
+    picker.createSpan({ text: "会计入今日总时长，但不会改变已经完成的主训练和“我的选择”。" });
+    const choices = picker.createDiv({ cls: "cx-health-workout-choices" });
+    ["pool", "back", "upper", "legs", "stretch"].forEach((id) => {
+      const button = choices.createEl("button", {
+        text: healthWorkout(id).label,
+        cls: "cx-health-choice",
+        attr: { type: "button" },
+      });
+      button.addEventListener("click", () => this.prepareAdditionalWorkout(file, id));
+    });
+  }
+
+  renderWorkoutModeSelector(parent, file, workoutId, mode) {
+    if (!healthWorkoutSupportsModes(workoutId)) return;
+    const selector = parent.createDiv({ cls: "cx-health-mode-selector" });
+    selector.createSpan({ text: "训练模式", cls: "cx-health-field-label" });
+    const choices = selector.createDiv({ cls: "cx-health-mode-choices" });
+    ["standard", "light"].forEach((nextMode) => {
+      const button = choices.createEl("button", {
+        cls: `cx-health-mode-choice${mode === nextMode ? " is-selected" : ""}`,
+        attr: { type: "button", "aria-pressed": String(mode === nextMode) },
+      });
+      button.createEl("strong", { text: nextMode === "standard" ? "Standard" : "Light" });
+      button.addEventListener("click", () => this.selectWorkout(file, workoutId, nextMode, true));
+    });
+  }
+
+  renderWorkout(parent, file, frontmatter, recommendation) {
+    const card = parent.createDiv({ cls: "cx-card cx-health-workout-card" });
+    const status = String(frontmatter.health_workout_status || "");
+    const sessions = healthWorkoutSessions(frontmatter);
+    const workoutId = String(frontmatter.health_workout_type || frontmatter.health_selected_workout || recommendation.workout);
+    const mode = String(frontmatter.health_workout_mode || frontmatter.health_selected_mode || recommendation.mode);
+    const header = card.createDiv({ cls: "cx-health-card-header" });
+    const title = header.createDiv();
+    title.createEl("h2", { text: status === "active" ? "Workout Mode" : status === "ready" ? "准备训练" : "今日训练" });
+    title.createSpan({ text: `${healthWorkout(workoutId).label} · ${mode === "light" ? "轻量模式" : mode === "recovery" ? "恢复模式" : "标准模式"}` });
+    if (sessions.length) this.renderSessionHistory(card, sessions);
+    if (status === "active") {
+      this.renderActiveWorkout(card, file, frontmatter);
+      return;
+    }
+    if (status === "completed" || status === "rest") {
+      if (!sessions.length) {
+        const complete = card.createDiv({ cls: "cx-health-workout-complete" });
+        complete.createEl("strong", { text: "今天选择休整" });
+        complete.createSpan({ text: frontmatter.health_workout_completed_at ? `记录于 ${String(frontmatter.health_workout_completed_at).slice(11, 16)}` : "" });
+      }
+      const actions = card.createDiv({ cls: "cx-health-workout-actions" });
+      const add = actions.createEl("button", { text: "再加入一个训练", cls: "cx-button cx-button-primary" });
+      add.addEventListener("click", () => {
+        this.addingWorkout = !this.addingWorkout;
+        this.renderDashboard();
+      });
+      if (this.addingWorkout) this.renderAdditionalWorkoutPicker(card, file);
+      return;
+    }
+    card.createDiv({ text: healthWorkout(workoutId).purpose, cls: "cx-health-workout-purpose" });
+    this.renderWorkoutModeSelector(card, file, workoutId, mode);
+    this.renderWorkoutPreview(card, workoutId, mode);
+    const actions = card.createDiv({ cls: "cx-health-workout-actions" });
+    const start = actions.createEl("button", {
+      text: workoutId === "rest" ? "记录今日休息" : "开始训练",
+      cls: "cx-button cx-button-primary",
+    });
+    start.addEventListener("click", () => this.startWorkout(file, frontmatter, recommendation));
+  }
+
+  renderTrends(parent, pages) {
+    const card = parent.createDiv({ cls: "cx-card cx-health-trend-card" });
+    const header = card.createDiv({ cls: "cx-health-card-header" });
+    const title = header.createDiv();
+    title.createEl("h2", { text: "最近 7 日身体趋势" });
+    title.createSpan({ text: "仅使用 Health Dashboard 独立字段" });
+    const recent = pages.filter((page) => isoDateValue(page.frontmatter.date) <= localISO()).slice(-7);
+    const rows = card.createDiv({ cls: "cx-health-trend-rows" });
+    recent.forEach((page) => {
+      const fm = page.frontmatter;
+      const row = rows.createDiv({ cls: "cx-health-trend-row" });
+      row.createSpan({ text: String(isoDateValue(fm.date)).slice(5).replace("-", "/"), cls: "cx-health-trend-date" });
+      [
+        ["睡眠", healthSignal(fm.health_morning_sleep), 5],
+        ["恢复", healthSignal(fm.health_morning_recovery), 5],
+        ["精力", healthAfternoonEnergy(fm), 5],
+      ].forEach(([label, value, maximum]) => {
+        const metric = row.createDiv({ cls: "cx-health-trend-metric" });
+        metric.createSpan({ text: label });
+        const track = metric.createDiv({ cls: "cx-health-mini-track" });
+        const fill = track.createSpan();
+        fill.style.width = `${value === null ? 0 : value / maximum * 100}%`;
+      });
+    });
+    if (!recent.length) rows.createDiv({ text: "尚无 Health 数据", cls: "cx-empty" });
+  }
+
+  renderRotation(parent, file, frontmatter) {
+    const card = parent.createDiv({ cls: "cx-card cx-health-rotation-card" });
+    const header = card.createDiv({ cls: "cx-health-card-header" });
+    const title = header.createDiv();
+    title.createEl("h2", { text: "训练轮换" });
+    title.createSpan({ text: "临时改做游泳、拉伸或休息，不推进原定轮换" });
+    const alreadySkipped = frontmatter.health_rotation_skipped === true;
+    const canSkip = !["ready", "active", "completed", "rest"].includes(String(frontmatter.health_workout_status || ""));
+    const skip = header.createEl("button", {
+      text: alreadySkipped
+        ? `已跳过 ${healthWorkout(frontmatter.health_rotation_skipped_workout).shortLabel}`
+        : `跳过当前 ${healthWorkout(this.plannedWorkout).shortLabel}`,
+      cls: "cx-button",
+      attr: { type: "button" },
+    });
+    skip.disabled = !canSkip || alreadySkipped;
+    skip.addEventListener("click", () => this.skipRotation(file, frontmatter));
+    const route = card.createDiv({ cls: "cx-health-rotation-route" });
+    const skippedSlot = alreadySkipped ? healthRotationSlot(frontmatter.health_rotation_skipped_slot) : null;
+    HEALTH_ROTATION.forEach((id, index) => {
+      const item = route.createDiv({
+        cls: `cx-health-rotation-node${index === this.plannedSlot ? " is-current" : ""}${index === skippedSlot ? " is-skipped" : ""}`,
+      });
+      item.createSpan({ text: healthWorkout(id).shortLabel, cls: "cx-health-rotation-name" });
+      item.createSpan({
+        text: index === this.plannedSlot ? "当前" : index === skippedSlot ? "已跳过" : String(index + 1),
+        cls: "cx-health-rotation-index",
+      });
+    });
+  }
+
+  async renderDashboard() {
+    const now = new Date();
+    this.currentDateISO = localISO(now);
+    const todayFile = await this.ensureDaily(now);
+    if (!(todayFile instanceof TFile)) {
+      this.renderSyncPending(now);
+      return;
+    }
+    const pages = this.dailyPages();
+    let frontmatter = await freshFrontmatter(this.app, todayFile);
+    frontmatter = await this.initializePlannedWorkout(todayFile, frontmatter, pages);
+    frontmatter = await this.normalizePrimaryWorkout(todayFile, frontmatter);
+    const recommendation = healthRecommendation(frontmatter, this.plannedWorkout, now);
+    const dashboard = this.createCanvas();
+    this.renderHeader(dashboard);
+    const main = dashboard.createDiv({ cls: "cx-health-main-grid" });
+    this.renderCheckin(main, todayFile, frontmatter);
+    this.renderDirection(main, todayFile, frontmatter, recommendation);
+    this.renderWorkout(dashboard, todayFile, frontmatter, recommendation);
+    const insights = dashboard.createDiv({ cls: "cx-health-insights-grid" });
+    const trendPages = pages
+      .filter((page) => isoDateValue(page.frontmatter.date) !== this.currentDateISO);
+    trendPages.push({ file: todayFile, frontmatter });
+    trendPages.sort((a, b) => String(isoDateValue(a.frontmatter.date)).localeCompare(String(isoDateValue(b.frontmatter.date))));
+    this.renderTrends(insights, trendPages);
+    this.renderRotation(insights, todayFile, frontmatter);
+    dashboard.createDiv({
+      cls: "cx-mobile-scroll-spacer",
+      attr: { "aria-hidden": "true" },
+    });
   }
 }
 
@@ -1556,6 +3251,7 @@ module.exports = class CastleXDashboardPlugin extends Plugin {
     this.mobileHomeButton = null;
     this.dailyCreationPromises = new Map();
     this.registerView(VIEW_TYPE, (leaf) => new CastleXHomeView(leaf, this));
+    this.registerView(HEALTH_VIEW_TYPE, (leaf) => new CastleXHealthView(leaf, this));
     this.registerMarkdownCodeBlockProcessor("castlex-status", (_source, element, context) => {
       const file = this.app.vault.getAbstractFileByPath(context.sourcePath);
       if (file instanceof TFile) context.addChild(new DailyStatusChild(element, this.app, file));
@@ -1568,8 +3264,14 @@ module.exports = class CastleXDashboardPlugin extends Plugin {
       const file = this.app.vault.getAbstractFileByPath(context.sourcePath);
       if (file instanceof TFile) context.addChild(new WeeklySnapshotChild(element, this.app, file));
     });
+    this.registerMarkdownCodeBlockProcessor("castlex-health-summary", (_source, element, context) => {
+      const file = this.app.vault.getAbstractFileByPath(context.sourcePath);
+      if (file instanceof TFile) context.addChild(new DailyHealthSummaryChild(element, this.app, file));
+    });
     this.addRibbonIcon("ship-wheel", "Open CastleX Home", () => this.activateView());
+    this.addRibbonIcon("heart-pulse", "Open Health Dashboard", () => this.activateHealthView());
     this.addCommand({ id: "open-home", name: "Open CastleX Home", callback: () => this.activateView() });
+    this.addCommand({ id: "open-health-dashboard", name: "Open Health Dashboard", callback: () => this.activateHealthView() });
     this.app.workspace.onLayoutReady(() => {
       this.activateView();
       this.setupMobileHomeButton();
@@ -1603,9 +3305,19 @@ module.exports = class CastleXDashboardPlugin extends Plugin {
     await this.app.workspace.revealLeaf(leaf);
   }
 
+  async activateHealthView() {
+    let leaf = this.app.workspace.getLeavesOfType(HEALTH_VIEW_TYPE)[0];
+    if (!leaf) {
+      leaf = this.app.workspace.getLeaf("tab");
+      await leaf.setViewState({ type: HEALTH_VIEW_TYPE, active: true });
+    }
+    await this.app.workspace.revealLeaf(leaf);
+  }
+
   onunload() {
     this.mobileHomeButton?.remove();
     this.mobileHomeButton = null;
     this.app.workspace.detachLeavesOfType(VIEW_TYPE);
+    this.app.workspace.detachLeavesOfType(HEALTH_VIEW_TYPE);
   }
 };

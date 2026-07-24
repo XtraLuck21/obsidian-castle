@@ -83,12 +83,12 @@ Daily Notes store source time values in whole minutes:
 project_minutes: 120
 admin_minutes: 40
 workout_minutes: 50
-personal_enrichment_minutes: 60
+enrichment_minutes: 60
 
 project_minutes_origin: ai
 admin_minutes_origin: ai
 workout_minutes_origin: ai
-personal_enrichment_minutes_origin: ai
+enrichment_minutes_origin: ai
 time_data_reviewed: false
 ```
 
@@ -115,16 +115,16 @@ time_data_reviewed: false
 - `Admin`: email, appointments, errands, household maintenance, purchasing,
   organizing, and similar life/work upkeep.
 - `Workout`: deliberately recorded exercise, training, or physical activity.
-- `Personal Enrichment`: reading, learning, art, media, reflection, or hobbies
+- `Enrichment`: reading, learning, art, media, reflection, or hobbies
   that do not directly advance a defined Project.
 
 Assign a time block to one primary category unless the source explicitly splits
 it. Project-directed learning belongs to `Project`, not both Project and
-Personal Enrichment.
+Enrichment.
 
 ### Four Heatmap levels
 
-For Project and Personal Enrichment:
+For Project and Enrichment:
 
 - Level 1: `1–60` minutes
 - Level 2: `61–120` minutes
@@ -149,6 +149,261 @@ empty and is called out for human clarification. A complete review may write
 `activity_reviewed` belong to the pre-0.7 scoring model. New templates and the
 Dashboard do not read them. Existing values remain historical data and must
 never be converted into minutes.
+
+## Health Dashboard
+
+Health Dashboard is an independent companion view. Its `health_*` fields do not
+read, write, infer, or complete the six-field Daily State used by CastleX Home.
+Both systems may live in the same Daily Note without sharing check-in answers.
+
+### Time-aware check-ins
+
+- From 00:00 through 08:59, the default form is Night State.
+- From 09:00 through 16:59, the default form is Morning Check-in.
+- From 17:00 through 21:59, the default form is Afternoon Check-in.
+- From 22:00 through 23:59, the default form is Evening Reflection.
+- Time controls only the default visible form. Every period remains available
+  through the Backfill control.
+- Every discrete selection writes immediately. A period completion timestamp is
+  optional and does not gate recommendations.
+- Text fields use a short debounce before writing to reduce sync churn.
+
+Five-level state questions use signal bars whose illuminated count matches the
+stored value. Except where the wording is explicitly inverted into a positive
+dimension such as Calmness or Clarity, more illuminated bars always mean a
+better or more available state. Afternoon Energy also uses the same `1–5`
+signal-bar scale and is stored in `health_afternoon_energy_signal`.
+
+The principal input fields are:
+
+```yaml
+health_night_bedtime_at:
+health_night_sleepiness:
+health_night_calmness:
+health_night_awake_reasons: []
+health_night_completed_at:
+
+health_morning_sleep:
+health_morning_recovery:
+health_morning_body:
+health_morning_outlook:
+health_morning_dream:
+health_morning_regions: []
+health_morning_discomfort: []
+health_morning_need:
+health_morning_completed_at:
+health_morning_capacity:
+
+health_afternoon_energy_signal:
+health_afternoon_calmness:
+health_afternoon_clarity:
+health_afternoon_body_change:
+health_afternoon_nap:
+health_afternoon_regions: []
+health_afternoon_discomfort: []
+health_afternoon_preference:
+health_afternoon_challenge:
+health_afternoon_completed_at:
+health_afternoon_state:
+
+health_evening_body:
+health_evening_post_workout:
+health_evening_body_note:
+health_evening_completed_at:
+```
+
+Night State belongs to the current calendar Daily. For example, a Night State
+recorded at 00:08 on July 24 is stored in the July 24 Daily, pairing the
+pre-sleep condition with the Morning Check-in after waking. The full-width
+lights-out control records the exact preparation time and completes the period.
+Sleepiness and Calmness use positive `1–5` signal scales. Awake reasons are a
+multi-select set: not sleepy, active mind, screen or entertainment, work or
+study, social activity, late workout, or other. Night fields do not affect the
+workout recommendation formula.
+
+Evening asks only about the current body state and, when a workout was recorded,
+the post-workout body state. It does not ask general life-reflection questions.
+
+### Deterministic workout recommendation
+
+Recommendations are local deterministic rules, not AI output. The view derives
+a provisional result from every available answer and recalculates after each
+change. Missing answers are excluded from the weighted denominator, and the UI
+always shows information completeness.
+
+Morning Recovery Capacity is a `0–100%` score:
+
+`((sleep × 30) + (wake recovery × 40) + (body availability × 20) + (outlook × 10)) ÷ 5`
+
+Each input is a `1–5` signal value. If some answers are missing, their weights
+are removed from the denominator rather than treated as zero.
+
+Afternoon Body State is also a `0–100%` score:
+
+`((energy × 40) + (calmness × 20) + (clarity × 20) + (change × 20)) ÷ 5 − penalties`
+
+Tightness subtracts `8` points and training soreness subtracts `12` points.
+Both may be selected together. The result is clamped to `0–100`.
+
+When both periods exist, the workout engine uses `40%` Morning Recovery
+Capacity plus `60%` Afternoon Body State. Before Afternoon Check-in, Morning
+Recovery Capacity is used alone.
+
+The seven-day trend uses the three raw `1–5` answers for Morning Sleep,
+Morning Wake Recovery, and Afternoon Energy. It does not plot either derived
+percentage.
+
+The underlying signal weights are:
+
+| Input | Weight |
+| --- | ---: |
+| Morning sleep | 30 |
+| Morning wake recovery | 40 |
+| Morning body availability | 20 |
+| Morning outlook | 10 |
+| Afternoon energy | 40 |
+| Afternoon calmness | 20 |
+| Afternoon clarity | 20 |
+| Afternoon body change | 20 |
+
+The engine decides training load before it considers changing the workout:
+
+| Current information | Recommendation |
+| --- | --- |
+| Morning only, capacity `≥75` | planned workout · Standard |
+| Morning only, capacity `55–74` | planned workout · Light |
+| Morning only, capacity `<55` | provisional Stretch; reassess after Afternoon |
+| Afternoon available, readiness `≥75`, Energy `4–5`, Body Change `3–5` | planned workout · Standard |
+| Readiness `55–74`, Energy `3`, or Body Change `2` | planned workout · Light |
+| Readiness `35–54`, Energy `2`, or Body Change `1` | Stretch |
+| Readiness `<35` or Energy `1` | Rest |
+
+This ordering means a moderate day normally keeps the planned training
+direction and reduces its volume instead of immediately switching to Pool or
+Rest. Pool has its own Standard and Light modes and remains part of the normal
+rotation.
+
+Relevant localized training soreness excludes the affected strength workout.
+When readiness is at least `55`, the engine selects an unaffected strength
+region and preserves the calculated Standard/Light load. If no suitable
+strength region remains, it recommends Stretch. Whole-body training soreness
+caps the recommendation at Stretch. A recorded body preference may replace the
+direction only when it does not conflict with the safety tier or an affected
+region.
+
+Every recommendation exposes its reasons. The human may select any workout,
+including Rest, without changing the rule result. Planned, Recommended,
+Selected, and Actual workout values remain separate:
+
+```yaml
+health_planned_workout:
+health_recommended_workout:
+health_selected_workout:
+health_actual_workout:
+health_actual_workout_mode:
+health_manual_override:
+health_override_reason:
+health_primary_session_id:
+health_primary_workout:
+health_primary_mode:
+health_primary_source:
+```
+
+### Rotation and workout sessions
+
+The rotating plan is:
+
+```text
+Pool → Back → Pool → Upper → Legs → repeat
+```
+
+Only a completed workout whose `health_rotation_advance` is true advances the
+rotation. Temporarily replacing the planned workout with another workout,
+Stretch, or Rest holds the current planned slot.
+
+The Rotation card also provides a one-time Skip Current action for the day.
+Skipping records the skipped slot and immediately makes the next slot the
+current plan. If the user then takes a recovery detour, the following Daily
+starts from the post-skip slot. If the user completes the post-skip planned
+workout on the same day, that completed slot takes precedence for the next
+Daily.
+
+```yaml
+health_rotation_skipped:
+health_rotation_skipped_slot:
+health_rotation_skipped_workout:
+health_rotation_skipped_at:
+```
+
+Strength sessions store completion at set level. Warm-up sets and working sets
+have stable IDs inside `health_workout_completed_sets`. Standard and Light are
+separate explicit plans rather than one plan with a generic set reduction. The
+current calculated plans are:
+
+| Day | Standard | Light |
+| --- | ---: | ---: |
+| Back | 19 groups | 13 groups |
+| Upper | 16 groups | 11 groups |
+| Legs | 19 groups | 12 groups |
+
+Back Light omits Dumbbell Curl, removes Face Pull warm-up, and uses two Back
+Extension working sets. Upper Light omits Cable Triceps Pushdown and removes Lateral
+Raise warm-up. Legs Standard adds Dumbbell Romanian Deadlift; Legs Light omits
+it, removes Bulgarian Split Squat and Leg Curl warm-ups, and uses two Back
+Extension working sets. The Chinese exercise name for Back Extension is
+`山羊挺身`.
+
+Warm-up and working-set counts are displayed separately even though both remain
+individually checkable. Standard carries the cue to leave approximately `2–3`
+good repetitions in reserve; Light carries the cue to leave approximately
+`4–5`. These are effort guides and do not require weight logging. The pre-workout
+mode switch itself is a visually distinct two-option control labeled only
+`Standard` and `Light`; set counts remain in the exercise preview and active
+progress instead of inside the mode buttons.
+
+Pool Standard is 60 minutes. Pool Light is 30–45 minutes. Stretching is not
+part of either Pool plan. Pool has no subsection or interval checkboxes and
+uses only session start/end time and completion status.
+
+```yaml
+health_workout_type:
+health_workout_mode:
+health_workout_status:
+health_workout_session_id:
+health_current_session_role:
+health_workout_started_at:
+health_workout_completed_at:
+health_workout_completed_sets: []
+health_workout_sessions: []
+```
+
+A Daily may contain multiple completed workout sessions. The first completed
+workout is stored as the stable `primary` session; sessions created through
+`再加入一个训练` are stored as `additional`. Each session stores its role,
+workout, mode, timestamps, elapsed minutes, planned total sets, planned
+working/warm-up counts, and completed set IDs inside
+`health_workout_sessions`.
+
+`health_primary_session_id`, `health_primary_workout`,
+`health_primary_mode`, and `health_primary_source` preserve the main result.
+After the primary session finishes, additional sessions never replace
+`health_selected_workout`, `health_actual_workout`, or the Daily Snapshot's
+main workout. They still contribute to `workout_minutes` and appear in the
+plugin-managed `Completed Today` summary. Completed session cards identify
+`主训练` and `追加` and always state whether each session was Standard, Light,
+or Recovery.
+
+After Finish Workout, the user may add another Pool, Back, Upper, Legs, or
+Stretch session. Choosing the next session enters `ready` state and shows its
+Standard/Light preview. Timing and the fresh checklist begin only after the
+user presses `开始训练`.
+There is no early-finish state: unchecked sets simply remain unchecked when the
+session is finished.
+
+Finishing a session updates total `workout_minutes`, keeps
+`workout_minutes_origin: human`, and upserts one factual, plugin-managed
+completion bullet summarizing all sessions under `Completed Today`. It never
+rewrites Raw Notes.
 
 ## Project organization
 

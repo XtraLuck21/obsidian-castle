@@ -33,6 +33,10 @@ rg -q 'rain-glass-sunset-beach-v2.webp' "$plugin/main.js" || fail "Dashboard mis
 rg -q '^rain-glass-sunset-beach-v2.webp$' "$SYSTEM_ROOT/assets/allowlist.txt" || fail "Rain-glass sunset beach background missing from asset allowlist"
 rg -q 'rain-glass-sunset-mobile-v1.webp' "$plugin/main.js" || fail "Dashboard missing portrait mobile sunset background"
 rg -q '^rain-glass-sunset-mobile-v1.webp$' "$SYSTEM_ROOT/assets/allowlist.txt" || fail "Portrait mobile sunset background missing from asset allowlist"
+rg -q 'rain-glass-outdoor-pool-desktop-v1.webp' "$plugin/main.js" || fail "Health Dashboard missing outdoor pool desktop background"
+rg -q '^rain-glass-outdoor-pool-desktop-v1.webp$' "$SYSTEM_ROOT/assets/allowlist.txt" || fail "Health desktop background missing from asset allowlist"
+rg -q 'rain-glass-outdoor-pool-mobile-v1.webp' "$plugin/main.js" || fail "Health Dashboard missing outdoor pool mobile background"
+rg -q '^rain-glass-outdoor-pool-mobile-v1.webp$' "$SYSTEM_ROOT/assets/allowlist.txt" || fail "Health mobile background missing from asset allowlist"
 rg -q 'cx-background-layer' "$plugin/main.js" || fail "Dashboard missing viewport-sized background layer"
 pass "responsive desktop/mobile rain-glass backgrounds"
 
@@ -49,12 +53,65 @@ rg -Fq 'options.allowCreate ?? !Platform.isMobile' "$plugin/main.js" || fail "Mo
 rg -q 'archiveDailyConflicts' "$plugin/main.js" || fail "Dashboard missing device-local conflict archiving"
 pass "single canonical Daily creation and conflict-archiving policy"
 
-fields=(sleep_quality physical_state stress energy agency appetite_stability state_recorded_at project_minutes admin_minutes workout_minutes personal_enrichment_minutes project_minutes_origin admin_minutes_origin workout_minutes_origin personal_enrichment_minutes_origin time_data_reviewed)
+fields=(sleep_quality physical_state stress energy agency appetite_stability state_recorded_at project_minutes admin_minutes workout_minutes enrichment_minutes project_minutes_origin admin_minutes_origin workout_minutes_origin enrichment_minutes_origin time_data_reviewed)
 for field in "${fields[@]}"; do
   rg -q "^${field}:" "$template" || fail "Daily template missing $field"
   rg -q "\`${field}\`|${field}:" "$schema" || fail "Schema missing $field"
 done
 pass "Daily template and Schema core fields"
+
+health_fields=(health_night_bedtime_at health_night_sleepiness health_night_calmness health_night_awake_reasons health_night_completed_at health_morning_sleep health_afternoon_energy_signal health_evening_body health_planned_workout health_recommended_workout health_selected_workout health_primary_session_id health_primary_workout health_primary_mode health_primary_source health_workout_status health_workout_completed_sets health_workout_sessions health_actual_workout_mode)
+for field in "${health_fields[@]}"; do
+  rg -q "^${field}:" "$template" || fail "Daily template missing $field"
+  rg -q "\`${field}\`|${field}:" "$schema" || fail "Schema missing $field"
+done
+rg -q '^```castlex-health-summary$' "$template" || fail "Daily template missing Health Snapshot block"
+rg -q 'HEALTH_VIEW_TYPE' "$plugin/main.js" || fail "Plugin missing independent Health Dashboard view"
+rg -q 'healthRecommendation' "$plugin/main.js" || fail "Plugin missing deterministic health recommendation engine"
+rg -q 'healthMorningCapacity' "$plugin/main.js" || fail "Health Snapshot missing Morning Recovery Capacity"
+rg -q 'healthAfternoonState' "$plugin/main.js" || fail "Health Snapshot missing Afternoon Body State"
+rg -Fq 'if (hour < 9) return "night"' "$plugin/main.js" || fail "Health Dashboard does not use Night State from midnight through 08:59"
+rg -q 'cx-health-night-ritual' "$plugin/main.js" "$plugin/styles.css" || fail "Night State missing full-width lights-out ritual"
+rg -Fq 'next.health_night_bedtime_at = recordedAt' "$plugin/main.js" || fail "Lights-out ritual does not record exact bedtime"
+rg -Fq 'this.renderSignal(fields, file, frontmatter, "health_night_sleepiness"' "$plugin/main.js" || fail "Night State missing Sleepiness signal"
+rg -Fq 'this.renderSignal(fields, file, frontmatter, "health_night_calmness"' "$plugin/main.js" || fail "Night State missing Calmness signal"
+rg -Fq 'this.renderMultiChoice(fields, file, frontmatter, "health_night_awake_reasons"' "$plugin/main.js" || fail "Night State missing multi-select awake reasons"
+if rg -A8 'health_night_awake_reasons' "$plugin/main.js" | rg -q '身体不适'; then
+  fail "Night State still contains removed physical-discomfort reason"
+fi
+rg -Fq 'this.renderMultiChoice(fields, file, frontmatter, "health_morning_discomfort"' "$plugin/main.js" || fail "Morning body feeling is not multi-select"
+rg -Fq 'this.renderMultiChoice(fields, file, frontmatter, "health_afternoon_discomfort"' "$plugin/main.js" || fail "Afternoon body feeling is not multi-select"
+rg -q '^health_morning_discomfort: \[\]$' "$template" || fail "Daily template does not initialize Morning body feeling as an array"
+rg -q 'cx-home-hero-actions' "$plugin/styles.css" || fail "Home hero actions are not vertically arranged"
+rg -q 'skipRotation' "$plugin/main.js" || fail "Health rotation missing Skip Current action"
+rg -q '^health_rotation_skipped:' "$template" || fail "Daily template missing rotation skip state"
+rg -q 'prepareAdditionalWorkout' "$plugin/main.js" || fail "Workout Mode missing prepared additional session support"
+rg -q 'health_workout_status = "ready"' "$plugin/main.js" || fail "Additional Workout starts timing before explicit Start Workout"
+rg -q 'health_current_session_role = "additional"' "$plugin/main.js" || fail "Additional workout does not preserve a separate session role"
+rg -q 'normalizePrimaryWorkout' "$plugin/main.js" || fail "Legacy workout sessions do not migrate to stable primary/additional roles"
+rg -Fq 'session.role === "primary" ? "主训练" : "追加"' "$plugin/main.js" || fail "Completed workout cards do not label primary and additional sessions"
+rg -q 'healthWorkoutPlan' "$plugin/main.js" || fail "Workout Mode missing explicit Standard and Light plans"
+rg -q '山羊挺身' "$plugin/main.js" || fail "Workout plan missing 山羊挺身 naming"
+rg -Fq 'healthModeLabel(session.mode)' "$plugin/main.js" || fail "Completed sessions do not display Standard or Light mode"
+rg -q 'planned_working_sets' "$plugin/main.js" || fail "Completed sessions do not preserve working-set totals"
+rg -q 'cx-health-set-breakdown' "$plugin/styles.css" || fail "Workout Mode does not separate working and warm-up set progress"
+rg -Fq 'content: "✓"' "$plugin/styles.css" || fail "Completed Health Check-ins do not use a check mark"
+rg -q 'cx-health-summary-tag' "$plugin/main.js" "$plugin/styles.css" || fail "Daily Health Snapshot missing compact workout status tag"
+rg -q 'trendPages.push' "$plugin/main.js" || fail "Mobile Health trends do not force-include freshly read Today data"
+[[ "$(rg -c 'cls: "cx-mobile-scroll-spacer"' "$plugin/main.js")" -ge 2 ]] || fail "Dashboards missing real mobile bottom spacer elements"
+rg -Fq 'overflow-y: scroll !important' "$plugin/styles.css" || fail "Mobile Dashboards missing constrained scroll containers"
+rg -Fq '168px + env(safe-area-inset-bottom)' "$plugin/styles.css" || fail "Mobile Dashboards missing balanced bottom toolbar safe space"
+rg -Fq 'scroll-margin-bottom: calc(168px + env(safe-area-inset-bottom))' "$plugin/styles.css" || fail "Final Dashboard cards missing mobile toolbar clearance"
+rg -Fq '.cx-health-dashboard-content > .cx-mobile-scroll-spacer' "$plugin/styles.css" || fail "Health Dashboard spacer is not anchored after ordered mobile sections"
+rg -Fq 'order: 5' "$plugin/styles.css" || fail "Health Dashboard spacer is not placed after insights"
+if rg -q '接受当前建议' "$plugin/main.js"; then
+  fail "Health direction still contains redundant Accept Recommendation action"
+fi
+if rg -q 'health_workout_stopped_early|到这里结束并保存' "$plugin/main.js" "$template" "$schema"; then
+  fail "Workout Mode still contains removed early-finish state"
+fi
+rg -q 'cx-health-progress-track' "$plugin/styles.css" || fail "Health Workout Mode missing progress bar"
+pass "Health Dashboard fields, rules, summary, and workout progress"
 
 rg -q 'Late entry' "$schema" || fail "Schema missing late-entry rule"
 rg -q '休整日' "$schema" || fail "Schema missing retrospective rest-day rule"

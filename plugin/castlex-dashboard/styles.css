@@ -189,6 +189,17 @@ body.theme-dark {
 .cx-clock { color: #f5f7f6; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: clamp(2.35rem, 4.5vw, 4.1rem); font-weight: 650; letter-spacing: -.075em; line-height: .98; text-shadow: 0 4px 22px rgba(0,0,0,.34); }
 .cx-hero-note { color: rgba(239, 244, 245, .66); font-size: clamp(.68rem, .82vw, .82rem); margin: 8px 0 0; }
 .cx-hero-actions { display: flex; gap: 7px; position: relative; z-index: 1; }
+.cx-home-hero-actions {
+  align-items: stretch;
+  flex: 0 0 auto;
+  flex-direction: column;
+  min-width: clamp(112px, 10vw, 146px);
+}
+.cx-home-hero-actions .cx-button {
+  margin: 0;
+  text-align: center;
+  width: 100%;
+}
 .cx-button { background: rgba(255,255,255,.075); border: 1px solid rgba(255,255,255,.12); border-radius: 999px; color: #edf3f5; cursor: pointer; font-size: .65rem; padding: 6px 11px; }
 .cx-button:hover { background: rgba(255,255,255,.13); }
 .cx-button-primary { background: rgba(221, 229, 229, .86); border-color: transparent; color: #172127; font-weight: 700; }
@@ -528,4 +539,730 @@ body.theme-dark {
   .cx-weekly-stats { grid-template-columns: 1fr; }
   .cx-weekly-allocation-row { grid-template-columns: 36px minmax(0,1fr) minmax(52px,auto); }
   .cx-weekly-time-legend { padding-left: 45px; }
+}
+
+/* Health Dashboard */
+.workspace-leaf-content[data-type="castlex-health"] .view-content {
+  overflow: auto;
+  padding: 0;
+}
+
+.castlex-health-view {
+  height: 100%;
+  min-height: 100%;
+  padding: 0 !important;
+}
+
+.cx-health-shell {
+  --cx-accent: #b6d5d2;
+  --cx-blue: #75b5bc;
+  --cx-glass: rgba(4, 19, 34, .58);
+  --cx-border: rgba(178, 218, 220, .2);
+}
+
+.cx-health-shell .cx-background-layer {
+  background-image:
+    linear-gradient(180deg, rgba(2, 13, 25, .13), rgba(3, 18, 31, .34)),
+    var(--cx-background-desktop);
+}
+
+.cx-health-dashboard-content {
+  display: grid;
+  gap: clamp(9px, .9vw, 14px);
+  min-height: 100%;
+  padding: clamp(10px, 1.15vw, 18px);
+  position: relative;
+  z-index: 1;
+}
+
+.cx-health-hero {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  min-height: 138px;
+  overflow: hidden;
+  padding: clamp(18px, 2vw, 28px);
+  position: relative;
+}
+
+.cx-health-hero::after {
+  background: radial-gradient(circle, rgba(102, 189, 187, .18), transparent 68%);
+  content: "";
+  height: 280px;
+  pointer-events: none;
+  position: absolute;
+  right: -80px;
+  top: -170px;
+  width: 280px;
+}
+
+.cx-health-clock {
+  color: #f4f8f7;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: clamp(2.4rem, 4.6vw, 4.25rem);
+  font-weight: 650;
+  letter-spacing: -.075em;
+  line-height: .98;
+  text-shadow: 0 4px 22px rgba(0,0,0,.34);
+}
+
+.cx-health-signature {
+  color: rgba(233, 245, 243, .74);
+  font-size: clamp(.72rem, .9vw, .9rem);
+  letter-spacing: .06em;
+  margin: 9px 0 0;
+}
+
+.cx-health-main-grid {
+  display: grid;
+  gap: clamp(9px, .9vw, 14px);
+  grid-template-columns: minmax(410px, .92fr) minmax(500px, 1.25fr);
+}
+
+.cx-health-card-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 13px;
+}
+
+.cx-health-card-header h2 {
+  color: #f1f7f6;
+  font-size: clamp(.92rem, 1.1vw, 1.16rem);
+  margin: 0;
+}
+
+.cx-health-card-header span {
+  color: rgba(228, 241, 240, .58);
+  display: block;
+  font-size: .58rem;
+  margin-top: 3px;
+}
+
+.cx-health-stage-tracker {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 13px;
+}
+
+.cx-shell button.cx-health-stage {
+  appearance: none;
+  background: rgba(255,255,255,.025) !important;
+  border: 1px solid rgba(221,239,238,.085) !important;
+  border-radius: 11px !important;
+  box-shadow: none !important;
+  color: rgba(236,245,244,.62);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  font-size: .63rem;
+  min-height: 50px;
+  padding: 8px 9px !important;
+  text-align: left;
+}
+
+.cx-shell button.cx-health-stage.is-active {
+  background: rgba(94, 169, 171, .16) !important;
+  border-color: rgba(150, 213, 211, .34) !important;
+  color: #f0f7f5;
+}
+
+.cx-shell button.cx-health-stage.is-complete::before {
+  align-items: center;
+  background: rgba(112, 185, 158, .18);
+  border: 1px solid rgba(153, 216, 191, .4);
+  border-radius: 50%;
+  color: #a7dbc5;
+  content: "✓";
+  display: flex;
+  font-size: .54rem;
+  font-weight: 800;
+  height: 17px;
+  justify-content: center;
+  line-height: 1;
+  position: absolute;
+  right: 7px;
+  top: 7px;
+  width: 17px;
+}
+
+.cx-shell button.cx-health-stage { position: relative; }
+.cx-health-stage-state { color: rgba(225,239,238,.42) !important; font-size: .48rem !important; }
+.cx-health-stage.is-active .cx-health-stage-state { color: rgba(228,244,241,.7) !important; }
+
+.cx-health-form { max-height: min(62vh, 660px); overflow: auto; padding-right: 3px; }
+.cx-health-form-grid { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.cx-health-night-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.cx-shell button.cx-health-night-ritual {
+  align-items: center;
+  appearance: none;
+  background:
+    radial-gradient(circle at 82% 25%, rgba(168, 218, 216, .13), transparent 24%),
+    linear-gradient(135deg, rgba(32, 74, 91, .72), rgba(5, 23, 42, .92)) !important;
+  border: 1px solid rgba(171, 220, 216, .2) !important;
+  border-radius: 16px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 10px 28px rgba(0,0,0,.14) !important;
+  color: #eef8f6;
+  cursor: pointer;
+  display: flex;
+  gap: 16px;
+  grid-column: 1 / -1;
+  min-height: 104px;
+  overflow: hidden;
+  padding: 18px 20px !important;
+  position: relative;
+  text-align: left;
+  transition: border-color .3s ease, box-shadow .3s ease, transform .3s ease;
+}
+.cx-shell button.cx-health-night-ritual:hover {
+  border-color: rgba(191, 231, 225, .38) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 14px 34px rgba(0,0,0,.2) !important;
+  transform: translateY(-1px);
+}
+.cx-shell button.cx-health-night-ritual::after {
+  background: linear-gradient(100deg, rgba(2,10,23,.96), rgba(4,17,33,.82));
+  content: "";
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-102%);
+  z-index: 1;
+}
+.cx-shell button.cx-health-night-ritual.is-activating::after {
+  animation: cx-health-lights-out 1.35s cubic-bezier(.42,0,.2,1);
+}
+.cx-shell button.cx-health-night-ritual.is-recorded {
+  background:
+    radial-gradient(circle at 82% 25%, rgba(169, 214, 210, .1), transparent 23%),
+    linear-gradient(135deg, rgba(12, 37, 55, .9), rgba(3, 14, 29, .97)) !important;
+  border-color: rgba(148, 205, 198, .27) !important;
+}
+.cx-health-night-sky {
+  align-items: center;
+  display: flex;
+  flex: 0 0 58px;
+  height: 58px;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
+}
+.cx-health-night-moon {
+  color: #c9e6df;
+  display: block;
+  filter: drop-shadow(0 0 9px rgba(174, 222, 215, .28));
+  height: 34px;
+  width: 34px;
+}
+.cx-health-night-moon svg { height: 34px; width: 34px; }
+.cx-health-night-star {
+  background: #d9eeea;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(213,239,235,.7);
+  height: 3px;
+  opacity: .68;
+  position: absolute;
+  width: 3px;
+}
+.cx-health-night-star.is-one { left: 4px; top: 12px; }
+.cx-health-night-star.is-two { right: 2px; top: 5px; }
+.cx-health-night-star.is-three { bottom: 5px; right: 10px; }
+.cx-health-night-ritual-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  position: relative;
+  z-index: 2;
+}
+.cx-health-night-ritual-title { color: #f2f8f6; font-size: .9rem; font-weight: 720; }
+.cx-health-night-ritual-note { color: rgba(222,239,235,.56); font-size: .56rem; line-height: 1.5; }
+.cx-health-night-reasons { grid-column: 1 / -1; }
+@keyframes cx-health-lights-out {
+  0% { opacity: 0; transform: translateX(-102%); }
+  42% { opacity: .95; transform: translateX(0); }
+  78% { opacity: .95; transform: translateX(0); }
+  100% { opacity: 0; transform: translateX(102%); }
+}
+.cx-health-field {
+  background: rgba(255,255,255,.026);
+  border: 1px solid rgba(224,239,238,.075);
+  border-radius: 13px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.cx-health-field-label {
+  color: rgba(239,247,245,.84);
+  font-size: .67rem;
+  font-weight: 650;
+}
+
+.cx-health-field-value {
+  color: rgba(222,239,237,.5);
+  font-size: .5rem;
+  margin-top: 5px;
+}
+
+.cx-health-signal {
+  align-items: flex-end;
+  display: flex;
+  gap: 7px;
+  height: 50px;
+  margin-top: 7px;
+}
+
+.cx-shell button.cx-health-signal-bar {
+  appearance: none;
+  background: rgba(225,241,239,.095) !important;
+  border: 1px solid rgba(226,243,241,.08) !important;
+  border-radius: 4px 4px 2px 2px !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  height: var(--cx-signal-height);
+  min-height: 0;
+  min-width: 17px;
+  padding: 0 !important;
+  transition: background-color .15s ease, border-color .15s ease, filter .15s ease;
+  width: clamp(19px, 2.3vw, 28px);
+}
+
+.cx-shell button.cx-health-signal-bar:hover {
+  background: rgba(159,211,208,.26) !important;
+}
+
+.cx-shell button.cx-health-signal-bar.is-active {
+  background: linear-gradient(180deg, #b7dcd5, #67aeb1) !important;
+  border-color: rgba(213,244,238,.55) !important;
+}
+
+.cx-shell button.cx-health-signal-bar.is-selected {
+  filter: drop-shadow(0 0 6px rgba(121,202,197,.46));
+}
+
+.cx-health-choice-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.cx-shell button.cx-health-choice {
+  appearance: none;
+  background: rgba(255,255,255,.035) !important;
+  border: 1px solid rgba(225,240,239,.1) !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  color: rgba(234,244,243,.66);
+  cursor: pointer;
+  font-size: .56rem;
+  min-height: 28px;
+  padding: 5px 9px !important;
+}
+
+.cx-shell button.cx-health-choice:hover {
+  background: rgba(105,173,175,.14) !important;
+  color: #f0f7f5;
+}
+
+.cx-shell button.cx-health-choice.is-selected {
+  background: rgba(110, 187, 184, .22) !important;
+  border-color: rgba(164, 221, 215, .42) !important;
+  color: #eff8f5;
+}
+
+.cx-health-range-heading { align-items: baseline; display: flex; justify-content: space-between; }
+.cx-health-range-value { color: #c6e6e0; font-size: .72rem; font-weight: 700; }
+.cx-health-range { accent-color: #83c1bc; margin: 13px 0 5px; width: 100%; }
+.cx-health-range-marks { color: rgba(226,240,239,.4); display: flex; font-size: .47rem; justify-content: space-between; }
+
+.cx-health-textarea {
+  background: rgba(2,18,31,.44) !important;
+  border: 1px solid rgba(220,239,237,.12) !important;
+  border-radius: 9px !important;
+  box-shadow: none !important;
+  color: #edf7f5 !important;
+  font-size: .62rem !important;
+  line-height: 1.45;
+  margin-top: 8px;
+  min-height: 56px;
+  padding: 8px 9px !important;
+  resize: vertical;
+  width: 100%;
+}
+
+.cx-health-form-footer {
+  align-items: center;
+  color: rgba(226,240,239,.46);
+  display: flex;
+  font-size: .52rem;
+  gap: 10px;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+
+.cx-health-direction-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+}
+
+.cx-health-direction-item {
+  background: rgba(255,255,255,.028);
+  border: 1px solid rgba(224,239,238,.08);
+  border-radius: 13px;
+  min-width: 0;
+  padding: 11px;
+}
+
+.cx-health-direction-item.is-recommended {
+  background: rgba(86,161,165,.14);
+  border-color: rgba(139,207,205,.27);
+}
+
+.cx-health-direction-item.is-selected {
+  background: rgba(151,176,150,.1);
+  border-color: rgba(181,211,175,.2);
+}
+
+.cx-health-direction-label {
+  color: rgba(225,240,239,.48);
+  display: block;
+  font-size: .5rem;
+  margin-bottom: 5px;
+}
+
+.cx-health-direction-item strong { color: #edf7f5; display: block; font-size: .76rem; overflow: hidden; text-overflow: ellipsis; }
+.cx-health-reasons { margin-top: 13px; }
+.cx-health-reasons ul { color: rgba(231,242,241,.7); font-size: .59rem; line-height: 1.55; margin: 6px 0 0; padding-left: 17px; }
+.cx-health-direction-hint {
+  color: rgba(224,240,238,.52);
+  font-size: .54rem;
+  line-height: 1.5;
+  margin-top: 12px;
+}
+.cx-health-workout-choices { display: flex; flex-wrap: wrap; gap: 6px; margin: 11px 0; }
+
+.cx-health-workout-card { padding: clamp(13px, 1.4vw, 21px); }
+.cx-health-workout-purpose { color: rgba(230,242,241,.62); font-size: .65rem; margin-bottom: 12px; }
+.cx-health-preview-list { display: grid; gap: 7px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.cx-health-preview-row {
+  align-items: center;
+  background: rgba(255,255,255,.026);
+  border: 1px solid rgba(226,240,239,.07);
+  border-radius: 11px;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 9px 10px;
+}
+.cx-health-preview-row strong { color: #eef6f4; display: block; font-size: .65rem; }
+.cx-health-preview-row div > span { color: rgba(223,239,237,.43); display: block; font-size: .48rem; margin-top: 2px; }
+.cx-health-preview-meta { color: rgba(226,241,239,.58); font-size: .54rem; text-align: right; }
+.cx-health-workout-empty {
+  background: rgba(255,255,255,.026);
+  border: 1px solid rgba(225,240,239,.075);
+  border-radius: 13px;
+  color: rgba(232,243,242,.68);
+  font-size: .64rem;
+  padding: 18px;
+  text-align: center;
+}
+.cx-health-workout-empty strong,
+.cx-health-workout-empty span { display: block; }
+.cx-health-workout-empty span { color: rgba(232,243,242,.5); margin-top: 5px; }
+.cx-health-mode-selector { margin: 0 0 15px; }
+.cx-health-mode-choices {
+  background: rgba(5,25,38,.68);
+  border: 1px solid rgba(150,205,207,.17);
+  border-radius: 17px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 8px 22px rgba(0,10,20,.14);
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 8px;
+  padding: 6px;
+}
+.cx-health-mode-choice {
+  align-items: center;
+  background: rgba(20,48,66,.38);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: rgba(226,240,239,.6);
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  min-height: 48px;
+  padding: 9px 14px;
+  text-align: center;
+  transition: background .2s ease, border-color .2s ease, box-shadow .2s ease, color .2s ease, transform .2s ease;
+}
+.cx-health-mode-choice:hover {
+  background: rgba(48,91,105,.4);
+  border-color: rgba(147,209,207,.17);
+}
+.cx-health-mode-choice strong { color: inherit; display: block; font-size: .7rem; letter-spacing: .025em; }
+.cx-health-mode-choice.is-selected {
+  background: linear-gradient(135deg, rgba(76,150,154,.52), rgba(45,105,123,.58));
+  border-color: rgba(153,224,215,.56);
+  box-shadow: inset 0 1px 0 rgba(234,255,250,.13), 0 0 20px rgba(75,172,166,.13);
+  color: #f4fffc;
+}
+.cx-health-workout-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+
+.cx-health-workout-progress-header {
+  align-items: center;
+  color: #f0f7f5;
+  display: flex;
+  font-size: .72rem;
+  justify-content: space-between;
+}
+.cx-health-workout-timer { color: rgba(218,239,236,.58); font-size: .58rem; }
+.cx-health-set-breakdown {
+  color: rgba(216,237,232,.58);
+  font-size: .53rem;
+  margin-top: 5px;
+}
+.cx-health-progress-track {
+  background: rgba(229,242,240,.085);
+  border-radius: 999px;
+  height: 7px;
+  overflow: hidden;
+  width: 100%;
+}
+.cx-health-progress-track.is-large { height: 10px; margin: 8px 0 15px; }
+.cx-health-progress-fill {
+  background: linear-gradient(90deg, #5fa4a9, #b4d8cb);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  transition: width .25s ease;
+}
+
+.cx-health-exercise-list { display: grid; gap: 9px; grid-template-columns: repeat(2, minmax(0,1fr)); }
+.cx-health-exercise {
+  background: rgba(255,255,255,.027);
+  border: 1px solid rgba(224,239,238,.075);
+  border-radius: 13px;
+  min-width: 0;
+  padding: 11px;
+}
+.cx-health-exercise-header strong { color: #eff7f5; display: block; font-size: .68rem; }
+.cx-health-exercise-header span { color: rgba(222,238,237,.46); display: block; font-size: .49rem; margin-top: 2px; }
+.cx-health-set-list { display: grid; gap: 5px; margin-top: 9px; }
+.cx-health-set {
+  align-items: center;
+  background: rgba(255,255,255,.018);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: rgba(233,244,242,.68);
+  cursor: pointer;
+  display: flex;
+  font-size: .58rem;
+  gap: 8px;
+  min-height: 31px;
+  padding: 5px 7px;
+}
+.cx-health-set:hover { background: rgba(117,181,183,.09); border-color: rgba(160,211,210,.12); }
+.cx-health-set.is-complete { background: rgba(102,177,164,.1); color: #e9f6f2; }
+.cx-health-set input { accent-color: #83c5b5; height: 15px; margin: 0; width: 15px; }
+
+.cx-health-workout-complete {
+  align-items: flex-start;
+  background: rgba(91,166,151,.1);
+  border: 1px solid rgba(147,209,193,.2);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px;
+}
+.cx-health-workout-complete strong { color: #ecf7f2; font-size: .82rem; }
+.cx-health-workout-complete > span { color: rgba(225,241,237,.54); font-size: .55rem; }
+.cx-health-session-history { margin-bottom: 14px; }
+.cx-health-session-list {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin-top: 7px;
+}
+.cx-health-session-item {
+  background: rgba(91,166,151,.075);
+  border: 1px solid rgba(147,209,193,.15);
+  border-radius: 12px;
+  padding: 10px;
+}
+.cx-health-session-header { align-items: center; display: flex; justify-content: space-between; }
+.cx-health-session-header strong { color: #edf7f3; font-size: .64rem; }
+.cx-health-session-header span { color: rgba(221,239,235,.45); font-size: .49rem; }
+.cx-health-session-meta { color: rgba(225,241,237,.58); display: block; font-size: .52rem; margin: 4px 0 7px; }
+.cx-health-add-workout {
+  background: rgba(255,255,255,.025);
+  border: 1px solid rgba(221,239,238,.085);
+  border-radius: 13px;
+  margin-top: 12px;
+  padding: 12px;
+}
+.cx-health-add-workout > span { color: rgba(222,239,237,.5); display: block; font-size: .52rem; margin: 3px 0 10px; }
+.cx-health-summary-progress { color: rgba(228,243,239,.65); font-size: .56rem; margin-top: 10px; width: 100%; }
+.cx-health-summary-progress > span { display: block; margin-bottom: 5px; }
+
+.cx-health-insights-grid { display: grid; gap: clamp(9px, .9vw, 14px); grid-template-columns: minmax(0, 1.35fr) minmax(300px, .65fr); }
+.cx-health-trend-rows { display: grid; gap: 5px; }
+.cx-health-trend-row {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 38px repeat(3, minmax(0,1fr));
+}
+.cx-health-trend-date { color: rgba(228,241,239,.48); font-size: .51rem; }
+.cx-health-trend-metric { align-items: center; display: grid; gap: 6px; grid-template-columns: 25px minmax(0,1fr); }
+.cx-health-trend-metric > span { color: rgba(231,242,241,.55); font-size: .49rem; }
+.cx-health-mini-track { background: rgba(229,242,240,.07); border-radius: 999px; height: 6px; overflow: hidden; }
+.cx-health-mini-track span { background: #82bbb5; border-radius: inherit; display: block; height: 100%; }
+
+.cx-health-rotation-route { display: grid; gap: 6px; grid-template-columns: repeat(5,minmax(0,1fr)); }
+.cx-health-rotation-node {
+  align-items: center;
+  background: rgba(255,255,255,.027);
+  border: 1px solid rgba(223,239,237,.075);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 9px 4px;
+}
+.cx-health-rotation-node.is-current {
+  background: rgba(94,169,171,.16);
+  border-color: rgba(151,215,211,.32);
+}
+.cx-health-rotation-node.is-skipped:not(.is-current) {
+  border-style: dashed;
+  opacity: .52;
+}
+.cx-health-rotation-node.is-skipped:not(.is-current) .cx-health-rotation-name {
+  text-decoration: line-through;
+}
+.cx-health-rotation-name { color: rgba(236,245,244,.72); font-size: .5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-health-rotation-index { color: rgba(220,239,236,.4); font-size: .45rem; margin-top: 3px; }
+
+.cx-health-daily-summary {
+  background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.012)), rgba(13,35,45,.4);
+  border: 1px solid rgba(173,210,211,.15);
+  border-radius: 18px;
+  margin: 8px 0 22px;
+  padding: 15px;
+}
+.cx-health-summary-header { align-items: baseline; display: flex; justify-content: space-between; }
+.cx-health-summary-header h3 { color: var(--text-normal); font-size: .9rem; margin: 0; }
+.cx-health-summary-header > span { color: var(--text-muted); font-size: .53rem; }
+.cx-health-summary-grid { display: grid; gap: 8px; grid-template-columns: repeat(3,minmax(0,1fr)); margin-top: 12px; }
+.cx-health-summary-item { background: rgba(255,255,255,.025); border-radius: 10px; min-width: 0; padding: 9px; position: relative; }
+.cx-health-summary-label { color: var(--text-muted); display: block; font-size: .5rem; }
+.cx-health-summary-value { color: var(--text-normal); display: block; font-size: .65rem; margin-top: 3px; padding-right: 4px; }
+.cx-health-summary-tag {
+  background: rgba(94, 153, 164, .16);
+  border: 1px solid rgba(134, 190, 196, .22);
+  border-radius: 999px;
+  color: rgba(218, 239, 238, .76);
+  font-size: .44rem;
+  line-height: 1;
+  padding: 4px 6px;
+  position: absolute;
+  right: 7px;
+  top: 7px;
+}
+.cx-health-summary-item.has-tag .cx-health-summary-label,
+.cx-health-summary-item.has-tag .cx-health-summary-value { padding-right: 56px; }
+.cx-health-summary-meta {
+  color: var(--text-muted);
+  display: block;
+  font-size: .49rem;
+  line-height: 1.45;
+  margin-top: 5px;
+}
+
+@media (max-width: 1050px) {
+  .cx-health-main-grid { grid-template-columns: 1fr; }
+  .cx-health-form { max-height: none; }
+}
+
+.cx-mobile-scroll-spacer {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .workspace-leaf-content[data-type="castlex-home"],
+  .workspace-leaf-content[data-type="castlex-health"] {
+    min-height: 0;
+    overflow: hidden;
+  }
+  .workspace-leaf-content[data-type="castlex-home"] .view-content,
+  .workspace-leaf-content[data-type="castlex-health"] .view-content {
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    -webkit-overflow-scrolling: touch;
+    overflow-x: hidden !important;
+    overflow-y: scroll !important;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+  }
+  .castlex-home-view,
+  .castlex-health-view {
+    height: 100% !important;
+    min-height: 0 !important;
+  }
+  .cx-health-shell .cx-background-layer {
+    background-image:
+      linear-gradient(180deg, rgba(2, 13, 25, .16), rgba(3, 18, 31, .38)),
+      var(--cx-background-mobile, var(--cx-background-desktop));
+    background-position: center;
+  }
+  .cx-dashboard-content,
+  .cx-health-dashboard-content {
+    padding-bottom: 12px;
+  }
+  .cx-mobile-scroll-spacer {
+    display: block;
+    grid-column: 1 / -1;
+    width: 100%;
+    height: calc(168px + env(safe-area-inset-bottom));
+    min-height: calc(168px + env(safe-area-inset-bottom));
+    pointer-events: none;
+  }
+  .cx-health-dashboard-content > .cx-mobile-scroll-spacer {
+    order: 5;
+  }
+  .cx-secondary-grid > :last-child,
+  .cx-health-insights-grid > :last-child {
+    scroll-margin-bottom: calc(168px + env(safe-area-inset-bottom));
+  }
+  .cx-health-dashboard-content { padding-left: 8px; padding-right: 8px; padding-top: 8px; }
+  .cx-health-hero { align-items: flex-start; min-height: 160px; }
+  .cx-health-hero .cx-hero-actions { flex-direction: column; }
+  .cx-health-form-grid, .cx-health-preview-list, .cx-health-exercise-list, .cx-health-insights-grid { grid-template-columns: 1fr; }
+  .cx-health-direction-grid { grid-template-columns: 1fr; }
+  .cx-health-workout-card { order: 3; }
+  .cx-health-insights-grid { order: 4; }
+  .cx-health-summary-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+
+@media (max-width: 480px) {
+  .cx-health-stage-tracker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cx-shell button.cx-health-stage { min-height: 42px; }
+  .cx-health-night-grid { grid-template-columns: 1fr; }
+  .cx-health-night-ritual,
+  .cx-health-night-reasons { grid-column: 1; }
+  .cx-health-form-footer { align-items: flex-start; flex-direction: column; }
+  .cx-health-workout-actions { align-items: stretch; flex-direction: column; }
+  .cx-health-rotation-route { grid-template-columns: repeat(5,minmax(48px,1fr)); overflow-x: auto; }
+  .cx-health-summary-grid { grid-template-columns: 1fr; }
 }

@@ -13,11 +13,11 @@ state_recorded_at: 2099-01-01T20:00:00-08:00
 project_minutes: 120
 admin_minutes: 40
 workout_minutes: 50
-personal_enrichment_minutes: 60
+enrichment_minutes: 60
 project_minutes_origin: ai
 admin_minutes_origin: ai
 workout_minutes_origin: ai
-personal_enrichment_minutes_origin: ai
+enrichment_minutes_origin: ai
 time_data_reviewed: false
 origin: mixed
 cssclasses:

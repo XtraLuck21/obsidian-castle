@@ -28,6 +28,9 @@ committed to this repository.
 ## Dashboard features
 
 - Full-screen blue-hour rain-glass Dashboard with separate 3072×2048 desktop and 1440×2560 mobile backgrounds
+- Separate Chinese-first Health Dashboard linked from CastleX Home, with its own empty outdoor-pool desktop/mobile backgrounds
+- Time-aware Morning, Afternoon, and Evening health check-ins with Backfill access and independent `health_*` Daily fields
+- Deterministic live workout recommendations, manual override, rotation tracking, and set-level Workout Mode with a progress bar
 - Viewport-sized sticky background layer prevents long mobile dashboards from upscaling one image across the full scroll height
 - Persistent mobile ship-wheel button returns directly to CastleX Home from notes and other views
 - Dashboard Check-in writes are serialized so rapid multi-field entry cannot overwrite earlier ratings
@@ -40,7 +43,7 @@ committed to this repository.
 - Six-dimension Daily check-in stored in YAML
 - Editable Daily status gauges with Late entry and Retrospective provenance
 - 14-day Energy/Sleep trend chart
-- Responsive time-driven Heatmap with Project/Admin/Workout/Personal Enrichment views
+- Responsive time-driven Heatmap with Project/Admin/Workout/Enrichment views
 - Four editable Apple Fitness-inspired time rings in each Daily Note
 - Calendar navigation that opens or creates Daily Notes
 - Active Project progress and Project Task overview
@@ -200,18 +203,18 @@ The Dashboard reads four source time values in whole minutes:
 project_minutes: 120
 admin_minutes: 40
 workout_minutes: 50
-personal_enrichment_minutes: 60
+enrichment_minutes: 60
 
 project_minutes_origin: ai
 admin_minutes_origin: ai
 workout_minutes_origin: ai
-personal_enrichment_minutes_origin: ai
+enrichment_minutes_origin: ai
 time_data_reviewed: false
 ```
 
 Empty means the category has not been recorded. `0` means it was reviewed with
 no time in that category. The Dashboard derives four color levels from the
-minutes: Project and Personal Enrichment advance one level per hour; Admin and
+minutes: Project and Enrichment advance one level per hour; Admin and
 Workout advance one level per 30 minutes. It never asks AI to score the day.
 
 AI-generated content must remain visibly marked. Per-category `*_origin: ai`
