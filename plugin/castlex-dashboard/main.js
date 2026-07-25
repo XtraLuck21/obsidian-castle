@@ -18,7 +18,8 @@ const DESKTOP_ASSET_PATH = "90_System/Assets/rain-glass-sunset-beach-v2.webp";
 const MOBILE_ASSET_PATH = "90_System/Assets/rain-glass-sunset-mobile-v1.webp";
 const HEALTH_DESKTOP_ASSET_PATH = "90_System/Assets/rain-glass-outdoor-pool-desktop-v1.webp";
 const HEALTH_MOBILE_ASSET_PATH = "90_System/Assets/rain-glass-outdoor-pool-mobile-v1.webp";
-const REQUIRED = [
+const NAVIGATION_CUTOVER = "2026-07-25";
+const LEGACY_REQUIRED = [
   "sleep_quality",
   "physical_state",
   "stress",
@@ -26,7 +27,7 @@ const REQUIRED = [
   "agency",
   "appetite_stability",
 ];
-const METRICS = [
+const LEGACY_METRICS = [
   { key: "sleep_quality", label: "睡眠质量", hint: "Sleep quality" },
   { key: "physical_state", label: "身体状态", hint: "Physical state" },
   { key: "appetite_stability", label: "食欲稳定", hint: "Appetite stability" },
@@ -34,6 +35,23 @@ const METRICS = [
   { key: "stress", label: "压力", hint: "Stress · 1 low / 5 high" },
   { key: "agency", label: "行动感", hint: "Agency / ability to start" },
 ];
+const NAVIGATION_REQUIRED = [
+  "navigation_direction",
+  "navigation_activation",
+  "navigation_work_energy",
+  "navigation_focus",
+  "navigation_calmness",
+  "navigation_outlook",
+];
+const NAVIGATION_METRICS = [
+  { key: "navigation_direction", label: "航向清晰", hint: "今日优先项与节奏" },
+  { key: "navigation_activation", label: "启动意愿", hint: "此刻愿意开始行动" },
+  { key: "navigation_work_energy", label: "工作能量", hint: "此刻可投入的能量" },
+  { key: "navigation_focus", label: "专注程度", hint: "注意力进入工作块" },
+  { key: "navigation_calmness", label: "内心平和", hint: "紧绷躁动 → 平静安定" },
+  { key: "navigation_outlook", label: "今日展望", hint: "沉重消极 → 积极期待" },
+];
+const ALL_CHECKIN_METRICS = [...LEGACY_METRICS, ...NAVIGATION_METRICS];
 const TIME_METRICS = [
   {
     id: "project",
@@ -188,7 +206,6 @@ const HEALTH_SIGNAL_LABELS = {
   sleepiness: ["完全不困", "有一点困", "开始有睡意", "已经很困", "随时可以入睡"],
   nightCalmness: ["思绪很亢奋", "比较活跃", "一般", "逐渐安静", "非常平静"],
   clarity: ["脑雾很重", "比较模糊", "一般", "比较清晰", "很清晰"],
-  change: ["明显变差", "稍微变差", "没有变化", "稍微好转", "明显好转"],
   eveningBody: ["很不舒服", "偏疲惫", "一般", "比较舒服", "很舒服"],
   postWorkout: ["消耗过大", "有些透支", "一般", "感觉不错", "恢复良好"],
 };
@@ -470,7 +487,7 @@ function healthAfternoonState(frontmatter) {
     [healthAfternoonEnergy(frontmatter), 40],
     [healthSignal(frontmatter.health_afternoon_calmness), 20],
     [healthSignal(frontmatter.health_afternoon_clarity), 20],
-    [healthSignal(frontmatter.health_afternoon_body_change), 20],
+    [healthSignal(frontmatter.health_afternoon_body), 20],
   ]);
   if (result.value === null) return { ...result, penalty: 0 };
   const feelings = new Set(healthArray(frontmatter.health_afternoon_discomfort));
@@ -497,7 +514,7 @@ function healthRecommendation(frontmatter, plannedWorkout, now = new Date()) {
     : afternoon.value ?? morning.value;
   const answered = morning.answered + afternoon.answered;
   const energy = healthAfternoonEnergy(frontmatter);
-  const bodyChange = healthSignal(frontmatter.health_afternoon_body_change);
+  const bodyAvailability = healthSignal(frontmatter.health_afternoon_body);
   const feelings = new Set([
     ...healthArray(frontmatter.health_afternoon_discomfort),
     ...healthArray(frontmatter.health_morning_discomfort),
@@ -525,9 +542,9 @@ function healthRecommendation(frontmatter, plannedWorkout, now = new Date()) {
   if (hasAfternoon) {
     if (energy === 1 || (capacity !== null && capacity < 35)) {
       intensity = "rest";
-    } else if (energy === 2 || bodyChange === 1 || (capacity !== null && capacity < 55)) {
+    } else if (energy === 2 || bodyAvailability === 1 || (capacity !== null && capacity < 55)) {
       intensity = "stretch";
-    } else if (energy === 3 || bodyChange === 2 || (capacity !== null && capacity < 75)) {
+    } else if (energy === 3 || bodyAvailability === 2 || (capacity !== null && capacity < 75)) {
       intensity = "light";
     }
   } else if (capacity !== null) {
@@ -605,8 +622,45 @@ function healthRecommendation(frontmatter, plannedWorkout, now = new Date()) {
   };
 }
 
+function usesNavigationModel(frontmatter) {
+  if (frontmatter?.daily_checkin_model === "navigation-v1") return true;
+  const date = isoDateValue(frontmatter?.date);
+  return Boolean(date && date >= NAVIGATION_CUTOVER);
+}
+
+function checkinDefinition(frontmatter) {
+  return usesNavigationModel(frontmatter)
+    ? {
+      model: "navigation-v1",
+      required: NAVIGATION_REQUIRED,
+      metrics: NAVIGATION_METRICS,
+      recordedAtKey: "navigation_recorded_at",
+    }
+    : {
+      model: "legacy-state",
+      required: LEGACY_REQUIRED,
+      metrics: LEGACY_METRICS,
+      recordedAtKey: "state_recorded_at",
+    };
+}
+
+function stateTrendValue(frontmatter, metric) {
+  const navigation = usesNavigationModel(frontmatter);
+  if (metric === "sleep") {
+    return rating(frontmatter?.[navigation ? "health_morning_sleep" : "sleep_quality"]);
+  }
+  if (metric === "energy") {
+    return rating(frontmatter?.[navigation ? "navigation_work_energy" : "energy"]);
+  }
+  if (metric === "activation") {
+    return rating(frontmatter?.[navigation ? "navigation_activation" : "agency"]);
+  }
+  return null;
+}
+
 function completion(frontmatter) {
-  return REQUIRED.filter((key) => rating(frontmatter?.[key]) !== null).length;
+  const { required } = checkinDefinition(frontmatter);
+  return required.filter((key) => rating(frontmatter?.[key]) !== null).length;
 }
 
 function localTimestamp(date = new Date()) {
@@ -629,9 +683,11 @@ function calendarDayDifference(fromValue, toValue) {
 }
 
 function stateEntryType(frontmatter) {
-  if (completion(frontmatter) !== REQUIRED.length) return "incomplete";
-  if (!frontmatter?.state_recorded_at) return "legacy";
-  const difference = calendarDayDifference(frontmatter.date, frontmatter.state_recorded_at);
+  const definition = checkinDefinition(frontmatter);
+  if (completion(frontmatter) !== definition.required.length) return "incomplete";
+  const recordedAt = frontmatter?.[definition.recordedAtKey];
+  if (!recordedAt) return "legacy";
+  const difference = calendarDayDifference(frontmatter.date, recordedAt);
   if (difference === 0) return "same-day";
   if (difference === 1) return "late";
   return "retrospective";
@@ -642,10 +698,22 @@ function isVoyageDay(frontmatter) {
 }
 
 function applyRating(frontmatter, key, value, now = new Date()) {
-  const wasComplete = completion(frontmatter) === REQUIRED.length;
+  const navigationMetric = NAVIGATION_REQUIRED.includes(key);
+  if (navigationMetric) frontmatter.daily_checkin_model = "navigation-v1";
+  const definition = navigationMetric
+    ? {
+      required: NAVIGATION_REQUIRED,
+      recordedAtKey: "navigation_recorded_at",
+    }
+    : {
+      required: LEGACY_REQUIRED,
+      recordedAtKey: "state_recorded_at",
+    };
+  const wasComplete = definition.required.every((item) => rating(frontmatter?.[item]) !== null);
   frontmatter[key] = Number(value);
-  if (!wasComplete && completion(frontmatter) === REQUIRED.length && !frontmatter.state_recorded_at) {
-    frontmatter.state_recorded_at = localTimestamp(now);
+  const isComplete = definition.required.every((item) => rating(frontmatter?.[item]) !== null);
+  if (!wasComplete && isComplete && !frontmatter[definition.recordedAtKey]) {
+    frontmatter[definition.recordedAtKey] = localTimestamp(now);
   }
 }
 
@@ -662,8 +730,9 @@ async function freshFrontmatter(app, file) {
 }
 
 function stateStatusPresentation(frontmatter, now = new Date()) {
+  const definition = checkinDefinition(frontmatter);
   const type = stateEntryType(frontmatter);
-  const recordedDate = isoDateValue(frontmatter?.state_recorded_at);
+  const recordedDate = isoDateValue(frontmatter?.[definition.recordedAtKey]);
   if (type === "late") {
     return { type, label: "航行日 · Late entry", detail: `补录于 ${recordedDate}，计入连续航行` };
   }
@@ -729,14 +798,26 @@ function miniGaugePath(index) {
 }
 
 function renderDailyStatus(frontmatter, container, onSelect) {
-  const wrap = container.createDiv({ cls: "cx-daily-status" });
+  const definition = checkinDefinition(frontmatter);
+  let host = container;
+  if (definition.model === "navigation-v1") {
+    host = container.createDiv({ cls: "cx-daily-navigation" });
+    const start = host.createDiv({ cls: `cx-navigation-daily-start${frontmatter.voyage_started_at ? " is-started" : ""}` });
+    const boat = start.createSpan({ cls: "cx-navigation-daily-boat", attr: { "aria-hidden": "true" } });
+    setIcon(boat, "sailboat");
+    const copy = start.createDiv({ cls: "cx-navigation-daily-copy" });
+    copy.createSpan({ text: "今日起航", cls: "cx-navigation-daily-label" });
+    const match = String(frontmatter.voyage_started_at ?? "").match(/T(\d{2}:\d{2})/);
+    copy.createSpan({ text: match?.[1] ?? "尚未启航", cls: "cx-navigation-daily-time" });
+  }
+  const wrap = host.createDiv({ cls: "cx-daily-status" });
   const presentation = stateStatusPresentation(frontmatter);
   if (presentation) {
     const status = wrap.createDiv({ cls: `cx-daily-status-meta is-${presentation.type}` });
     status.createSpan({ text: presentation.label, cls: "cx-daily-status-badge" });
     status.createSpan({ text: presentation.detail, cls: "cx-daily-status-detail" });
   }
-  METRICS.forEach((metric) => {
+  definition.metrics.forEach((metric) => {
     const item = wrap.createDiv({ cls: "cx-daily-status-item" });
     const svg = createSvgElement(item, "svg", { viewBox: "0 0 104 65", class: "cx-daily-status-svg" });
     const selected = rating(frontmatter[metric.key]);
@@ -758,6 +839,748 @@ function renderDailyStatus(frontmatter, container, onSelect) {
     valueText.textContent = selected ?? "—";
     item.createDiv({ text: metric.label, cls: "cx-daily-status-label" });
   });
+}
+
+function trackerDesktopIO() {
+  if (Platform.isMobile) return null;
+  try {
+    return { fs: require("fs"), path: require("path") };
+  } catch (_error) {
+    return null;
+  }
+}
+
+function trackerClock(totalSeconds) {
+  const value = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+  const hours = Math.floor(value / 3600);
+  const minutes = Math.floor((value % 3600) / 60);
+  const seconds = value % 60;
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
+function trackerDuration(totalSeconds) {
+  const minutes = Math.max(0, Math.round((Number(totalSeconds) || 0) / 60));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
+}
+
+function trackerDateLabel(value, options = {}) {
+  const date = value instanceof Date
+    ? value
+    : /^\d{4}-\d{2}-\d{2}$/.test(String(value || ""))
+      ? dateFromISO(value)
+      : new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    ...(options.time ? { hour: "numeric", minute: "2-digit" } : {}),
+  }).format(date);
+}
+
+function trackerPatternLabel(value) {
+  return String(value || "")
+    .replace(/^\d+_/, "")
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function trackerTimerSeconds(timer, now = Date.now()) {
+  if (!timer) return 0;
+  const accumulated = Math.max(0, Number(timer.active_seconds) || 0);
+  if (timer.status !== "running" || !timer.running_since) return accumulated;
+  const runningSince = new Date(timer.running_since).getTime();
+  return accumulated + (Number.isFinite(runningSince) ? Math.max(0, (now - runningSince) / 1000) : 0);
+}
+
+const TRACKER_PHASES = [
+  { id: "thinking", label: "Thinking" },
+  { id: "implementation", label: "Implementation" },
+  { id: "debugging", label: "Debugging" },
+];
+
+function trackerPhaseSeconds(timer, now = Date.now()) {
+  const phases = {};
+  const stored = timer?.phase_seconds;
+  if (stored && typeof stored === "object" && !Array.isArray(stored)) {
+    TRACKER_PHASES.forEach(({ id }) => {
+      if (Object.prototype.hasOwnProperty.call(stored, id)) {
+        phases[id] = Math.max(0, Number(stored[id]) || 0);
+      }
+    });
+  }
+  if (timer?.status === "running" && timer.running_since && TRACKER_PHASES.some(({ id }) => id === timer.phase)) {
+    const runningSince = new Date(timer.running_since).getTime();
+    const elapsed = Number.isFinite(runningSince) ? Math.max(0, (now - runningSince) / 1000) : 0;
+    phases[timer.phase] = Math.max(0, Number(phases[timer.phase]) || 0) + elapsed;
+  }
+  return phases;
+}
+
+function trackerTimerSnapshot(timer, now = Date.now()) {
+  const phases = trackerPhaseSeconds(timer, now);
+  return {
+    active_seconds: Math.max(0, trackerTimerSeconds(timer, now)),
+    phase_seconds: Object.fromEntries(
+      Object.entries(phases).map(([phase, seconds]) => [phase, Math.max(0, seconds)]),
+    ),
+  };
+}
+
+function trackerEventId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `lc-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function trackerTaskSessions(events, taskId) {
+  return events
+    .filter((event) => event.task_id === taskId)
+    .sort((a, b) => String(a.ended_at).localeCompare(String(b.ended_at)));
+}
+
+function trackerTaskExecutionStatus(events, taskId) {
+  const sessions = trackerTaskSessions(events, taskId);
+  if (sessions.some((event) => event.completion_status === "completed")) return "completed";
+  return sessions[sessions.length - 1]?.completion_status ?? "planned";
+}
+
+function trackerWeekRange(date = new Date()) {
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = start.getDay();
+  start.setDate(start.getDate() - (day === 0 ? 6 : day - 1));
+  const end = addDays(start, 6);
+  return { start: localISO(start), end: localISO(end) };
+}
+
+class LeetCodeTrackerChild extends MarkdownRenderChild {
+  constructor(container, plugin, file, config) {
+    super(container);
+    this.plugin = plugin;
+    this.app = plugin.app;
+    this.file = file;
+    this.config = config && typeof config === "object" ? config : {};
+    this.data = null;
+    this.loading = false;
+    this.activeTab = "today";
+    this.selectedTaskId = "";
+    this.timerDisplay = null;
+    this.timerRing = null;
+    this.timerMeta = null;
+    this.phaseDisplays = new Map();
+    this.phaseStatus = null;
+    this.hintLevel = "";
+    this.userNote = "";
+    this.savingSession = false;
+  }
+
+  onload() {
+    this.render();
+    this.registerInterval(window.setInterval(() => this.updateTimerDisplay(), 1000));
+  }
+
+  timerKey() {
+    return `${this.file.path}::${String(this.config.bridge_path || "")}`;
+  }
+
+  timer() {
+    return this.plugin.getLeetcodeTimer(this.timerKey());
+  }
+
+  bridgePath(relativePath) {
+    const io = trackerDesktopIO();
+    const root = String(this.config.bridge_path || "").trim();
+    return io && root ? io.path.join(root, relativePath) : null;
+  }
+
+  async readJson(relativePath) {
+    const io = trackerDesktopIO();
+    const target = this.bridgePath(relativePath);
+    if (!io || !target) throw new Error("Bridge path is unavailable on this device.");
+    return JSON.parse(await io.fs.promises.readFile(target, "utf8"));
+  }
+
+  async readEvents() {
+    const io = trackerDesktopIO();
+    const target = this.bridgePath("from_obsidian/session_events.jsonl");
+    if (!io || !target) throw new Error("Session event output is unavailable on this device.");
+    const content = await io.fs.promises.readFile(target, "utf8");
+    return content
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        try {
+          return JSON.parse(line);
+        } catch (_error) {
+          return null;
+        }
+      })
+      .filter((event) => event?.event_type === "session_completed" && event.task_id);
+  }
+
+  async loadBridgeData() {
+    if (Platform.isMobile) throw new Error("LeetCode Tracker is configured for desktop use.");
+    if (!String(this.config.bridge_path || "").trim()) {
+      throw new Error("Add bridge_path to the castlex-leetcode-tracker block.");
+    }
+    const [plan, current, review, events] = await Promise.all([
+      this.readJson("to_obsidian/plan_export.json"),
+      this.readJson("to_obsidian/current_state.json"),
+      this.readJson("to_obsidian/review_queue.json"),
+      this.readEvents(),
+    ]);
+    if (!Array.isArray(plan.tasks) || Number(plan.schema_version) !== 1) {
+      throw new Error("The Bridge plan export is not a supported schema.");
+    }
+    this.data = { plan, current, review, events };
+    const timerTaskId = this.timer()?.task_id;
+    const taskIds = new Set(plan.tasks.map((task) => task.task_id));
+    if (timerTaskId && taskIds.has(timerTaskId)) this.selectedTaskId = timerTaskId;
+    if (!this.selectedTaskId || !taskIds.has(this.selectedTaskId)) {
+      this.selectedTaskId = this.recommendedTask()?.task_id ?? plan.tasks[0]?.task_id ?? "";
+    }
+  }
+
+  tasks() {
+    return this.data?.plan?.tasks ?? [];
+  }
+
+  problemTasks() {
+    return this.tasks().filter((task) => task.task_type === "problem");
+  }
+
+  task(taskId) {
+    return this.tasks().find((task) => task.task_id === taskId) ?? null;
+  }
+
+  sessions(taskId = "") {
+    const events = this.data?.events ?? [];
+    return taskId ? trackerTaskSessions(events, taskId) : [...events];
+  }
+
+  taskStatus(taskId) {
+    return trackerTaskExecutionStatus(this.data?.events ?? [], taskId);
+  }
+
+  completedTaskIds() {
+    return new Set(this.tasks()
+      .filter((task) => this.taskStatus(task.task_id) === "completed")
+      .map((task) => task.task_id));
+  }
+
+  recommendedTask() {
+    if (!this.data) return null;
+    const active = this.timer();
+    if (active?.task_id) return this.task(active.task_id);
+    const completed = this.completedTaskIds();
+    const open = this.tasks().filter((task) => !completed.has(task.task_id));
+    const today = localISO();
+    return open.find((task) => task.scheduled_date === today)
+      ?? open.find((task) => task.scheduled_date <= today)
+      ?? open[0]
+      ?? this.tasks()[this.tasks().length - 1]
+      ?? null;
+  }
+
+  selectedTask() {
+    return this.task(this.selectedTaskId) ?? this.recommendedTask();
+  }
+
+  async render() {
+    if (this.loading) return;
+    this.loading = true;
+    this.containerEl.empty();
+    const shell = this.containerEl.createDiv({ cls: "cx-lc-shell" });
+    shell.createDiv({ cls: "cx-lc-loading", text: "Loading LeetCode plan…" });
+    try {
+      await this.loadBridgeData();
+      this.renderTracker();
+    } catch (error) {
+      shell.empty();
+      const card = shell.createDiv({ cls: "cx-lc-error" });
+      card.createEl("h3", { text: "LeetCode Tracker unavailable" });
+      card.createEl("p", { text: error instanceof Error ? error.message : String(error) });
+      if (!Platform.isMobile) {
+        const retry = card.createEl("button", { cls: "cx-lc-button", text: "Retry" });
+        retry.addEventListener("click", () => this.render());
+      }
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  renderTracker() {
+    const shell = this.containerEl.querySelector(".cx-lc-shell");
+    shell.empty();
+    this.renderHeader(shell);
+    this.renderNavigation(shell);
+    const content = shell.createDiv({ cls: "cx-lc-content" });
+    if (this.activeTab === "week") this.renderWeek(content);
+    else if (this.activeTab === "plan") this.renderPlan(content);
+    else if (this.activeTab === "review") this.renderReview(content);
+    else if (this.activeTab === "sessions") this.renderSessions(content);
+    else this.renderToday(content);
+    this.updateTimerDisplay();
+  }
+
+  renderHeader(shell) {
+    const problems = this.problemTasks();
+    const technicalCompleted = Math.max(0, Number(this.data.current.completed_problem_count) || 0);
+    const technicalTotal = technicalCompleted + problems.length;
+    const completed = this.completedTaskIds();
+    const executionCompleted = problems.filter((task) => completed.has(task.task_id)).length;
+    const events = this.sessions();
+    const totalSeconds = events.reduce((sum, event) => sum + Math.max(0, Number(event.active_seconds) || 0), 0);
+    const milestone = this.data.current.next_milestone;
+    const milestoneIds = Array.isArray(milestone?.task_ids) ? milestone.task_ids : [];
+    const milestoneCompleted = milestoneIds.filter((taskId) => completed.has(taskId)).length;
+
+    const hero = shell.createDiv({ cls: "cx-lc-hero" });
+    const heading = hero.createDiv({ cls: "cx-lc-heading" });
+    heading.createDiv({ cls: "cx-lc-kicker", text: this.data.plan.round?.title || "LeetCode Training" });
+    heading.createEl("h2", { text: "Execution Console" });
+    heading.createDiv({
+      cls: "cx-lc-subtitle",
+      text: `${trackerPatternLabel(this.data.current.current_pattern)} · Checkpoint ${trackerDateLabel(this.data.plan.round?.checkpoint_date)}`,
+    });
+    const refresh = hero.createEl("button", {
+      cls: "cx-lc-icon-button",
+      attr: { "aria-label": "Refresh Bridge plan", title: "Refresh Bridge plan" },
+    });
+    setIcon(refresh, "refresh-cw");
+    refresh.addEventListener("click", () => this.render());
+
+    const progressGrid = shell.createDiv({ cls: "cx-lc-progress-grid" });
+    this.renderProgress(progressGrid, "Technical coverage", technicalCompleted, technicalTotal, "Repository evidence");
+    this.renderProgress(progressGrid, "Plan execution", executionCompleted, problems.length, "Completed sessions");
+    this.renderProgress(progressGrid, milestone?.title || "Current milestone", milestoneCompleted, milestoneIds.length, "Current focus");
+    const time = progressGrid.createDiv({ cls: "cx-lc-progress-card cx-lc-time-card" });
+    time.createDiv({ cls: "cx-lc-progress-label", text: "Recorded active time" });
+    time.createDiv({ cls: "cx-lc-time-value", text: trackerDuration(totalSeconds) });
+    time.createDiv({ cls: "cx-lc-progress-detail", text: `${events.length} completed session${events.length === 1 ? "" : "s"}` });
+  }
+
+  renderProgress(parent, label, value, total, detail) {
+    const safeTotal = Math.max(0, Number(total) || 0);
+    const safeValue = Math.max(0, Number(value) || 0);
+    const percentage = safeTotal ? Math.min(100, safeValue / safeTotal * 100) : 0;
+    const card = parent.createDiv({ cls: "cx-lc-progress-card" });
+    const line = card.createDiv({ cls: "cx-lc-progress-line" });
+    line.createSpan({ cls: "cx-lc-progress-label", text: label });
+    line.createSpan({ cls: "cx-lc-progress-count", text: `${safeValue} / ${safeTotal}` });
+    const track = card.createDiv({ cls: "cx-lc-progress-track" });
+    const bar = track.createSpan({ cls: "cx-lc-progress-bar" });
+    bar.style.width = `${percentage}%`;
+    card.createDiv({ cls: "cx-lc-progress-detail", text: detail });
+  }
+
+  renderNavigation(shell) {
+    const nav = shell.createDiv({ cls: "cx-lc-tabs" });
+    [
+      ["today", "Today"],
+      ["week", "This Week"],
+      ["plan", "Plan"],
+      ["review", "Review"],
+      ["sessions", "Sessions"],
+    ].forEach(([id, label]) => {
+      const button = nav.createEl("button", {
+        cls: `cx-lc-tab${this.activeTab === id ? " is-active" : ""}`,
+        text: label,
+      });
+      button.addEventListener("click", () => {
+        this.activeTab = id;
+        this.renderTracker();
+      });
+    });
+  }
+
+  renderToday(parent) {
+    const task = this.selectedTask();
+    if (!task) {
+      parent.createDiv({ cls: "cx-lc-empty", text: "No task is available in the current plan." });
+      return;
+    }
+    const taskSessions = this.sessions(task.task_id);
+    const totalSeconds = taskSessions.reduce((sum, event) => sum + Number(event.active_seconds || 0), 0);
+    const status = this.taskStatus(task.task_id);
+    const card = parent.createDiv({ cls: "cx-lc-session-card" });
+    const meta = card.createDiv({ cls: "cx-lc-task-meta" });
+    meta.createSpan({ cls: `cx-lc-status is-${status}`, text: status === "planned" ? "Up next" : status });
+    meta.createSpan({ text: task.task_type === "checkpoint" ? "Round checkpoint" : `LC ${task.leetcode_id}` });
+    meta.createSpan({ text: trackerPatternLabel(task.pattern) });
+    meta.createSpan({ text: task.stage });
+    card.createEl("h3", { text: task.title });
+    const schedule = card.createDiv({ cls: "cx-lc-schedule" });
+    schedule.createSpan({ text: `Planned · ${trackerDateLabel(task.scheduled_date)}` });
+    schedule.createSpan({ text: `Expected · ${task.expected_active_minutes}m` });
+    if (taskSessions.length) {
+      schedule.createSpan({ text: `${taskSessions.length} session${taskSessions.length === 1 ? "" : "s"} · ${trackerDuration(totalSeconds)}` });
+    }
+
+    const timerArea = card.createDiv({ cls: "cx-lc-timer-area" });
+    const ring = timerArea.createDiv({ cls: "cx-lc-timer-ring" });
+    this.timerRing = ring;
+    this.phaseDisplays = new Map();
+    this.phaseStatus = null;
+    const inner = ring.createDiv({ cls: "cx-lc-timer-inner" });
+    this.timerDisplay = inner.createDiv({ cls: "cx-lc-clock", text: "00:00:00" });
+    this.timerMeta = inner.createDiv({ cls: "cx-lc-clock-meta", text: "Ready to begin" });
+    this.renderTimerActions(timerArea, task);
+    this.renderOptionalDetails(card);
+    this.renderTaskChooser(parent, task);
+  }
+
+  renderTimerActions(parent, task) {
+    const timer = this.timer();
+    const actions = parent.createDiv({ cls: "cx-lc-timer-actions" });
+    if (!timer) {
+      const start = actions.createEl("button", { cls: "cx-lc-button is-primary", text: "Start Session" });
+      start.addEventListener("click", () => this.startSession(task));
+      return;
+    }
+    if (timer.task_id !== task.task_id) {
+      actions.createDiv({ cls: "cx-lc-running-note", text: `A session is already active for ${this.task(timer.task_id)?.title || timer.task_id}.` });
+      const open = actions.createEl("button", { cls: "cx-lc-button", text: "Open Active Session" });
+      open.addEventListener("click", () => {
+        this.selectedTaskId = timer.task_id;
+        this.renderTracker();
+      });
+      return;
+    }
+    const pause = actions.createEl("button", {
+      cls: "cx-lc-button",
+      text: timer.status === "running" ? "Pause" : "Resume",
+    });
+    pause.addEventListener("click", () => timer.status === "running" ? this.pauseSession() : this.resumeSession());
+    this.renderPhaseSelector(actions, timer);
+    const finish = actions.createEl("button", { cls: "cx-lc-button is-primary", text: "Finish · Completed" });
+    finish.addEventListener("click", () => this.finishSession("completed"));
+    const partial = actions.createEl("button", { cls: "cx-lc-button is-quiet", text: "Save Partial" });
+    partial.addEventListener("click", () => this.finishSession("partial"));
+    const stopped = actions.createEl("button", { cls: "cx-lc-button is-quiet", text: "Stop" });
+    stopped.addEventListener("click", () => this.finishSession("stopped"));
+  }
+
+  renderPhaseSelector(parent, timer) {
+    const panel = parent.createDiv({ cls: "cx-lc-phase-panel" });
+    const heading = panel.createDiv({ cls: "cx-lc-phase-heading" });
+    heading.createSpan({ text: "Optional phase" });
+    this.phaseStatus = heading.createSpan({
+      cls: "cx-lc-phase-status",
+      text: timer.phase ? `Tracking ${trackerPatternLabel(timer.phase)}` : "Total only",
+    });
+    panel.createDiv({
+      cls: "cx-lc-phase-help",
+      text: "Choose only when useful. Tap the active phase again to return to Total only.",
+    });
+    const choices = panel.createDiv({ cls: "cx-lc-phase-choices" });
+    const phaseSeconds = trackerPhaseSeconds(timer);
+    TRACKER_PHASES.forEach(({ id, label }) => {
+      const button = choices.createEl("button", {
+        cls: `cx-lc-phase-button${timer.phase === id ? " is-active" : ""}`,
+        attr: {
+          type: "button",
+          "aria-pressed": timer.phase === id ? "true" : "false",
+        },
+      });
+      button.createSpan({ cls: "cx-lc-phase-label", text: label });
+      const display = button.createSpan({
+        cls: "cx-lc-phase-time",
+        text: Object.prototype.hasOwnProperty.call(phaseSeconds, id) ? trackerClock(phaseSeconds[id]) : "N/A",
+      });
+      this.phaseDisplays.set(id, display);
+      button.addEventListener("click", () => this.selectPhase(timer.phase === id ? null : id));
+    });
+  }
+
+  renderOptionalDetails(parent) {
+    const details = parent.createEl("details", { cls: "cx-lc-details" });
+    details.createEl("summary", { text: "Optional details · hint level and note" });
+    const fields = details.createDiv({ cls: "cx-lc-detail-fields" });
+    const hint = fields.createDiv({ cls: "cx-lc-field" });
+    hint.createEl("label", { text: "Hint level" });
+    const select = hint.createEl("select");
+    [
+      ["", "Not recorded"],
+      ["H0", "H0 · No hint"],
+      ["H1", "H1 · Direction"],
+      ["H2", "H2 · Concept / structure"],
+      ["H3", "H3 · Strong guidance"],
+      ["answer", "Answer viewed"],
+    ].forEach(([value, label]) => select.createEl("option", { attr: { value }, text: label }));
+    select.value = this.hintLevel;
+    select.addEventListener("change", () => { this.hintLevel = select.value; });
+    const note = fields.createDiv({ cls: "cx-lc-field is-note" });
+    note.createEl("label", { text: "Session note" });
+    const textarea = note.createEl("textarea", {
+      attr: { maxlength: "500", placeholder: "Optional friction, feeling, or next step…" },
+    });
+    textarea.value = this.userNote;
+    textarea.addEventListener("input", () => { this.userNote = textarea.value; });
+  }
+
+  renderTaskChooser(parent, selectedTask) {
+    const queue = parent.createDiv({ cls: "cx-lc-queue" });
+    const header = queue.createDiv({ cls: "cx-lc-section-heading" });
+    header.createEl("h4", { text: "Choose another task" });
+    header.createSpan({ text: "Planned dates remain anchors" });
+    const open = this.tasks()
+      .filter((task) => task.task_id !== selectedTask.task_id && this.taskStatus(task.task_id) !== "completed")
+      .slice(0, 4);
+    if (!open.length) {
+      queue.createDiv({ cls: "cx-lc-empty", text: "All current plan tasks have a completed session." });
+      return;
+    }
+    open.forEach((task) => this.renderTaskRow(queue, task));
+  }
+
+  renderWeek(parent) {
+    const range = trackerWeekRange();
+    const tasks = this.tasks().filter((task) => task.scheduled_date >= range.start && task.scheduled_date <= range.end);
+    this.renderListHeader(parent, "This Week", `${trackerDateLabel(range.start)} – ${trackerDateLabel(range.end)}`);
+    if (!tasks.length) {
+      parent.createDiv({ cls: "cx-lc-empty", text: "No main problem is scheduled this week." });
+      return;
+    }
+    tasks.forEach((task) => this.renderTaskRow(parent, task));
+  }
+
+  renderPlan(parent) {
+    this.renderListHeader(parent, "Round 1 Plan", `${this.problemTasks().length} upcoming problems · dates are planning anchors`);
+    let currentPattern = "";
+    this.tasks().forEach((task) => {
+      if (task.pattern !== currentPattern) {
+        currentPattern = task.pattern;
+        parent.createDiv({ cls: "cx-lc-pattern-heading", text: trackerPatternLabel(currentPattern) });
+      }
+      this.renderTaskRow(parent, task);
+    });
+  }
+
+  renderReview(parent) {
+    const active = Array.isArray(this.data.review.active) ? this.data.review.active : [];
+    this.renderListHeader(parent, "Review Due", "Owned by the LeetCode repository");
+    if (!active.length) {
+      parent.createDiv({ cls: "cx-lc-empty", text: "No active retrieval is due. Deferred Round 2 items stay out of the current workload." });
+      return;
+    }
+    active.forEach((review) => {
+      const row = parent.createDiv({ cls: "cx-lc-task-row" });
+      const main = row.createDiv({ cls: "cx-lc-task-row-main" });
+      main.createDiv({ cls: "cx-lc-task-title", text: review.title });
+      main.createDiv({ cls: "cx-lc-task-detail", text: `${trackerPatternLabel(review.pattern)} · ${review.review_type || "Retrieval"}` });
+    });
+  }
+
+  renderSessions(parent) {
+    const tasks = new Map(this.tasks().map((task) => [task.task_id, task]));
+    const events = this.sessions().sort((a, b) => String(b.ended_at).localeCompare(String(a.ended_at)));
+    this.renderListHeader(parent, "Recent Sessions", `${events.length} recorded in the Bridge`);
+    if (!events.length) {
+      parent.createDiv({ cls: "cx-lc-empty", text: "Finish a session to create the first timing record." });
+      return;
+    }
+    events.slice(0, 20).forEach((event) => {
+      const task = tasks.get(event.task_id);
+      const row = parent.createDiv({ cls: "cx-lc-session-row" });
+      const main = row.createDiv({ cls: "cx-lc-task-row-main" });
+      main.createDiv({ cls: "cx-lc-task-title", text: task?.title || event.task_id });
+      const detail = [
+        trackerDateLabel(event.ended_at, { time: true }),
+        trackerDuration(event.active_seconds),
+        event.completion_status,
+        event.hint_level || "",
+      ].filter(Boolean).join(" · ");
+      main.createDiv({ cls: "cx-lc-task-detail", text: detail });
+      const phases = event.phase_seconds && typeof event.phase_seconds === "object"
+        ? event.phase_seconds
+        : {};
+      const phaseLine = main.createDiv({ cls: "cx-lc-session-phases" });
+      TRACKER_PHASES.forEach(({ id, label }) => {
+        const hasValue = Object.prototype.hasOwnProperty.call(phases, id);
+        phaseLine.createSpan({ text: `${label} ${hasValue ? trackerDuration(phases[id]) : "N/A"}` });
+      });
+      if (event.user_note) main.createDiv({ cls: "cx-lc-session-note", text: event.user_note });
+    });
+  }
+
+  renderListHeader(parent, title, detail) {
+    const header = parent.createDiv({ cls: "cx-lc-section-heading" });
+    header.createEl("h3", { text: title });
+    header.createSpan({ text: detail });
+  }
+
+  renderTaskRow(parent, task) {
+    const status = this.taskStatus(task.task_id);
+    const sessions = this.sessions(task.task_id);
+    const totalSeconds = sessions.reduce((sum, event) => sum + Number(event.active_seconds || 0), 0);
+    const row = parent.createDiv({ cls: "cx-lc-task-row" });
+    const date = row.createDiv({ cls: "cx-lc-task-date" });
+    date.createSpan({ text: trackerDateLabel(task.scheduled_date) });
+    const main = row.createDiv({ cls: "cx-lc-task-row-main" });
+    main.createDiv({ cls: "cx-lc-task-title", text: `${task.leetcode_id ? `LC ${task.leetcode_id} · ` : ""}${task.title}` });
+    main.createDiv({
+      cls: "cx-lc-task-detail",
+      text: `${trackerPatternLabel(task.pattern)} · ${task.stage} · ${task.expected_active_minutes}m${sessions.length ? ` · ${trackerDuration(totalSeconds)} recorded` : ""}`,
+    });
+    row.createSpan({ cls: `cx-lc-status is-${status}`, text: status });
+    const select = row.createEl("button", {
+      cls: "cx-lc-row-button",
+      text: this.timer()?.task_id === task.task_id ? "Active" : "Open",
+    });
+    select.disabled = this.timer()?.task_id === task.task_id;
+    select.addEventListener("click", () => {
+      this.selectedTaskId = task.task_id;
+      this.activeTab = "today";
+      this.renderTracker();
+    });
+  }
+
+  async startSession(task) {
+    if (this.timer()) {
+      new Notice("Finish or stop the active LeetCode session first.");
+      return;
+    }
+    const now = new Date().toISOString();
+    await this.plugin.setLeetcodeTimer(this.timerKey(), {
+      task_id: task.task_id,
+      started_at: now,
+      running_since: now,
+      active_seconds: 0,
+      phase: null,
+      phase_seconds: {},
+      status: "running",
+    });
+    this.selectedTaskId = task.task_id;
+    this.renderTracker();
+  }
+
+  async pauseSession() {
+    const timer = this.timer();
+    if (!timer || timer.status !== "running") return;
+    const snapshot = trackerTimerSnapshot(timer);
+    await this.plugin.setLeetcodeTimer(this.timerKey(), {
+      ...timer,
+      ...snapshot,
+      running_since: null,
+      status: "paused",
+    });
+    this.renderTracker();
+  }
+
+  async resumeSession() {
+    const timer = this.timer();
+    if (!timer || timer.status !== "paused") return;
+    await this.plugin.setLeetcodeTimer(this.timerKey(), {
+      ...timer,
+      running_since: new Date().toISOString(),
+      status: "running",
+    });
+    this.renderTracker();
+  }
+
+  async selectPhase(phase) {
+    const timer = this.timer();
+    if (!timer || (phase !== null && !TRACKER_PHASES.some(({ id }) => id === phase))) return;
+    const snapshot = trackerTimerSnapshot(timer);
+    if (phase && !Object.prototype.hasOwnProperty.call(snapshot.phase_seconds, phase)) {
+      snapshot.phase_seconds[phase] = 0;
+    }
+    await this.plugin.setLeetcodeTimer(this.timerKey(), {
+      ...timer,
+      ...snapshot,
+      phase,
+      running_since: timer.status === "running" ? new Date().toISOString() : null,
+    });
+    this.renderTracker();
+  }
+
+  async finishSession(completionStatus) {
+    if (this.savingSession) return;
+    let timer = this.timer();
+    if (!timer || !["completed", "partial", "stopped"].includes(completionStatus)) return;
+    const io = trackerDesktopIO();
+    const target = this.bridgePath("from_obsidian/session_events.jsonl");
+    if (!io || !target) {
+      new Notice("Bridge output is unavailable.");
+      return;
+    }
+    this.savingSession = true;
+    try {
+      const eventId = timer.pending_event_id || trackerEventId();
+      if (!timer.pending_event_id) {
+        timer = { ...timer, pending_event_id: eventId };
+        await this.plugin.setLeetcodeTimer(this.timerKey(), timer);
+      }
+      const snapshot = trackerTimerSnapshot(timer);
+      const event = {
+        schema_version: 2,
+        event_id: eventId,
+        event_type: "session_completed",
+        task_id: timer.task_id,
+        started_at: timer.started_at,
+        ended_at: new Date().toISOString(),
+        active_seconds: Math.max(0, Math.floor(snapshot.active_seconds)),
+        completion_status: completionStatus,
+        obsidian_note_path: this.file.path,
+      };
+      if (Object.keys(snapshot.phase_seconds).length) {
+        event.phase_seconds = Object.fromEntries(
+          Object.entries(snapshot.phase_seconds).map(([phase, seconds]) => [phase, Math.max(0, Math.floor(seconds))]),
+        );
+      }
+      if (this.hintLevel) event.hint_level = this.hintLevel;
+      const note = this.userNote.trim().slice(0, 500);
+      if (note) event.user_note = note;
+      const existing = await this.readEvents();
+      if (!existing.some((item) => item.event_id === event.event_id)) {
+        await io.fs.promises.appendFile(target, `${JSON.stringify(event)}\n`, "utf8");
+      }
+      await this.plugin.setLeetcodeTimer(this.timerKey(), null);
+      this.hintLevel = "";
+      this.userNote = "";
+      this.selectedTaskId = timer.task_id;
+      new Notice(`${this.task(timer.task_id)?.title || "LeetCode"} session saved.`);
+      await this.render();
+    } catch (error) {
+      new Notice(`Could not save the LeetCode session: ${error.message || error}`);
+    } finally {
+      this.savingSession = false;
+    }
+  }
+
+  updateTimerDisplay() {
+    if (!this.timerDisplay || !this.timerRing || !this.timerMeta) return;
+    const timer = this.timer();
+    const task = this.selectedTask();
+    const seconds = timer?.task_id === task?.task_id ? trackerTimerSeconds(timer) : 0;
+    this.timerDisplay.setText(trackerClock(seconds));
+    const expectedSeconds = Math.max(60, Number(task?.expected_active_minutes || 0) * 60);
+    const percentage = Math.min(100, seconds / expectedSeconds * 100);
+    this.timerRing.style.setProperty("--cx-lc-timer-progress", `${percentage * 3.6}deg`);
+    if (!timer || timer.task_id !== task?.task_id) {
+      this.timerMeta.setText("Ready to begin");
+    } else if (timer.status === "paused") {
+      this.timerMeta.setText(`Paused · ${timer.phase ? trackerPatternLabel(timer.phase) : "Total only"}`);
+    } else if (seconds >= expectedSeconds) {
+      this.timerMeta.setText(`Reached the ${task.expected_active_minutes}m check-in point`);
+    } else {
+      this.timerMeta.setText(`Active · ${timer.phase ? trackerPatternLabel(timer.phase) : "Total only"}`);
+    }
+    if (timer?.task_id === task?.task_id) {
+      const phaseSeconds = trackerPhaseSeconds(timer);
+      TRACKER_PHASES.forEach(({ id }) => {
+        const display = this.phaseDisplays.get(id);
+        if (!display) return;
+        display.setText(Object.prototype.hasOwnProperty.call(phaseSeconds, id) ? trackerClock(phaseSeconds[id]) : "N/A");
+      });
+      this.phaseStatus?.setText(timer.phase ? `Tracking ${trackerPatternLabel(timer.phase)}` : "Total only");
+    }
+  }
 }
 
 class DailyStatusChild extends MarkdownRenderChild {
@@ -980,12 +1803,12 @@ class WeeklySnapshotChild extends MarkdownRenderChild {
     const section = parent.createDiv({ cls: "cx-weekly-section cx-weekly-state-section" });
     const heading = section.createDiv({ cls: "cx-weekly-section-heading" });
     heading.createEl("h4", { text: "State relationship" });
-    heading.createSpan({ text: "Sleep · Energy · Agency", cls: "cx-weekly-section-subtitle" });
+    heading.createSpan({ text: "Sleep · Energy · Activation", cls: "cx-weekly-section-subtitle" });
     const svg = createSvgElement(section, "svg", {
       viewBox: "0 0 760 244",
       class: "cx-weekly-state-chart",
       role: "img",
-      "aria-label": "Daily sleep quality, energy, and agency from one to five across the weekly period",
+      "aria-label": "Daily sleep quality, work energy, and activation from one to five across the weekly period",
     });
     const left = 48;
     const right = 720;
@@ -1001,9 +1824,9 @@ class WeeklySnapshotChild extends MarkdownRenderChild {
       label.textContent = String(value);
     }
     const series = [
-      { key: "sleep_quality", label: "Sleep", cls: "is-sleep" },
-      { key: "energy", label: "Energy", cls: "is-energy" },
-      { key: "agency", label: "Agency", cls: "is-agency" },
+      { metric: "sleep", label: "Sleep", cls: "is-sleep" },
+      { metric: "energy", label: "Energy", cls: "is-energy" },
+      { metric: "activation", label: "Activation", cls: "is-activation" },
     ];
     series.forEach((definition) => {
       let segment = [];
@@ -1015,7 +1838,7 @@ class WeeklySnapshotChild extends MarkdownRenderChild {
         segment = [];
       };
       days.forEach((day, index) => {
-        const value = rating(day.frontmatter?.[definition.key]);
+        const value = stateTrendValue(day.frontmatter, definition.metric);
         if (value === null) {
           flush();
           return;
@@ -1136,11 +1959,11 @@ class WeeklySnapshotChild extends MarkdownRenderChild {
     const charts = wrap.createDiv({ cls: "cx-weekly-charts" });
     this.renderStateChart(charts, days);
     this.renderAllocationChart(charts, days);
-    const sleepAverage = average(days.map((day) => rating(day.frontmatter?.sleep_quality)));
-    const energyAverage = average(days.map((day) => rating(day.frontmatter?.energy)));
-    const agencyAverage = average(days.map((day) => rating(day.frontmatter?.agency)));
+    const sleepAverage = average(days.map((day) => stateTrendValue(day.frontmatter, "sleep")));
+    const energyAverage = average(days.map((day) => stateTrendValue(day.frontmatter, "energy")));
+    const activationAverage = average(days.map((day) => stateTrendValue(day.frontmatter, "activation")));
     const footer = wrap.createDiv({ cls: "cx-weekly-snapshot-footer" });
-    footer.createSpan({ text: `Sleep ${sleepAverage?.toFixed(1) ?? "—"} · Energy ${energyAverage?.toFixed(1) ?? "—"} · Agency ${agencyAverage?.toFixed(1) ?? "—"}` });
+    footer.createSpan({ text: `Sleep ${sleepAverage?.toFixed(1) ?? "—"} · Energy ${energyAverage?.toFixed(1) ?? "—"} · Activation ${activationAverage?.toFixed(1) ?? "—"}` });
     footer.createSpan({ text: "Current Daily Note YAML · human corrections take precedence" });
   }
 }
@@ -1192,7 +2015,6 @@ class DailyHealthSummaryChild extends MarkdownRenderChild {
     const afternoon = healthAfternoonState(frontmatter);
     const header = wrap.createDiv({ cls: "cx-health-summary-header" });
     header.createEl("h3", { text: "Health Snapshot" });
-    header.createSpan({ text: "与 Home Check-in 分开记录" });
     const grid = wrap.createDiv({ cls: "cx-health-summary-grid" });
     const recommendationChanged = recommendation !== planned || recommendationMode !== "standard";
     const manuallyChanged = String(frontmatter.health_primary_source || "") === "manual"
@@ -1256,6 +2078,7 @@ class CastleXHomeView extends ItemView {
     this.renderTimer = null;
     this.heatmapObserver = null;
     this.writeQueue = Promise.resolve();
+    this.voyageAnimationUntil = 0;
   }
 
   getViewType() {
@@ -1524,11 +2347,32 @@ class CastleXHomeView extends ItemView {
       await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
         applyRating(frontmatter, key, value);
       });
-      new Notice(`${METRICS.find((metric) => metric.key === key)?.label ?? key}: ${value}/5`);
+      new Notice(`${ALL_CHECKIN_METRICS.find((metric) => metric.key === key)?.label ?? key}: ${value}/5`);
     };
     this.writeQueue = this.writeQueue.then(write, write);
     await this.writeQueue;
     this.scheduleRender();
+  }
+
+  async startVoyage(file) {
+    const write = async () => {
+      let started = false;
+      await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+        frontmatter.daily_checkin_model = "navigation-v1";
+        if (!frontmatter.voyage_started_at) {
+          frontmatter.voyage_started_at = localTimestamp();
+          started = true;
+        }
+      });
+      if (started) {
+        this.voyageAnimationUntil = Date.now() + 1700;
+        new Notice("今日已启航");
+      }
+    };
+    this.writeQueue = this.writeQueue.then(write, write);
+    await this.writeQueue;
+    this.scheduleRender();
+    window.setTimeout(() => this.scheduleRender(), 1750);
   }
 
   async completeTask(task) {
@@ -1586,37 +2430,32 @@ class CastleXHomeView extends ItemView {
     today.addEventListener("click", () => this.openFile(todayFile));
     const health = actions.createEl("button", { text: "Health Dashboard", cls: "cx-button" });
     health.addEventListener("click", () => this.plugin.activateHealthView());
-    const refresh = actions.createEl("button", { text: "刷新", cls: "cx-button" });
-    refresh.addEventListener("click", () => this.renderDashboard());
   }
 
-  renderKpis(parent, todayFrontmatter, streaks) {
+  renderKpis(parent, todayFile, todayFrontmatter, streaks) {
     const grid = parent.createDiv({ cls: "cx-kpi-grid" });
-    const timeEntries = TIME_METRICS.map((metric) => ({
-      metric,
-      minutes: minutesValue(todayFrontmatter[metric.key]),
-    }));
-    const recorded = timeEntries.filter((entry) => entry.minutes !== null);
-    const totalMinutes = recorded.reduce((sum, entry) => sum + entry.minutes, 0);
-    const dominant = recorded
-      .filter((entry) => entry.minutes > 0)
-      .sort((a, b) => b.minutes - a.minutes)[0] ?? null;
-    const timeKpi = !recorded.length
-      ? { value: "—", label: "今日投入", detail: "尚未记录时间分配" }
-      : {
-        value: formatDuration(totalMinutes),
-        label: "今日投入",
-        detail: dominant ? `${dominant.metric.label} · ${formatDuration(dominant.minutes)}` : "今日无已记录投入",
-      };
-    [
-      timeKpi,
-      { value: streaks.active, label: "连续航行", detail: `最长 ${streaks.longest} 天` },
-    ].forEach((item) => {
-      const card = grid.createDiv({ cls: "cx-kpi cx-glass" });
-      card.createDiv({ text: String(item.value), cls: "cx-kpi-value" });
-      card.createDiv({ text: item.label, cls: "cx-kpi-label" });
-      card.createDiv({ text: item.detail, cls: "cx-kpi-detail" });
+    const started = Boolean(todayFrontmatter.voyage_started_at);
+    const voyage = grid.createEl("button", {
+      cls: `cx-kpi cx-glass cx-voyage-ritual${started ? Date.now() < this.voyageAnimationUntil ? " is-starting" : " is-sailing" : " is-docked"}`,
+      attr: {
+        type: "button",
+        "aria-label": started ? "今日航行中" : "开始今日航行",
+        "aria-disabled": String(started),
+      },
     });
+    const scene = voyage.createSpan({ cls: "cx-voyage-scene", attr: { "aria-hidden": "true" } });
+    scene.createSpan({ cls: "cx-voyage-water" });
+    scene.createSpan({ cls: "cx-voyage-wake" });
+    const boat = scene.createSpan({ cls: "cx-voyage-boat" });
+    setIcon(boat, "sailboat");
+    voyage.createSpan({ text: started ? "航行中" : "开始航行", cls: "cx-voyage-label" });
+    if (!started) voyage.addEventListener("click", () => this.startVoyage(todayFile));
+
+    const streak = grid.createDiv({ cls: "cx-kpi cx-glass cx-streak-kpi" });
+    streak.createDiv({ text: String(streaks.active), cls: "cx-kpi-value" });
+    const streakCopy = streak.createDiv({ cls: "cx-streak-copy" });
+    streakCopy.createDiv({ text: "连续航行", cls: "cx-kpi-label" });
+    streakCopy.createDiv({ text: `最长 ${streaks.longest} 天`, cls: "cx-kpi-detail" });
   }
 
   renderProjects(parent, projects, taskGroups) {
@@ -1702,7 +2541,7 @@ class CastleXHomeView extends ItemView {
       const day = track.createDiv({ cls: `cx-route-day cx-level-${level}${offset === 0 ? " is-today" : ""}` });
       day.createSpan({ cls: "cx-route-node" });
       day.createSpan({ text: new Intl.DateTimeFormat("en-US", { weekday: "narrow" }).format(date), cls: "cx-route-weekday" });
-      day.setAttr("aria-label", entryType === "retrospective" ? `${iso}: 休整日 · Retrospective` : `${iso}: ${count}/6`);
+      day.setAttr("aria-label", entryType === "retrospective" ? `${iso}: 休整日 · Retrospective` : `${iso}: ${count}/6 Navigation`);
     }
     const sailingRate = Math.round(voyageDays / 14 * 100);
     route.createDiv({ text: `近14日航行 ${voyageDays}天 · 出海率 ${sailingRate}%`, cls: "cx-route-milestone" });
@@ -1731,10 +2570,10 @@ class CastleXHomeView extends ItemView {
   }
 
   renderCheckin(parent, todayFile, frontmatter) {
-    const card = this.createCard(parent, "Today’s Check-in", "点击扇形区间写入今日 YAML");
+    const card = this.createCard(parent, "Navigation Check-in", "启航当下 · 记录条件，不评价努力");
     card.addClass("cx-checkin-card");
     const body = card.createDiv({ cls: "cx-checkin-grid" });
-    METRICS.forEach((metric) => {
+    NAVIGATION_METRICS.forEach((metric) => {
       const gauge = body.createDiv({ cls: "cx-mini-gauge" });
       const svg = this.createSvg(gauge, "svg", { viewBox: "0 0 160 104", class: "cx-gauge-svg" });
       const selected = rating(frontmatter[metric.key]);
@@ -1760,6 +2599,9 @@ class CastleXHomeView extends ItemView {
   }
 
   radarValues(frontmatter) {
+    if (usesNavigationModel(frontmatter)) {
+      return NAVIGATION_METRICS.map((metric) => rating(frontmatter[metric.key]) ?? 0);
+    }
     return [
       rating(frontmatter.sleep_quality) ?? 0,
       rating(frontmatter.physical_state) ?? 0,
@@ -1779,7 +2621,12 @@ class CastleXHomeView extends ItemView {
   }
 
   renderRadar(parent, todayFrontmatter, pages) {
-    const card = this.createCard(parent, "状态 Radar", "压力转换为平稳度；面积越大代表可用状态越好");
+    const navigation = usesNavigationModel(todayFrontmatter);
+    const card = this.createCard(
+      parent,
+      navigation ? "Navigation Radar" : "状态 Radar",
+      navigation ? "启航时的工作条件 · 面积越大代表越可用" : "压力转换为平稳度；面积越大代表可用状态越好",
+    );
     card.addClass("cx-radar-card");
     const svg = this.createSvg(card, "svg", { viewBox: "0 0 340 300", class: "cx-radar" });
     const centerX = 170;
@@ -1797,7 +2644,10 @@ class CastleXHomeView extends ItemView {
         class: "cx-radar-axis",
       });
     }
-    const completePages = pages.filter((page) => completion(page.frontmatter) === REQUIRED.length).slice(-7);
+    const completePages = pages
+      .filter((page) => usesNavigationModel(page.frontmatter) === navigation)
+      .filter((page) => completion(page.frontmatter) === checkinDefinition(page.frontmatter).required.length)
+      .slice(-7);
     const recent = completePages.map((page) => this.radarValues(page.frontmatter));
     const averages = Array.from({ length: 6 }, (_, index) => {
       const values = recent.map((row) => row[index]).filter((value) => value > 0);
@@ -1807,7 +2657,10 @@ class CastleXHomeView extends ItemView {
       this.createSvg(svg, "polygon", { points: this.polygonPoints(averages, centerX, centerY, radius), class: "cx-radar-average" });
     }
     this.createSvg(svg, "polygon", { points: this.polygonPoints(this.radarValues(todayFrontmatter), centerX, centerY, radius), class: "cx-radar-today" });
-    ["睡眠", "身体", "食欲", "行动感", "平稳", "精力"].forEach((label, index) => {
+    const labels = navigation
+      ? NAVIGATION_METRICS.map((metric) => metric.label)
+      : ["睡眠", "身体", "食欲", "行动感", "平稳", "精力"];
+    labels.forEach((label, index) => {
       const angle = -Math.PI / 2 + index * Math.PI / 3;
       const text = this.createSvg(svg, "text", {
         x: centerX + Math.cos(angle) * (radius + 25),
@@ -1961,18 +2814,28 @@ class CastleXHomeView extends ItemView {
     paint(bounds.width, bounds.height);
   }
 
-  trendSeries(pages, key) {
+  trendSeries(pages, mode) {
     const byDate = new Map(pages.map((page) => [String(page.frontmatter.date).slice(0, 10), page.frontmatter]));
     return Array.from({ length: 14 }, (_, index) => {
       const date = addDays(new Date(), index - 13);
       const frontmatter = byDate.get(localISO(date));
-      return { date, iso: localISO(date), value: rating(frontmatter?.[key]), entryType: stateEntryType(frontmatter) };
+      const navigation = usesNavigationModel(frontmatter);
+      const key = mode === "energy"
+        ? navigation ? "navigation_work_energy" : "energy"
+        : navigation ? "health_morning_sleep" : "sleep_quality";
+      return {
+        date,
+        iso: localISO(date),
+        value: rating(frontmatter?.[key]),
+        entryType: stateEntryType(frontmatter),
+        source: navigation ? "Navigation v1" : "Legacy",
+      };
     });
   }
 
   renderTrend(parent, pages) {
-    const label = this.trendMode === "energy" ? "Energy" : "Sleep Quality";
-    const card = this.createCard(parent, `14-day ${label}`, "缺失数据保持断点，不按 0 计算");
+    const label = this.trendMode === "energy" ? "Start Energy" : "Sleep Quality";
+    const card = this.createCard(parent, `14-day ${label}`, "7/25 起读取 Navigation Energy 与 Health Morning Sleep");
     card.addClass("cx-trend-card");
     const header = card.querySelector(".cx-card-header");
     this.renderModeTabs(header, [["energy", "Energy"], ["sleep_quality", "Sleep"]], this.trendMode, (mode) => {
@@ -1996,6 +2859,17 @@ class CastleXHomeView extends ItemView {
       const text = this.createSvg(svg, "text", { x: 28, y: y + 4, class: "cx-trend-axis", "text-anchor": "middle" });
       text.textContent = String(value);
     }
+    const cutoverIndex = series.findIndex((item) => item.iso === NAVIGATION_CUTOVER);
+    if (cutoverIndex >= 0) {
+      const x = xAt(cutoverIndex);
+      this.createSvg(svg, "line", { x1: x, y1: top, x2: x, y2: bottom, class: "cx-trend-cutover" });
+      const marker = this.createSvg(svg, "text", {
+        x: x + 5,
+        y: top + 10,
+        class: "cx-trend-cutover-label",
+      });
+      marker.textContent = "Navigation v1";
+    }
     let segment = [];
     const flush = () => {
       if (segment.length > 1) this.createSvg(svg, "polyline", { points: segment.join(" "), class: "cx-trend-line" });
@@ -2012,7 +2886,9 @@ class CastleXHomeView extends ItemView {
       const retrospective = item.entryType === "retrospective";
       const point = this.createSvg(svg, "circle", { cx: x, cy: y, r: 4.5, class: `cx-trend-point${retrospective ? " is-retrospective" : ""}` });
       const title = this.createSvg(point, "title");
-      title.textContent = retrospective ? `${item.iso}: ${item.value}/5 · 休整日 Retrospective` : `${item.iso}: ${item.value}/5`;
+      title.textContent = retrospective
+        ? `${item.iso}: ${item.value}/5 · ${item.source} · 休整日 Retrospective`
+        : `${item.iso}: ${item.value}/5 · ${item.source}`;
     });
     flush();
     [0, 6, 13].forEach((index) => {
@@ -2082,7 +2958,7 @@ class CastleXHomeView extends ItemView {
     const top = dashboard.createDiv({ cls: "cx-top-grid" });
     const left = top.createDiv({ cls: "cx-top-left" });
     this.renderHero(left, todayFile);
-    this.renderKpis(left, todayFrontmatter, streaks);
+    this.renderKpis(left, todayFile, todayFrontmatter, streaks);
     this.renderProjects(top, projects, taskGroups);
     this.renderTasks(top, focusTaskGroups);
 
@@ -2349,6 +3225,14 @@ class CastleXHealthView extends ItemView {
     return freshFrontmatter(this.app, file);
   }
 
+  async removeLegacyAfternoonBodyChange(file, frontmatter) {
+    if (!Object.prototype.hasOwnProperty.call(frontmatter, "health_afternoon_body_change")) return frontmatter;
+    await this.app.fileManager.processFrontMatter(file, (next) => {
+      delete next.health_afternoon_body_change;
+    });
+    return freshFrontmatter(this.app, file);
+  }
+
   async updateHealth(file, mutator, notice = "") {
     const write = async () => {
       await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
@@ -2539,7 +3423,7 @@ class CastleXHealthView extends ItemView {
     this.renderSignal(fields, file, frontmatter, "health_afternoon_energy_signal", "当前精力", HEALTH_SIGNAL_LABELS.energy);
     this.renderSignal(fields, file, frontmatter, "health_afternoon_calmness", "当前平稳度", HEALTH_SIGNAL_LABELS.calmness);
     this.renderSignal(fields, file, frontmatter, "health_afternoon_clarity", "当前清晰度", HEALTH_SIGNAL_LABELS.clarity);
-    this.renderSignal(fields, file, frontmatter, "health_afternoon_body_change", "身体相较早上", HEALTH_SIGNAL_LABELS.change);
+    this.renderSignal(fields, file, frontmatter, "health_afternoon_body", "身体可用状态", HEALTH_SIGNAL_LABELS.body);
     this.renderChoice(fields, file, frontmatter, "health_afternoon_nap", "今天是否午睡", [
       ["none", "没有"], ["15-30", "15–30 分钟"], ["30-45", "30–45 分钟"], ["45-60", "45–60 分钟"], ["60+", "超过 60 分钟"],
     ]);
@@ -3223,6 +4107,7 @@ class CastleXHealthView extends ItemView {
     }
     const pages = this.dailyPages();
     let frontmatter = await freshFrontmatter(this.app, todayFile);
+    frontmatter = await this.removeLegacyAfternoonBodyChange(todayFile, frontmatter);
     frontmatter = await this.initializePlannedWorkout(todayFile, frontmatter, pages);
     frontmatter = await this.normalizePrimaryWorkout(todayFile, frontmatter);
     const recommendation = healthRecommendation(frontmatter, this.plannedWorkout, now);
@@ -3250,9 +4135,18 @@ module.exports = class CastleXDashboardPlugin extends Plugin {
   async onload() {
     this.mobileHomeButton = null;
     this.dailyCreationPromises = new Map();
+    this.pluginData = await this.loadData() ?? {};
+    this.pluginData.leetcodeTimers = this.pluginData.leetcodeTimers && typeof this.pluginData.leetcodeTimers === "object"
+      ? this.pluginData.leetcodeTimers
+      : {};
+    this.leetcodeDataWriteQueue = Promise.resolve();
     this.registerView(VIEW_TYPE, (leaf) => new CastleXHomeView(leaf, this));
     this.registerView(HEALTH_VIEW_TYPE, (leaf) => new CastleXHealthView(leaf, this));
     this.registerMarkdownCodeBlockProcessor("castlex-status", (_source, element, context) => {
+      const file = this.app.vault.getAbstractFileByPath(context.sourcePath);
+      if (file instanceof TFile) context.addChild(new DailyStatusChild(element, this.app, file));
+    });
+    this.registerMarkdownCodeBlockProcessor("castlex-navigation", (_source, element, context) => {
       const file = this.app.vault.getAbstractFileByPath(context.sourcePath);
       if (file instanceof TFile) context.addChild(new DailyStatusChild(element, this.app, file));
     });
@@ -3268,6 +4162,18 @@ module.exports = class CastleXDashboardPlugin extends Plugin {
       const file = this.app.vault.getAbstractFileByPath(context.sourcePath);
       if (file instanceof TFile) context.addChild(new DailyHealthSummaryChild(element, this.app, file));
     });
+    this.registerMarkdownCodeBlockProcessor("castlex-leetcode-tracker", (source, element, context) => {
+      const file = this.app.vault.getAbstractFileByPath(context.sourcePath);
+      if (!(file instanceof TFile)) return;
+      let config = {};
+      try {
+        config = parseYaml(source) ?? {};
+      } catch (error) {
+        element.createDiv({ cls: "cx-lc-error", text: `Invalid LeetCode Tracker configuration: ${error.message || error}` });
+        return;
+      }
+      context.addChild(new LeetCodeTrackerChild(element, this, file, config));
+    });
     this.addRibbonIcon("ship-wheel", "Open CastleX Home", () => this.activateView());
     this.addRibbonIcon("heart-pulse", "Open Health Dashboard", () => this.activateHealthView());
     this.addCommand({ id: "open-home", name: "Open CastleX Home", callback: () => this.activateView() });
@@ -3276,6 +4182,23 @@ module.exports = class CastleXDashboardPlugin extends Plugin {
       this.activateView();
       this.setupMobileHomeButton();
     });
+  }
+
+  getLeetcodeTimer(key) {
+    return this.pluginData?.leetcodeTimers?.[key] ?? null;
+  }
+
+  async setLeetcodeTimer(key, timer) {
+    const write = async () => {
+      if (!this.pluginData.leetcodeTimers || typeof this.pluginData.leetcodeTimers !== "object") {
+        this.pluginData.leetcodeTimers = {};
+      }
+      if (timer) this.pluginData.leetcodeTimers[key] = timer;
+      else delete this.pluginData.leetcodeTimers[key];
+      await this.saveData(this.pluginData);
+    };
+    this.leetcodeDataWriteQueue = this.leetcodeDataWriteQueue.then(write, write);
+    return this.leetcodeDataWriteQueue;
   }
 
   setupMobileHomeButton() {

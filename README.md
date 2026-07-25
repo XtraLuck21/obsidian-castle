@@ -40,9 +40,10 @@ committed to this repository.
 - When a canonical Daily exists, device-local same-date conflict copies are moved into `99_Archive/Sync-Conflicts/<date>/` without deletion or automatic value merging
 - Desktop cards use a light background blur for contrast; mobile cards stay blur-free for sharp rendering
 - Deep-navy Obsidian color system for app chrome, notes, controls, and accents
-- Six-dimension Daily check-in stored in YAML
-- Editable Daily status gauges with Late entry and Retrospective provenance
-- 14-day Energy/Sleep trend chart
+- Six-dimension start-of-voyage Navigation check-in stored in YAML
+- Full-card animated `开始航行` ritual beside the voyage streak, with a preserved Daily start timestamp
+- Editable Navigation gauges with Late entry and Retrospective provenance
+- Cross-model 14-day Start Energy/Sleep trend chart
 - Responsive time-driven Heatmap with Project/Admin/Workout/Enrichment views
 - Four editable Apple Fitness-inspired time rings in each Daily Note
 - Calendar navigation that opens or creates Daily Notes
@@ -131,26 +132,40 @@ The Dashboard calendar creates Daily Notes at:
 10_Journal/Daily/YYYY/MM/YYYY-MM-DD.md
 ```
 
-Each Daily Note stores six check-in values:
+Navigation v1 Daily Notes store one voyage ritual timestamp and six start-of-day
+working conditions:
 
 ```yaml
-sleep_quality: 4
-physical_state: 3
-stress: 2
-energy: 4
-agency: 3
-appetite_stability: 4
-state_recorded_at: 2099-01-01T20:00:00-08:00
+daily_checkin_model: navigation-v1
+voyage_started_at: 2099-01-01T09:20:00-08:00
+navigation_direction: 4
+navigation_activation: 3
+navigation_work_energy: 4
+navigation_focus: 3
+navigation_calmness: 4
+navigation_outlook: 4
+navigation_recorded_at: 2099-01-01T09:24:00-08:00
 ```
+
+The two-row Navigation order is 航向清晰, 启动意愿, 工作能量, 专注程度,
+内心平和, and 今日展望. The Home Dashboard keeps Time Allocation in its
+dedicated visualizations rather than repeating a Today total in the top KPI row.
 
 A day counts as a Voyage Day when all six fields contain values from `1` to `5`
 and are completed either on the note date or during the following local calendar
-day. CastleX records the first complete time in `state_recorded_at`. Entries
+day. CastleX records the first complete time in `navigation_recorded_at`.
+Selecting `开始航行` stores `voyage_started_at`, plays a short launch animation,
+and then leaves only `航行中` on CastleX Home; it does not start a timer or
+qualify the day on its own. Entries
 completed later are shown as **休整日 · Retrospective**: their values remain in
 Radar and trend charts but do not illuminate Calendar or count toward streaks.
-Complete legacy notes without a timestamp remain Voyage Days. Daily State can
-be edited from either the current Dashboard or the status gauges inside any
-Daily Note.
+Complete legacy notes through 2026-07-24 remain Voyage Days and keep their
+original `sleep_quality`, `energy`, and other state fields. Navigation can be
+edited from either the current Dashboard or the gauges inside the Daily Note.
+
+The 14-day chart reads legacy `sleep_quality` and `energy` through the cutover.
+For Navigation v1 dates, Sleep comes from Health Dashboard Morning Check-in and
+Energy comes from `navigation_work_energy`.
 
 The note keeps `Raw Notes` at the end so AI processing never needs to replace
 the original human writing. Raw Notes preserve chronological insertion order:
@@ -231,8 +246,10 @@ returns the values to the pending-review state.
 Weekly Reviews live under `10_Journal/Weekly/`. Standard periods run Sunday
 through Saturday and use explicit `period_start` and `period_end` fields. The
 `castlex-weekly-snapshot` block reads those Daily Notes and renders a compact
-period-specific view: Sleep, Energy, and Agency on one aligned state chart, and
-the four Time Allocation categories as one stacked chart per day.
+period-specific view: Sleep, Energy, and Activation on one aligned state chart,
+and the four Time Allocation categories as one stacked chart per day. The state
+chart reads the legacy Daily State fields through 2026-07-24, then switches to
+Health morning sleep plus Navigation work energy and activation from 2026-07-25.
 
 The snapshot is read-only derived data and has no review button. It always reads
 the current Daily YAML, so a later human correction takes precedence over an

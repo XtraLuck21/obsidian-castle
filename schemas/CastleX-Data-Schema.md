@@ -1,9 +1,54 @@
-# CastleX Data Schema v0.5
+# CastleX Data Schema v0.6
 
 ## Daily tracker
 
-A Daily Note has a complete Daily State when all six required tracker fields
-contain a numeric value from 1 to 5:
+### Navigation v1 · 2026-07-25 onward
+
+CastleX Home is the command deck. Starting with Daily Notes dated 2026-07-25,
+its check-in records the conditions at the moment the user sits down to begin
+the day's work. It is not a wake-up check, an all-day health summary, or an
+evening reflection.
+
+The user may select `开始航行` once. CastleX records the exact ritual timestamp
+without starting a timer or displaying elapsed voyage time:
+
+```yaml
+daily_checkin_model: navigation-v1
+voyage_started_at: 2026-07-25T09:30:00-07:00
+```
+
+The full first KPI card on CastleX Home owns this ritual; Time Allocation is not
+repeated there. After activation, the card displays only an animated sailing
+boat and `航行中`. The exact time remains visible in the first block of the
+Daily Navigation component.
+
+A Navigation Check-in is complete when all six fields contain a value from 1
+to 5. The UI order is two rows of three:
+
+| Field | UI label | Meaning | Scale |
+| --- | --- | --- | --- |
+| `navigation_direction` | 航向清晰 | Today's priorities and rough rhythm are understood | 1 unclear → 5 clear |
+| `navigation_activation` | 启动意愿 | Willingness to move from preparation into action | 1 resistant → 5 ready |
+| `navigation_work_energy` | 工作能量 | Energy currently available for work | 1 depleted → 5 abundant |
+| `navigation_focus` | 专注程度 | Ability to place attention on one work block | 1 scattered → 5 focused |
+| `navigation_calmness` | 内心平和 | Current internal tension versus peace | 1 agitated → 5 peaceful |
+| `navigation_outlook` | 今日展望 | Emotional stance toward the day ahead | 1 heavy → 5 positive |
+
+Low values describe the day's starting conditions; they do not judge effort,
+character, or whether the plan was correct. When the sixth field first becomes
+complete, CastleX preserves:
+
+```yaml
+navigation_recorded_at: 2026-07-25T09:34:00-07:00
+```
+
+`voyage_started_at` and `navigation_recorded_at` are deliberately separate.
+Starting the ritual alone does not qualify the date as a Voyage Day; the six
+Navigation values do.
+
+### Legacy Daily State · through 2026-07-24
+
+Daily Notes dated through 2026-07-24 retain the original six-field state model:
 
 | Field | Meaning | Scale |
 | --- | --- | --- |
@@ -23,13 +68,14 @@ When the six fields first become complete, CastleX writes one source timestamp:
 state_recorded_at: 2026-07-13T21:30:00-07:00
 ```
 
-The timestamp is preserved when a completed state is corrected later. Entry
-timing is derived from the Daily Note `date` and `state_recorded_at`; no separate
-status property is stored.
+Legacy fields and `state_recorded_at` remain untouched in existing Daily Notes.
+New templates do not create them, and CastleX does not convert their values into
+Navigation v1 fields.
 
 ## Voyage streak
 
-- All six tracker values are required for a Voyage Day.
+- All six fields from the Daily Note's declared model are required for a Voyage
+  Day.
 - Same-day entries completed on the Daily Note date are Voyage Days.
 - A **Late entry** completed during the following local calendar day is also a
   Voyage Day and counts toward the streak.
@@ -43,22 +89,31 @@ status property is stored.
 - Missing or partial historical days break a streak.
 - Heatmap metrics do not affect the Voyage streak.
 
-The `castlex-status` block is interactive in every Daily Note. Opening an older
-note allows Late or Retrospective entry while displaying the resulting timing
-classification before and after completion.
+The `castlex-navigation` block is interactive in Navigation v1 Daily Notes and
+places the start-time block first. Historical `castlex-status` blocks remain
+interactive in legacy Daily Notes. Opening an older note still allows Late or
+Retrospective entry while displaying the resulting timing classification.
+
+The 14-day trend preserves its continuity across the model boundary. Through
+2026-07-24, Sleep and Energy read `sleep_quality` and `energy`. Starting
+2026-07-25, Sleep reads `health_morning_sleep` and Energy reads
+`navigation_work_energy`. The chart marks the Navigation v1 cutover and does not
+write or fabricate either source.
 
 ## Daily sections
 
-Daily Notes contain, in order:
+Navigation v1 Daily Notes contain, in order:
 
-1. Six-dimension `Daily State`
+1. `Daily Navigation`, beginning with the exact voyage start time and followed
+   by the six Navigation dimensions
 2. Editable `Time Allocation`
-3. `Today’s Wins` as encouraging bullet points about effective habits, choices,
+3. Read-only `Health Snapshot`
+4. `Today’s Wins` as encouraging bullet points about effective habits, choices,
    and responses
-4. `Completed Today` as factual bullet points for verified tasks and outcomes
-5. `Open Loops` for started, committed, awaiting, or unresolved follow-ups
-6. `Backlog` for explicitly deferred work that has not started
-7. `Raw Notes` at the end
+5. `Completed Today` as factual bullet points for verified tasks and outcomes
+6. `Open Loops` for started, committed, awaiting, or unresolved follow-ups
+7. `Backlog` for explicitly deferred work that has not started
+8. `Raw Notes` at the end
 
 Daily Notes do not contain task checkboxes or a Timeline. Project tasks exist
 only in Project notes. All four synthesis sections use flat bullet lists.
@@ -152,9 +207,12 @@ never be converted into minutes.
 
 ## Health Dashboard
 
-Health Dashboard is an independent companion view. Its `health_*` fields do not
-read, write, infer, or complete the six-field Daily State used by CastleX Home.
-Both systems may live in the same Daily Note without sharing check-in answers.
+Health Dashboard is an independent body-and-workout companion view. Its
+`health_*` fields do not write, infer, or complete the six-field Navigation
+Check-in used by CastleX Home. Both systems live in the same Daily Note without
+duplicating check-in answers. The one intentional cross-view read is the
+read-only 14-day Sleep series, which uses `health_morning_sleep` from
+Navigation v1 dates.
 
 ### Time-aware check-ins
 
@@ -197,7 +255,7 @@ health_morning_capacity:
 health_afternoon_energy_signal:
 health_afternoon_calmness:
 health_afternoon_clarity:
-health_afternoon_body_change:
+health_afternoon_body:
 health_afternoon_nap:
 health_afternoon_regions: []
 health_afternoon_discomfort: []
@@ -240,10 +298,14 @@ are removed from the denominator rather than treated as zero.
 
 Afternoon Body State is also a `0–100%` score:
 
-`((energy × 40) + (calmness × 20) + (clarity × 20) + (change × 20)) ÷ 5 − penalties`
+`((energy × 40) + (calmness × 20) + (clarity × 20) + (body availability × 20)) ÷ 5 − penalties`
 
 Tightness subtracts `8` points and training soreness subtracts `12` points.
 Both may be selected together. The result is clamped to `0–100`.
+Afternoon Body Availability is an absolute current-state `1–5` signal, using
+the same positive scale as Morning Body Availability. The system may compare
+the two values later; the human does not need to translate change into a
+relative score.
 
 When both periods exist, the workout engine uses `40%` Morning Recovery
 Capacity plus `60%` Afternoon Body State. Before Afternoon Check-in, Morning
@@ -264,7 +326,7 @@ The underlying signal weights are:
 | Afternoon energy | 40 |
 | Afternoon calmness | 20 |
 | Afternoon clarity | 20 |
-| Afternoon body change | 20 |
+| Afternoon body availability | 20 |
 
 The engine decides training load before it considers changing the workout:
 
@@ -273,9 +335,9 @@ The engine decides training load before it considers changing the workout:
 | Morning only, capacity `≥75` | planned workout · Standard |
 | Morning only, capacity `55–74` | planned workout · Light |
 | Morning only, capacity `<55` | provisional Stretch; reassess after Afternoon |
-| Afternoon available, readiness `≥75`, Energy `4–5`, Body Change `3–5` | planned workout · Standard |
-| Readiness `55–74`, Energy `3`, or Body Change `2` | planned workout · Light |
-| Readiness `35–54`, Energy `2`, or Body Change `1` | Stretch |
+| Afternoon available, readiness `≥75`, Energy `4–5`, Body Availability `3–5` | planned workout · Standard |
+| Readiness `55–74`, Energy `3`, or Body Availability `2` | planned workout · Light |
+| Readiness `35–54`, Energy `2`, or Body Availability `1` | Stretch |
 | Readiness `<35` or Energy `1` | Rest |
 
 This ordering means a moderate day normally keeps the planned training
@@ -456,6 +518,44 @@ no checkboxes contributes zero progress. This model supports numeric work,
 qualitative deliverables, and retrospectives without Project-specific fields or
 double counting.
 
+## Optional desktop Project session tracker
+
+A short-lived Project may embed an interactive execution surface without
+becoming a permanent Dashboard:
+
+````markdown
+```castlex-leetcode-tracker
+bridge_path: /absolute/path/to/obsidian_bridge
+```
+````
+
+The private Project note owns the machine-specific `bridge_path`; public
+templates and plugin source never hard-code it. The tracker is desktop-only
+because the external Bridge lives outside the Vault. Mobile renders a clear
+unavailable state while the rest of CastleX remains mobile-compatible.
+
+The LeetCode repository owns plan order, test evidence, mastery, and review
+scheduling through the Bridge `to_obsidian/` files. The Project tracker owns
+only execution sessions. Start is clicked when the problem is first read.
+Pause and Resume persist local timer state in plugin data. Finish appends
+exactly one schema-v2 `session_completed` event to
+`from_obsidian/session_events.jsonl`; it never writes Daily Note time fields.
+
+Total active time always accumulates while the session is running. After Start,
+the user may optionally classify time as `thinking`, `implementation`, or
+`debugging`. Only a selected phase accumulates classified seconds. Missing
+phase keys render as `N/A`, not zero, and unclassified time remains included in
+Total. Selecting a different phase changes classification without interrupting
+Total; tapping the active phase again returns to Total-only timing.
+
+`completion_status: completed` is clicked only after all tests pass and records
+the user's completion declaration. The coding repository remains the source of
+test evidence and mastery evaluation. `partial` and `stopped` preserve time and
+attempt history without advancing the execution progress bar. Hint level and a
+short note are optional. Planned dates remain anchors, while actual
+`started_at`, `ended_at`, `active_seconds`, and optional `phase_seconds`
+preserve what happened.
+
 ## Weekly Review
 
 Weekly Review files live under `10_Journal/Weekly/` and declare their source
@@ -471,7 +571,11 @@ origin: mixed
 
 The `castlex-weekly-snapshot` block reads the canonical Daily Notes inside that
 inclusive period. It renders one aligned state chart for Sleep, Energy, and
-Agency plus one stacked daily chart for the four Time Allocation categories.
+Activation plus one stacked daily chart for the four Time Allocation
+categories. Through 2026-07-24 those series use `sleep_quality`, `energy`, and
+`agency`. Starting 2026-07-25 they use `health_morning_sleep`,
+`navigation_work_energy`, and `navigation_activation`, so a Weekly Review that
+crosses the cutover remains continuous without rewriting legacy Daily Notes.
 The snapshot is computed from Daily YAML and never writes derived totals back
 to the Weekly file. It is read-only derived information and does not require a
 separate review status. When a human changes a Daily value after AI assistance,

@@ -3,13 +3,15 @@ type: daily
 date: 2099-01-01
 week: 2099-W01
 month: 2099-01
-sleep_quality: 4
-physical_state: 3
-stress: 2
-energy: 4
-agency: 3
-appetite_stability: 4
-state_recorded_at: 2099-01-01T20:00:00-08:00
+daily_checkin_model: navigation-v1
+voyage_started_at: 2099-01-01T09:20:00-08:00
+navigation_direction: 4
+navigation_activation: 3
+navigation_work_energy: 4
+navigation_focus: 3
+navigation_calmness: 4
+navigation_outlook: 4
+navigation_recorded_at: 2099-01-01T09:24:00-08:00
 project_minutes: 120
 admin_minutes: 40
 workout_minutes: 50
@@ -25,9 +27,9 @@ cssclasses:
 ---
 # 2099-01-01 · Example Day
 
-## Daily State
+## Daily Navigation
 
-```castlex-status
+```castlex-navigation
 ```
 
 ## Time Allocation

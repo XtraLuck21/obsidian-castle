@@ -26,7 +26,7 @@ node --check "$plugin/main.js"
 pass "plugin JavaScript syntax"
 
 jq -e '.id == "castlex-dashboard" and (.version | type == "string") and (.name | type == "string") and (.minAppVersion | type == "string")' "$manifest" >/dev/null
-node -e 'const m=require(process.argv[1]); const p=m.version.split(".").map(Number); if (p[0] < 1 && (p[1] || 0) < 10) process.exit(1)' "$manifest" || fail "plugin version must be at least 0.10.0"
+node -e 'const m=require(process.argv[1]); const p=m.version.split(".").map(Number); if (p[0] < 1 && (p[1] || 0) < 21) process.exit(1)' "$manifest" || fail "plugin version must be at least 0.21.0"
 pass "manifest fields and version"
 
 rg -q 'rain-glass-sunset-beach-v2.webp' "$plugin/main.js" || fail "Dashboard missing rain-glass sunset beach background"
@@ -53,14 +53,38 @@ rg -Fq 'options.allowCreate ?? !Platform.isMobile' "$plugin/main.js" || fail "Mo
 rg -q 'archiveDailyConflicts' "$plugin/main.js" || fail "Dashboard missing device-local conflict archiving"
 pass "single canonical Daily creation and conflict-archiving policy"
 
-fields=(sleep_quality physical_state stress energy agency appetite_stability state_recorded_at project_minutes admin_minutes workout_minutes enrichment_minutes project_minutes_origin admin_minutes_origin workout_minutes_origin enrichment_minutes_origin time_data_reviewed)
+fields=(daily_checkin_model voyage_started_at navigation_direction navigation_activation navigation_work_energy navigation_focus navigation_calmness navigation_outlook navigation_recorded_at project_minutes admin_minutes workout_minutes enrichment_minutes project_minutes_origin admin_minutes_origin workout_minutes_origin enrichment_minutes_origin time_data_reviewed)
 for field in "${fields[@]}"; do
   rg -q "^${field}:" "$template" || fail "Daily template missing $field"
   rg -q "\`${field}\`|${field}:" "$schema" || fail "Schema missing $field"
 done
-pass "Daily template and Schema core fields"
+for legacy_field in sleep_quality physical_state stress energy agency appetite_stability state_recorded_at; do
+  if rg -q "^${legacy_field}:" "$template"; then
+    fail "Navigation v1 template still creates legacy field: $legacy_field"
+  fi
+  rg -q "\`${legacy_field}\`|${legacy_field}:" "$schema" || fail "Schema no longer documents legacy field: $legacy_field"
+done
+rg -q '^```castlex-navigation$' "$template" || fail "Daily template missing Navigation block"
+rg -Fq 'const NAVIGATION_CUTOVER = "2026-07-25"' "$plugin/main.js" || fail "Plugin missing Navigation v1 cutover"
+rg -Fq 'voyage.createSpan({ text: started ? "航行中" : "开始航行"' "$plugin/main.js" || fail "Home missing voyage ritual states"
+rg -Fq 'cls: `cx-kpi cx-glass cx-voyage-ritual' "$plugin/main.js" || fail "Voyage ritual is not rendered as the full KPI card"
+rg -Fq 'height: 100% !important' "$plugin/styles.css" || fail "Voyage ritual does not fill the KPI grid cell"
+rg -Fq 'cx-streak-kpi' "$plugin/main.js" || fail "Voyage streak card is missing the balanced horizontal layout"
+if rg -Fq 'text: "刷新", cls: "cx-button"' "$plugin/main.js"; then
+  fail "CastleX Home still exposes the redundant Refresh button"
+fi
+if rg -Fq 'label: "今日投入"' "$plugin/main.js"; then
+  fail "CastleX Home still exposes the Today total KPI"
+fi
+if rg -Fq '与 Home Check-in 分开记录' "$plugin/main.js"; then
+  fail "Daily Health Snapshot still carries the obsolete separation hint"
+fi
+rg -q 'cx-voyage-launch' "$plugin/styles.css" || fail "Voyage ritual missing launch animation"
+rg -Fq 'navigation ? "navigation_work_energy" : "energy"' "$plugin/main.js" || fail "Trend does not switch Energy sources"
+rg -Fq 'navigation ? "health_morning_sleep" : "sleep_quality"' "$plugin/main.js" || fail "Trend does not switch Sleep sources"
+pass "Navigation v1 template, voyage ritual, dual-model compatibility, and trend sources"
 
-health_fields=(health_night_bedtime_at health_night_sleepiness health_night_calmness health_night_awake_reasons health_night_completed_at health_morning_sleep health_afternoon_energy_signal health_evening_body health_planned_workout health_recommended_workout health_selected_workout health_primary_session_id health_primary_workout health_primary_mode health_primary_source health_workout_status health_workout_completed_sets health_workout_sessions health_actual_workout_mode)
+health_fields=(health_night_bedtime_at health_night_sleepiness health_night_calmness health_night_awake_reasons health_night_completed_at health_morning_sleep health_afternoon_energy_signal health_afternoon_body health_evening_body health_planned_workout health_recommended_workout health_selected_workout health_primary_session_id health_primary_workout health_primary_mode health_primary_source health_workout_status health_workout_completed_sets health_workout_sessions health_actual_workout_mode)
 for field in "${health_fields[@]}"; do
   rg -q "^${field}:" "$template" || fail "Daily template missing $field"
   rg -q "\`${field}\`|${field}:" "$schema" || fail "Schema missing $field"
@@ -70,6 +94,8 @@ rg -q 'HEALTH_VIEW_TYPE' "$plugin/main.js" || fail "Plugin missing independent H
 rg -q 'healthRecommendation' "$plugin/main.js" || fail "Plugin missing deterministic health recommendation engine"
 rg -q 'healthMorningCapacity' "$plugin/main.js" || fail "Health Snapshot missing Morning Recovery Capacity"
 rg -q 'healthAfternoonState' "$plugin/main.js" || fail "Health Snapshot missing Afternoon Body State"
+rg -Fq 'this.renderSignal(fields, file, frontmatter, "health_afternoon_body", "身体可用状态"' "$plugin/main.js" || fail "Afternoon check-in missing absolute Body Availability signal"
+rg -Fq 'delete next.health_afternoon_body_change' "$plugin/main.js" || fail "Current Daily does not discard the incompatible legacy relative body score"
 rg -Fq 'if (hour < 9) return "night"' "$plugin/main.js" || fail "Health Dashboard does not use Night State from midnight through 08:59"
 rg -q 'cx-health-night-ritual' "$plugin/main.js" "$plugin/styles.css" || fail "Night State missing full-width lights-out ritual"
 rg -Fq 'next.health_night_bedtime_at = recordedAt' "$plugin/main.js" || fail "Lights-out ritual does not record exact bedtime"
@@ -115,8 +141,9 @@ pass "Health Dashboard fields, rules, summary, and workout progress"
 
 rg -q 'Late entry' "$schema" || fail "Schema missing late-entry rule"
 rg -q '休整日' "$schema" || fail "Schema missing retrospective rest-day rule"
-rg -q 'state_recorded_at' "$plugin/main.js" || fail "Dashboard missing Daily State timestamp support"
-pass "Daily State timing and voyage eligibility rules"
+rg -q 'navigation_recorded_at' "$plugin/main.js" || fail "Dashboard missing Navigation timestamp support"
+rg -q 'state_recorded_at' "$plugin/main.js" || fail "Dashboard missing legacy Daily State timestamp support"
+pass "Navigation and legacy timing and voyage eligibility rules"
 
 rg -q '^focus: false$' "$project_template" || fail "Project template missing focus default"
 rg -q '^progress_sections:$' "$project_template" || fail "Project template missing progress sections"
@@ -128,6 +155,19 @@ if rg -q '^task_section:|^progress:' "$project_template"; then
   fail "Project template contains deprecated task_section or manual progress"
 fi
 pass "Project focus, weighted progress sections, and Upcoming Tasks fields"
+
+rg -q 'castlex-leetcode-tracker' "$plugin/main.js" "$schema" || fail "Plugin or Schema missing embedded LeetCode Project tracker"
+rg -q 'class LeetCodeTrackerChild' "$plugin/main.js" || fail "Plugin missing LeetCode Tracker render child"
+rg -Fq 'from_obsidian/session_events.jsonl' "$plugin/main.js" || fail "LeetCode Tracker missing Bridge session output"
+rg -Fq 'appendFile(target' "$plugin/main.js" || fail "LeetCode Tracker does not append completed sessions"
+rg -q 'cx-lc-timer-ring' "$plugin/styles.css" || fail "LeetCode Tracker missing visual timer"
+rg -q 'leetcodeTimers' "$plugin/main.js" || fail "LeetCode Tracker timer state is not persisted"
+rg -q 'TRACKER_PHASES' "$plugin/main.js" || fail "LeetCode Tracker missing optional phase timing"
+rg -q 'phase_seconds' "$plugin/main.js" "$schema" || fail "LeetCode Tracker missing schema-v2 phase output"
+rg -q 'Total-only timing' "$schema" || fail "Schema does not define unclassified phase behavior"
+rg -Fq 'Finish · Completed' "$plugin/main.js" || fail "LeetCode Tracker missing explicit completion action"
+rg -q 'never writes Daily Note time fields' "$schema" || fail "Schema does not preserve LeetCode/Daily time boundary"
+pass "embedded desktop Project tracker, optional phase timing, and Bridge session boundary"
 
 rg -q '^```castlex-time-rings$' "$template" || fail "Daily template missing time-ring block"
 previous_line=0
@@ -153,6 +193,8 @@ for field in period_start period_end; do
   rg -q "^${field}:" "$weekly_template" || fail "Weekly template missing $field"
 done
 rg -q 'castlex-weekly-snapshot' "$plugin/main.js" || fail "Dashboard missing Weekly Snapshot processor"
+rg -Fq 'navigation ? "navigation_activation" : "agency"' "$plugin/main.js" || fail "Weekly Snapshot does not switch Activation sources"
+rg -Fq 'stateTrendValue(day.frontmatter, "sleep")' "$plugin/main.js" || fail "Weekly Snapshot does not use the dual-model Sleep source"
 if rg -q 'cx-weekly-review|Verify AI review|Weekly AI review' "$plugin/main.js" "$plugin/styles.css" "$weekly_template"; then
   fail "Weekly Snapshot still contains AI review controls"
 fi

@@ -3,13 +3,15 @@ type: daily
 date: {{date:YYYY-MM-DD}}
 week: {{date:gggg-[W]ww}}
 month: {{date:YYYY-MM}}
-sleep_quality:
-physical_state:
-stress:
-energy:
-agency:
-appetite_stability:
-state_recorded_at:
+daily_checkin_model: navigation-v1
+voyage_started_at:
+navigation_direction:
+navigation_activation:
+navigation_work_energy:
+navigation_focus:
+navigation_calmness:
+navigation_outlook:
+navigation_recorded_at:
 project_minutes:
 admin_minutes:
 workout_minutes:
@@ -37,7 +39,7 @@ health_morning_capacity:
 health_afternoon_energy_signal:
 health_afternoon_calmness:
 health_afternoon_clarity:
-health_afternoon_body_change:
+health_afternoon_body:
 health_afternoon_nap:
 health_afternoon_regions: []
 health_afternoon_discomfort: []
@@ -90,9 +92,9 @@ cssclasses:
 ---
 # {{date:YYYY-MM-DD · dddd}}
 
-## Daily State
+## Daily Navigation
 
-```castlex-status
+```castlex-navigation
 ```
 
 ## Time Allocation
