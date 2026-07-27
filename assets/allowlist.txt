@@ -3,5 +3,9 @@ night-voyage-modern.png
 rain-glass-navy.webp
 rain-glass-outdoor-pool-desktop-v1.webp
 rain-glass-outdoor-pool-mobile-v1.webp
+rain-glass-mental-harbor-desktop-v1.webp
+rain-glass-mental-harbor-mobile-v1.webp
+rain-glass-mental-lighthouse-desktop-v2.webp
+rain-glass-mental-lighthouse-mobile-v2.webp
 rain-glass-sunset-beach-v2.webp
 rain-glass-sunset-mobile-v1.webp

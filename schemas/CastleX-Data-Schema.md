@@ -15,6 +15,7 @@ without starting a timer or displaying elapsed voyage time:
 ```yaml
 daily_checkin_model: navigation-v1
 voyage_started_at: 2026-07-25T09:30:00-07:00
+voyage_ended_at: 2026-07-25T22:40:00-07:00
 ```
 
 The full first KPI card on CastleX Home owns this ritual; Time Allocation is not
@@ -45,6 +46,13 @@ navigation_recorded_at: 2026-07-25T09:34:00-07:00
 `voyage_started_at` and `navigation_recorded_at` are deliberately separate.
 Starting the ritual alone does not qualify the date as a Voyage Day; the six
 Navigation values do.
+
+Mental Dashboard writes `voyage_ended_at` to the same Daily that owns the open
+voyage. A single open voyage may be selected across midnight only while its
+start is within the last 24 hours. Multiple recent open voyages require an
+explicit target choice. Older unfinished voyages remain missing an end
+timestamp, but Home no longer displays them as sailing and no later Mental
+record is written into them automatically.
 
 ### Legacy Daily State · through 2026-07-24
 
@@ -87,6 +95,9 @@ Navigation v1 fields.
   does not fabricate historical timestamps.
 - An incomplete current day does not break the streak before the day ends.
 - Missing or partial historical days break a streak.
+- Returning after several unused days creates or opens only the current
+  canonical Daily. CastleX does not create the skipped dates, infer check-ins,
+  fill trend values with zero, or illuminate Calendar for those dates.
 - Heatmap metrics do not affect the Voyage streak.
 
 The `castlex-navigation` block is interactive in Navigation v1 Daily Notes and
@@ -94,11 +105,12 @@ places the start-time block first. Historical `castlex-status` blocks remain
 interactive in legacy Daily Notes. Opening an older note still allows Late or
 Retrospective entry while displaying the resulting timing classification.
 
-The 14-day trend preserves its continuity across the model boundary. Through
-2026-07-24, Sleep and Energy read `sleep_quality` and `energy`. Starting
-2026-07-25, Sleep reads `health_morning_sleep` and Energy reads
-`navigation_work_energy`. The chart marks the Navigation v1 cutover and does not
-write or fabricate either source.
+The 14-day trend preserves its continuity across the model boundary. Sleep reads
+`sleep_quality` through 2026-07-24 and `health_morning_sleep` from 2026-07-25.
+Overall Energy reads legacy `energy` through 2026-07-24, uses
+`navigation_work_energy` as a labeled Work Energy fallback on 2026-07-25, and
+reads `health_evening_overall_energy` from 2026-07-26. Missing Overall Energy
+after that date remains missing. The UI tabs remain `Energy` and `Sleep`.
 
 ## Daily sections
 
@@ -107,13 +119,16 @@ Navigation v1 Daily Notes contain, in order:
 1. `Daily Navigation`, beginning with the exact voyage start time and followed
    by the six Navigation dimensions
 2. Editable `Time Allocation`
-3. Read-only `Health Snapshot`
-4. `Today’s Wins` as encouraging bullet points about effective habits, choices,
+3. `Time & Task Log` as a source-backed chronological list extracted from Raw
+   Notes for Daily Notes dated 2026-07-26 or later
+4. Read-only `Health Snapshot`
+5. Read-only `Mental Log`
+6. `Today’s Wins` as encouraging bullet points about effective habits, choices,
    and responses
-5. `Completed Today` as factual bullet points for verified tasks and outcomes
-6. `Open Loops` for started, committed, awaiting, or unresolved follow-ups
-7. `Backlog` for explicitly deferred work that has not started
-8. `Raw Notes` at the end
+7. `Completed Today` as factual bullet points for verified tasks and outcomes
+8. `Open Loops` for started, committed, awaiting, or unresolved follow-ups
+9. `Backlog` for explicitly deferred work that has not started
+10. `Raw Notes` at the end
 
 Daily Notes do not contain task checkboxes or a Timeline. Project tasks exist
 only in Project notes. All four synthesis sections use flat bullet lists.
@@ -125,10 +140,57 @@ observations are consolidated rather than expanded into an exhaustive list. Cros
 patterns are not repeated in Daily Notes; Weekly Review decides whether the
 accumulated evidence supports a pattern.
 
+`Completed Today` is deliberately shorter than `Time & Task Log`. Each bullet
+states only what was completed in the fewest useful words. It contains no
+timestamp, date, clock range, or duration and must not reproduce the
+chronological activity ledger.
+
+When Codex appends a bold inline label to `Raw Notes`, text on that same line
+begins after exactly two ASCII spaces following the closing `**`, for example:
+
+```text
+**时间补充：**  7 月 26 日凌晨约 01:30–03:00，我也在策划 Mental Dashboard，投入约 1.5 小时。
+```
+
+This is a rendering rule for Obsidian and does not change the preserved source
+meaning or chronological append-only policy.
+
 Daily Notes do not contain an `AI Summary` or `Decisions & Insights` section.
 Cross-day AI synthesis belongs in the Weekly Review under `AI Weekly Summary`,
 where the source set is broad enough to identify patterns without rewriting a
 single day’s Raw Notes.
+
+### Time & Task Log
+
+Starting with Daily Notes dated 2026-07-26, Codex extracts explicit task-time
+evidence from `Raw Notes` into `Time & Task Log`. This is a compact factual
+activity ledger for later Weekly Review comparison; it is not a Timeline,
+dashboard visualization, or end-of-day reflection.
+
+Use one chronological flat bullet per attributable task:
+
+```text
+- 14:00–16:00 · 2h engaged · Research · Direct · 阅读 abstract 和 introduction
+- 14:00–17:00 window · 1h engaged · System · Dashboard
+```
+
+- An exact continuous block keeps its start, end, and explicit engaged
+  duration.
+- When Raw Notes describe a wider mixed or interrupted window plus a smaller
+  task duration, preserve both by adding `window`; never convert the whole
+  window into engaged time.
+- Parallel tasks may appear as separate bullets when the user gives an
+  attributable duration for each. Their engaged durations are not required to
+  add up to the enclosing window.
+- Preserve the user's task domain and description. `Direct`, `Planning`,
+  `System`, or another mode may be used only when the source supports it.
+- Do not infer missing clock times, durations, task modes, or task boundaries.
+- The ledger is derived from Raw Notes but never replaces or silently rewrites
+  them. Human corrections take precedence.
+- Do not copy its timestamps, ranges, or durations into `Completed Today`;
+  that section contains only terse completed outcomes.
+- Do not backfill Daily Notes dated before 2026-07-26.
+- Do not create an `End-of-day Evidence` section.
 
 ## Time allocation
 
@@ -197,6 +259,9 @@ Codex may only sum durations that are explicit in the source. It must not invent
 minutes from vague phrases. A mentioned activity without a usable duration stays
 empty and is called out for human clarification. A complete review may write
 `0` when the source confirms that no activity of that category occurred.
+For mixed windows in `Time & Task Log`, Time Allocation uses the explicit
+`engaged` duration rather than the enclosing clock-window length. A task is not
+double-counted merely because several bullets share the same window.
 
 ### Deprecated score fields
 
@@ -216,14 +281,24 @@ Navigation v1 dates.
 
 ### Time-aware check-ins
 
-- From 00:00 through 08:59, the default form is Night State.
-- From 09:00 through 16:59, the default form is Morning Check-in.
-- From 17:00 through 21:59, the default form is Afternoon Check-in.
-- From 22:00 through 23:59, the default form is Evening Reflection.
-- Time controls only the default visible form. Every period remains available
-  through the Backfill control.
+- From 00:00 through 08:59, the recommended form is 夜间.
+- From 09:00 through 13:59, the recommended form is 早晨.
+- From 14:00 through 20:59, the recommended form is 傍晚.
+- From 21:00 through 23:59, the recommended form is 晚间.
+- Stage controls are displayed in the same 夜间 → 早晨 → 傍晚 → 晚间
+  order, so the first stage describes the preceding night's close.
+- Time only recommends a default. The four stage controls remain directly
+  selectable at all times.
+- Entering Health from Mental's completed voyage opens 夜间 directly. Manual
+  stage choice outranks the time recommendation until the natural date changes.
+- Health always belongs to the current natural date. A 02:00 lights-out action
+  writes the Daily whose date contains that 02:00 timestamp. No previous-date
+  lock or voyage-style cross-midnight ownership is applied.
 - Every discrete selection writes immediately. A period completion timestamp is
-  optional and does not gate recommendations.
+  optional. The stage tracker shows `已记录` when every core field for that
+  stage has an answer, or when the user explicitly presses its completion
+  button. Optional text fields do not gate completion. 夜间 completes through
+  the lights-out action.
 - Text fields use a short debounce before writing to reduce sync churn.
 
 Five-level state questions use signal bars whose illuminated count matches the
@@ -241,6 +316,7 @@ health_night_calmness:
 health_night_awake_reasons: []
 health_night_completed_at:
 
+health_morning_started_at:
 health_morning_sleep:
 health_morning_recovery:
 health_morning_body:
@@ -265,22 +341,85 @@ health_afternoon_completed_at:
 health_afternoon_state:
 
 health_evening_body:
+health_evening_overall_energy:
+health_evening_appetite_stability:
 health_evening_post_workout:
 health_evening_body_note:
 health_evening_completed_at:
 ```
 
-Night State belongs to the current calendar Daily. For example, a Night State
-recorded at 00:08 on July 24 is stored in the July 24 Daily, pairing the
-pre-sleep condition with the Morning Check-in after waking. The full-width
+Sleep State belongs to the natural calendar date on which the entry begins. For
+example, an entry opened at 23:50 on July 24 remains in the July 24 Daily if the
+user presses `关灯` after midnight. An entry first opened at 00:08 on July 25
+belongs to July 25. The full-width
 lights-out control records the exact preparation time and completes the period.
 Sleepiness and Calmness use positive `1–5` signal scales. Awake reasons are a
-multi-select set: not sleepy, active mind, screen or entertainment, work or
-study, social activity, late workout, or other. Night fields do not affect the
-workout recommendation formula.
+multi-select set including not sleepy, screen or entertainment, work or study,
+social activity, late workout, physical discomfort, hunger or thirst, ordinary
+active thoughts, anxiety, panic, low mood, rumination, environment, or other.
+Sleep fields do not affect the workout recommendation formula.
 
-Evening asks only about the current body state and, when a workout was recorded,
-the post-workout body state. It does not ask general life-reflection questions.
+Morning begins with an optional `迎接晨光` ritual stored in
+`health_morning_started_at`; this means Morning Check-in began, not the true wake
+time. Evening asks about current body state, whole-day Overall Energy, and
+whole-day appetite stability on positive `1–5` scales. When a workout was
+recorded, it also asks for post-workout body state. These fields do not affect
+the workout recommendation or Voyage Day calculation.
+
+## Mental Dashboard
+
+Mental Dashboard is the one-point evening reflection and work-voyage closure.
+It does not diagnose, compute a composite mental-health score, qualify a Voyage
+Day, or replace Health's final sleep ritual. The page signature is
+`用舍由时，行藏在我。`
+
+Five stable numeric dimensions remain independent:
+
+| Field | Mental UI label | Stored scale direction |
+| --- | --- | --- |
+| `mental_evening_mood` | 情绪亮度 | 1 low/dim → 5 light/bright |
+| `mental_evening_load` | 心理余量 | 1 light → 5 heavy |
+| `mental_evening_clarity` | 思维清晰 | 1 confused → 5 clear |
+| `mental_evening_thought_occupancy` | 思绪留白 | 1 loose → 5 full |
+| `mental_evening_connection` | 连接感受 | 1 distant → 5 connected |
+
+The Dashboard presents all five dimensions as a compact five-column grid. Each
+dimension owns one contiguous five-point star split into five directly
+interactive petals. Choosing a petal illuminates that petal and every preceding
+petal; all five illuminated petals merge into one solid star without a center
+dot. The current state word remains visible below the star. Therefore `心理余量`
+displays `6 - mental_evening_load`, and `思绪留白` displays
+`6 - mental_evening_thought_occupancy`. Storage semantics and historical values
+remain unchanged.
+
+The read-only Daily `Mental Log` uses the same display direction. Each recorded
+dimension shows its state word followed by a smaller `N/5` value; missing
+dimensions show `—` without a numeric score.
+
+Context and closure fields:
+
+```yaml
+mental_evening_stress_source:
+mental_evening_emotions: []
+mental_evening_relief_factors: []
+mental_evening_closure:
+mental_evening_recorded_at:
+mental_evening_completed_at:
+voyage_ended_at:
+```
+
+Stress source is single-select. Emotions and relief factors accept at most two
+values each. `今日风向` presents the three fields as full-width rows with a
+stable title, short explanation, and visible choices. Context questions are
+optional and never block voyage closure.
+`mental_evening_closure` is one of `active`, `shelved`, or `released`, presented
+as 还在心上, 暂时搁置, or 可以放下. Their static icons respectively show two
+sheets, a sheet placed into an envelope, or a conventional airplane indicating
+that the message has left. Mental selections update in place without replaying
+an animation or rebuilding the full background. Holding `结束今日航程` records both
+`mental_evening_completed_at` and `voyage_ended_at`; afterward the view links to
+Health's 夜间 stage. Unlike Mental, Health does not follow voyage ownership
+across midnight.
 
 ### Deterministic workout recommendation
 
@@ -588,6 +727,13 @@ Weekly AI output is intentionally brief:
 - `AI Weekly Summary`: at most three highest-priority evidence-backed bullets.
 - `AI Week-over-Week Comparison`: at most two bullets; no comparison without a
   reliable earlier Weekly Review.
+- `AI Cross-Domain Review`: reads Daily YAML, `Time & Task Log`, factual Daily
+  sections, Raw Notes, and the human Weekly Reflection. It compares time,
+  concrete behavior, subjective experience, and outcomes while distinguishing
+  direct work from planning or system construction. For periods starting
+  2026-07-26, the explicit `engaged` durations in `Time & Task Log` are the
+  preferred evidence for task-level allocation; the wider mixed window is
+  context, not duration.
 - `AI Navigation Advice`: at most two suggestions, clearly labeled as advice.
 
 ## Provenance

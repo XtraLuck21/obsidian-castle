@@ -29,7 +29,13 @@ committed to this repository.
 
 - Full-screen blue-hour rain-glass Dashboard with separate 3072×2048 desktop and 1440×2560 mobile backgrounds
 - Separate Chinese-first Health Dashboard linked from CastleX Home, with its own empty outdoor-pool desktop/mobile backgrounds
-- Time-aware Morning, Afternoon, and Evening health check-ins with Backfill access and independent `health_*` Daily fields
+- Separate warm, cabin-inspired Mental Dashboard for one evening reflection and voyage closure
+- Home, Health, and Mental share one Hero structure: left-aligned date/time/signature content and three vertically stacked navigation buttons; Health and Mental use matching compact typography
+- The Home 14-day route anchors its line and voyage nodes to the card's vertical center while weekday labels sit independently below
+- Health stages remain directly accessible in 夜间, 早晨, 傍晚, 晚间 order; 00:00–08:59, 09:00–13:59, 14:00–20:59, and 21:00–23:59 recommend those stages without locking them
+- Health records always belong to the current natural-date Daily; stage tabs reset at midnight instead of holding a prior-date Night entry
+- Health stages become recorded when all core answers are present or the explicit completion action is used; optional notes never block completion
+- Health Evening records whole-day appetite stability and Overall Energy; Morning and Sleep retain their own start/end rituals
 - Deterministic live workout recommendations, manual override, rotation tracking, and set-level Workout Mode with a progress bar
 - Viewport-sized sticky background layer prevents long mobile dashboards from upscaling one image across the full scroll height
 - Persistent mobile ship-wheel button returns directly to CastleX Home from notes and other views
@@ -43,7 +49,7 @@ committed to this repository.
 - Six-dimension start-of-voyage Navigation check-in stored in YAML
 - Full-card animated `开始航行` ritual beside the voyage streak, with a preserved Daily start timestamp
 - Editable Navigation gauges with Late entry and Retrospective provenance
-- Cross-model 14-day Start Energy/Sleep trend chart
+- Cross-model 14-day Overall Energy/Sleep trend chart
 - Responsive time-driven Heatmap with Project/Admin/Workout/Enrichment views
 - Four editable Apple Fitness-inspired time rings in each Daily Note
 - Calendar navigation that opens or creates Daily Notes
@@ -138,6 +144,7 @@ working conditions:
 ```yaml
 daily_checkin_model: navigation-v1
 voyage_started_at: 2099-01-01T09:20:00-08:00
+voyage_ended_at: 2099-01-01T22:40:00-08:00
 navigation_direction: 4
 navigation_activation: 3
 navigation_work_energy: 4
@@ -156,16 +163,41 @@ and are completed either on the note date or during the following local calendar
 day. CastleX records the first complete time in `navigation_recorded_at`.
 Selecting `开始航行` stores `voyage_started_at`, plays a short launch animation,
 and then leaves only `航行中` on CastleX Home; it does not start a timer or
-qualify the day on its own. Entries
+qualify the day on its own. Mental Dashboard's `结束今日航程` stores
+`voyage_ended_at`. An open voyage is eligible for automatic evening continuation
+for 24 hours only; older unfinished voyages are disclosed but never treated as
+still sailing or chosen as a new Mental target. Entries
 completed later are shown as **休整日 · Retrospective**: their values remain in
 Radar and trend charts but do not illuminate Calendar or count toward streaks.
 Complete legacy notes through 2026-07-24 remain Voyage Days and keep their
 original `sleep_quality`, `energy`, and other state fields. Navigation can be
 edited from either the current Dashboard or the gauges inside the Daily Note.
 
-The 14-day chart reads legacy `sleep_quality` and `energy` through the cutover.
-For Navigation v1 dates, Sleep comes from Health Dashboard Morning Check-in and
-Energy comes from `navigation_work_energy`.
+The 14-day chart keeps the short `Energy` and `Sleep` tabs. Sleep reads legacy
+`sleep_quality` through 2026-07-24 and Health Morning `health_morning_sleep`
+afterward. Overall Energy reads legacy `energy` through 2026-07-24, uses
+`navigation_work_energy` as an explicit fallback on 2026-07-25, and reads
+Health Evening `health_evening_overall_energy` from 2026-07-26 onward.
+
+Mental Dashboard writes five independent evening dimensions, three optional
+context questions, one closure state, and the voyage-end timestamp into the
+Daily Note that owns the open voyage. If reflection occurs after midnight, the
+most recent single open voyage within 24 hours remains the target. Multiple
+recent open voyages require an explicit date selection. The final action links
+directly to Health's `夜间` stage; it does not perform the Health lights-out
+ritual. Its date-and-time header, responsive rainy-coast lighthouse background,
+typeface, and glass cards use a dedicated warm dusk-brown and honey-gold palette.
+Five compact desktop columns each contain one contiguous five-petal star: the
+petals are directly selectable, accumulate to the chosen level, and merge into
+one solid star at level five without a center dot. The selected state word stays
+below the star. The Daily Mental Log repeats that state word and adds its
+display-direction score in smaller type, for example `平静 3/5`, while
+the stored `mental_evening_load` and
+`mental_evening_thought_occupancy` directions remain backward-compatible.
+`今日风向` keeps the same structured context fields but presents them as three
+full-width choice rows. Closure uses three static icons—two sheets, a sheet
+entering an envelope, and a conventional airplane—and Mental choices update
+in place without replaying an animation or rebuilding the full background.
 
 The note keeps `Raw Notes` at the end so AI processing never needs to replace
 the original human writing. Raw Notes preserve chronological insertion order:
@@ -174,12 +206,35 @@ than prepended or reordered.
 
 Daily Notes also include a `Time Allocation` card. Its four rings can be edited
 manually in 15-minute steps or filled by an AI-assisted review. After Raw Notes
-are provided, AI may populate four non-overlapping flat bullet lists: `Today’s
-Wins` recognizes effective habits and choices, `Completed Today` records factual
+are provided, Daily Notes dated 2026-07-26 or later also receive a chronological
+`Time & Task Log`. Codex preserves explicit clock windows, attributable engaged
+durations, task domains, modes, and descriptions. For example:
+
+```text
+- 14:00–16:00 · 2h engaged · Research · Direct · 阅读 abstract 和 introduction
+- 14:00–17:00 window · 1h engaged · System · Dashboard
+```
+
+The second form means that several activities occurred between 14:00 and 17:00,
+while approximately one hour was attributable to the named task. Codex must not
+replace that one-hour duration with the three-hour window or require parallel
+task durations to fill the window. The ledger remains textual source for later
+Weekly Reviews; it does not add a visualization, dashboard component, or
+`End-of-day Evidence` section, and notes before 2026-07-26 are not backfilled.
+
+AI may also populate four non-overlapping flat bullet lists: `Today’s Wins`
+recognizes effective habits and choices, `Completed Today` records factual
 finished work, `Open Loops` tracks unresolved follow-ups, and `Backlog` records
 explicitly deferred work. Daily Notes do not contain an AI Summary; cross-day
 synthesis belongs in the Weekly Review. `Today’s Wins` is limited to the three
-to five most important observations.
+to five most important observations. `Completed Today` uses the shortest useful
+task or outcome wording and never repeats timestamps, clock ranges, dates, or
+durations from `Time & Task Log`.
+
+When Codex appends a bold inline label inside Raw Notes, two ASCII spaces
+separate the closing `**` from same-line text—for example
+`**时间补充：**  7 月 26 日凌晨约 01:30–03:00，我也在策划 Mental Dashboard，投入约 1.5 小时。`—
+so Obsidian does not extend the bold styling across the full line.
 
 ### Projects
 
@@ -255,6 +310,10 @@ The snapshot is read-only derived data and has no review button. It always reads
 the current Daily YAML, so a later human correction takes precedence over an
 earlier AI-filled value. Human reflection and decisions remain normal prose,
 while AI summary, comparison, and advice remain visibly marked callouts.
+For weeks beginning 2026-07-26, the cross-domain review also reads each Daily
+`Time & Task Log` alongside Completed Today, Open Loops, Raw Notes, and YAML.
+Task-level comparison uses explicit engaged durations rather than the length of
+a wider mixed window.
 
 See [`examples/`](examples/) for deliberately fictional Daily, Project, and
 Weekly Review notes.

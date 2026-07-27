@@ -26,7 +26,7 @@ node --check "$plugin/main.js"
 pass "plugin JavaScript syntax"
 
 jq -e '.id == "castlex-dashboard" and (.version | type == "string") and (.name | type == "string") and (.minAppVersion | type == "string")' "$manifest" >/dev/null
-node -e 'const m=require(process.argv[1]); const p=m.version.split(".").map(Number); if (p[0] < 1 && (p[1] || 0) < 21) process.exit(1)' "$manifest" || fail "plugin version must be at least 0.21.0"
+node -e 'const m=require(process.argv[1]); const p=m.version.split(".").map(Number); if (p[0] < 1 && (p[1] || 0) < 23) process.exit(1)' "$manifest" || fail "plugin version must be at least 0.23.0"
 pass "manifest fields and version"
 
 rg -q 'rain-glass-sunset-beach-v2.webp' "$plugin/main.js" || fail "Dashboard missing rain-glass sunset beach background"
@@ -53,7 +53,7 @@ rg -Fq 'options.allowCreate ?? !Platform.isMobile' "$plugin/main.js" || fail "Mo
 rg -q 'archiveDailyConflicts' "$plugin/main.js" || fail "Dashboard missing device-local conflict archiving"
 pass "single canonical Daily creation and conflict-archiving policy"
 
-fields=(daily_checkin_model voyage_started_at navigation_direction navigation_activation navigation_work_energy navigation_focus navigation_calmness navigation_outlook navigation_recorded_at project_minutes admin_minutes workout_minutes enrichment_minutes project_minutes_origin admin_minutes_origin workout_minutes_origin enrichment_minutes_origin time_data_reviewed)
+fields=(daily_checkin_model voyage_started_at voyage_ended_at navigation_direction navigation_activation navigation_work_energy navigation_focus navigation_calmness navigation_outlook navigation_recorded_at project_minutes admin_minutes workout_minutes enrichment_minutes project_minutes_origin admin_minutes_origin workout_minutes_origin enrichment_minutes_origin time_data_reviewed)
 for field in "${fields[@]}"; do
   rg -q "^${field}:" "$template" || fail "Daily template missing $field"
   rg -q "\`${field}\`|${field}:" "$schema" || fail "Schema missing $field"
@@ -66,7 +66,7 @@ for legacy_field in sleep_quality physical_state stress energy agency appetite_s
 done
 rg -q '^```castlex-navigation$' "$template" || fail "Daily template missing Navigation block"
 rg -Fq 'const NAVIGATION_CUTOVER = "2026-07-25"' "$plugin/main.js" || fail "Plugin missing Navigation v1 cutover"
-rg -Fq 'voyage.createSpan({ text: started ? "航行中" : "开始航行"' "$plugin/main.js" || fail "Home missing voyage ritual states"
+rg -Fq 'const label = lifecycle.ambiguous' "$plugin/main.js" || fail "Home missing voyage lifecycle states"
 rg -Fq 'cls: `cx-kpi cx-glass cx-voyage-ritual' "$plugin/main.js" || fail "Voyage ritual is not rendered as the full KPI card"
 rg -Fq 'height: 100% !important' "$plugin/styles.css" || fail "Voyage ritual does not fill the KPI grid cell"
 rg -Fq 'cx-streak-kpi' "$plugin/main.js" || fail "Voyage streak card is missing the balanced horizontal layout"
@@ -80,11 +80,13 @@ if rg -Fq '与 Home Check-in 分开记录' "$plugin/main.js"; then
   fail "Daily Health Snapshot still carries the obsolete separation hint"
 fi
 rg -q 'cx-voyage-launch' "$plugin/styles.css" || fail "Voyage ritual missing launch animation"
-rg -Fq 'navigation ? "navigation_work_energy" : "energy"' "$plugin/main.js" || fail "Trend does not switch Energy sources"
+rg -q 'overallEnergyValue' "$plugin/main.js" || fail "Trend does not use Overall Energy source rules"
+rg -Fq 'const OVERALL_ENERGY_CUTOVER = "2026-07-26"' "$plugin/main.js" || fail "Trend missing Overall Energy cutover"
 rg -Fq 'navigation ? "health_morning_sleep" : "sleep_quality"' "$plugin/main.js" || fail "Trend does not switch Sleep sources"
+rg -Fq 'OPEN_VOYAGE_HOURS = 24' "$plugin/main.js" || fail "Voyage lifecycle missing 24-hour stale guard"
 pass "Navigation v1 template, voyage ritual, dual-model compatibility, and trend sources"
 
-health_fields=(health_night_bedtime_at health_night_sleepiness health_night_calmness health_night_awake_reasons health_night_completed_at health_morning_sleep health_afternoon_energy_signal health_afternoon_body health_evening_body health_planned_workout health_recommended_workout health_selected_workout health_primary_session_id health_primary_workout health_primary_mode health_primary_source health_workout_status health_workout_completed_sets health_workout_sessions health_actual_workout_mode)
+health_fields=(health_night_bedtime_at health_night_sleepiness health_night_calmness health_night_awake_reasons health_night_completed_at health_morning_started_at health_morning_sleep health_afternoon_energy_signal health_afternoon_body health_evening_body health_evening_overall_energy health_evening_appetite_stability health_planned_workout health_recommended_workout health_selected_workout health_primary_session_id health_primary_workout health_primary_mode health_primary_source health_workout_status health_workout_completed_sets health_workout_sessions health_actual_workout_mode)
 for field in "${health_fields[@]}"; do
   rg -q "^${field}:" "$template" || fail "Daily template missing $field"
   rg -q "\`${field}\`|${field}:" "$schema" || fail "Schema missing $field"
@@ -94,21 +96,37 @@ rg -q 'HEALTH_VIEW_TYPE' "$plugin/main.js" || fail "Plugin missing independent H
 rg -q 'healthRecommendation' "$plugin/main.js" || fail "Plugin missing deterministic health recommendation engine"
 rg -q 'healthMorningCapacity' "$plugin/main.js" || fail "Health Snapshot missing Morning Recovery Capacity"
 rg -q 'healthAfternoonState' "$plugin/main.js" || fail "Health Snapshot missing Afternoon Body State"
+rg -Fq 'this.renderSignal(fields, file, frontmatter, "health_evening_appetite_stability", "今日整体食欲平稳度"' "$plugin/main.js" || fail "Evening Reflection missing whole-day Appetite Stability signal"
+rg -Fq 'this.renderSignal(fields, file, frontmatter, "health_evening_overall_energy", "今日整体精力"' "$plugin/main.js" || fail "Evening Reflection missing Overall Energy signal"
 rg -Fq 'this.renderSignal(fields, file, frontmatter, "health_afternoon_body", "身体可用状态"' "$plugin/main.js" || fail "Afternoon check-in missing absolute Body Availability signal"
 rg -Fq 'delete next.health_afternoon_body_change' "$plugin/main.js" || fail "Current Daily does not discard the incompatible legacy relative body score"
-rg -Fq 'if (hour < 9) return "night"' "$plugin/main.js" || fail "Health Dashboard does not use Night State from midnight through 08:59"
+rg -Fq 'if (hour < 9) return "sleep"' "$plugin/main.js" || fail "Health Dashboard does not recommend Night from midnight through 08:59"
+rg -Fq 'if (hour < 14) return "morning"' "$plugin/main.js" || fail "Health Dashboard does not recommend Morning from 09:00 through 13:59"
+rg -Fq 'if (hour < 21) return "afternoon"' "$plugin/main.js" || fail "Health Dashboard does not recommend Afternoon from 14:00 through 20:59"
+rg -Fq '["sleep", "morning", "afternoon", "evening"]' "$plugin/main.js" || fail "Health Dashboard stages are not ordered Night, Morning, Afternoon, Evening"
+rg -Fq 'healthStageComplete(frontmatter, item)' "$plugin/main.js" || fail "Health stage tracker does not derive completion from all core answers"
+rg -Fq 'healthStageComplete(frontmatter, "afternoon")' "$plugin/main.js" || fail "Health recommendation does not honor auto-completed Afternoon check-in"
+if rg -q 'sleepTargetISO|text: "进入夜间状态"' "$plugin/main.js"; then
+  fail "Health still locks Night to a prior date or exposes the removed Evening-to-Night shortcut"
+fi
+rg -Fq '夜间记录写入 ${targetISO} 自然日' "$plugin/main.js" || fail "Health Night does not disclose natural-date ownership"
+rg -q 'health_morning_started_at' "$plugin/main.js" || fail "Health Morning missing 迎接晨光 ritual timestamp"
 rg -q 'cx-health-night-ritual' "$plugin/main.js" "$plugin/styles.css" || fail "Night State missing full-width lights-out ritual"
 rg -Fq 'next.health_night_bedtime_at = recordedAt' "$plugin/main.js" || fail "Lights-out ritual does not record exact bedtime"
 rg -Fq 'this.renderSignal(fields, file, frontmatter, "health_night_sleepiness"' "$plugin/main.js" || fail "Night State missing Sleepiness signal"
 rg -Fq 'this.renderSignal(fields, file, frontmatter, "health_night_calmness"' "$plugin/main.js" || fail "Night State missing Calmness signal"
 rg -Fq 'this.renderMultiChoice(fields, file, frontmatter, "health_night_awake_reasons"' "$plugin/main.js" || fail "Night State missing multi-select awake reasons"
-if rg -A8 'health_night_awake_reasons' "$plugin/main.js" | rg -q '身体不适'; then
-  fail "Night State still contains removed physical-discomfort reason"
-fi
+rg -A18 'health_night_awake_reasons' "$plugin/main.js" | rg -q '担忧／焦虑' || fail "Sleep State missing anxiety awake reason"
+rg -A18 'health_night_awake_reasons' "$plugin/main.js" | rg -q '恐惧／恐慌' || fail "Sleep State missing panic awake reason"
 rg -Fq 'this.renderMultiChoice(fields, file, frontmatter, "health_morning_discomfort"' "$plugin/main.js" || fail "Morning body feeling is not multi-select"
 rg -Fq 'this.renderMultiChoice(fields, file, frontmatter, "health_afternoon_discomfort"' "$plugin/main.js" || fail "Afternoon body feeling is not multi-select"
 rg -q '^health_morning_discomfort: \[\]$' "$template" || fail "Daily template does not initialize Morning body feeling as an array"
-rg -q 'cx-home-hero-actions' "$plugin/styles.css" || fail "Home hero actions are not vertically arranged"
+rg -q 'cx-dashboard-hero-actions' "$plugin/main.js" "$plugin/styles.css" || fail "Dashboard hero actions do not share the vertical three-button layout"
+[[ $(rg -o 'cx-dashboard-hero-actions' "$plugin/main.js" | wc -l | tr -d ' ') -eq 3 ]] || fail "Home, Health, and Mental do not all use the shared hero action layout"
+rg -Fq 'text: `${value}/5`' "$plugin/main.js" || fail "Daily Mental Log does not expose the display-direction score"
+rg -q 'cx-mental-summary-score' "$plugin/main.js" "$plugin/styles.css" || fail "Daily Mental Log score styling is missing"
+rg -Fq 'top: 50%; transform: translateY(-50%)' "$plugin/styles.css" || fail "14-day route line is not vertically centered"
+rg -Fq 'text: "CastleX Home", cls: "cx-button cx-button-primary"' "$plugin/main.js" || fail "Health and Mental hero navigation lacks the emphasized Home action"
 rg -q 'skipRotation' "$plugin/main.js" || fail "Health rotation missing Skip Current action"
 rg -q '^health_rotation_skipped:' "$template" || fail "Daily template missing rotation skip state"
 rg -q 'prepareAdditionalWorkout' "$plugin/main.js" || fail "Workout Mode missing prepared additional session support"
@@ -124,7 +142,7 @@ rg -q 'cx-health-set-breakdown' "$plugin/styles.css" || fail "Workout Mode does 
 rg -Fq 'content: "✓"' "$plugin/styles.css" || fail "Completed Health Check-ins do not use a check mark"
 rg -q 'cx-health-summary-tag' "$plugin/main.js" "$plugin/styles.css" || fail "Daily Health Snapshot missing compact workout status tag"
 rg -q 'trendPages.push' "$plugin/main.js" || fail "Mobile Health trends do not force-include freshly read Today data"
-[[ "$(rg -c 'cls: "cx-mobile-scroll-spacer"' "$plugin/main.js")" -ge 2 ]] || fail "Dashboards missing real mobile bottom spacer elements"
+[[ "$(rg -c 'cls: "cx-mobile-scroll-spacer"' "$plugin/main.js")" -ge 3 ]] || fail "Dashboards missing real mobile bottom spacer elements"
 rg -Fq 'overflow-y: scroll !important' "$plugin/styles.css" || fail "Mobile Dashboards missing constrained scroll containers"
 rg -Fq '168px + env(safe-area-inset-bottom)' "$plugin/styles.css" || fail "Mobile Dashboards missing balanced bottom toolbar safe space"
 rg -Fq 'scroll-margin-bottom: calc(168px + env(safe-area-inset-bottom))' "$plugin/styles.css" || fail "Final Dashboard cards missing mobile toolbar clearance"
@@ -138,6 +156,46 @@ if rg -q 'health_workout_stopped_early|到这里结束并保存' "$plugin/main.j
 fi
 rg -q 'cx-health-progress-track' "$plugin/styles.css" || fail "Health Workout Mode missing progress bar"
 pass "Health Dashboard fields, rules, summary, and workout progress"
+
+mental_fields=(mental_evening_mood mental_evening_load mental_evening_clarity mental_evening_thought_occupancy mental_evening_connection mental_evening_stress_source mental_evening_emotions mental_evening_relief_factors mental_evening_closure mental_evening_recorded_at mental_evening_completed_at)
+for field in "${mental_fields[@]}"; do
+  rg -q "^${field}:" "$template" || fail "Daily template missing $field"
+  rg -q "\`${field}\`|${field}:" "$schema" || fail "Schema missing $field"
+done
+rg -q '^```castlex-mental-summary$' "$template" || fail "Daily template missing Mental Log block"
+rg -q 'MENTAL_VIEW_TYPE' "$plugin/main.js" || fail "Plugin missing Mental Dashboard view"
+rg -Fq '用舍由时，行藏在我。' "$plugin/main.js" || fail "Mental Dashboard missing signature"
+rg -q 'class CastleXMentalView' "$plugin/main.js" || fail "Plugin missing Mental Dashboard renderer"
+rg -Fq 'rain-glass-mental-lighthouse-desktop-v2.webp' "$plugin/main.js" || fail "Mental Dashboard missing desktop lighthouse background"
+rg -Fq 'rain-glass-mental-lighthouse-mobile-v2.webp' "$plugin/main.js" || fail "Mental Dashboard missing mobile lighthouse background"
+rg -Fq 'mentalDisplayValue(metric' "$plugin/main.js" || fail "Mental Dashboard missing compatible positive-direction display mapping"
+rg -Fq 'cx-mental-star-petal' "$plugin/main.js" "$plugin/styles.css" || fail "Mental Dashboard missing five-petal star lights"
+rg -Fq 'grid-template-columns: repeat(5, minmax(0, 1fr))' "$plugin/styles.css" || fail "Mental metrics are not a compact five-column desktop grid"
+rg -Fq 'petal.setAttribute("role", "button")' "$plugin/main.js" || fail "Mental star petals are not directly interactive"
+rg -Fq 'height: 62px' "$plugin/styles.css" || fail "Mental desktop star is not reduced to the compact size"
+rg -Fq 'font-size: .61rem' "$plugin/styles.css" || fail "Mental Today wind choice text is not enlarged"
+if rg -q 'cx-mental-slider|cx-mental-star-center|向上推一点|点亮暖灯' "$plugin/main.js" "$plugin/styles.css"; then
+  fail "Mental Dashboard still contains the removed slider, center dot, or interaction prompt"
+fi
+rg -Fq 'grid-template-columns: repeat(auto-fit, minmax(104px, 1fr))' "$plugin/styles.css" || fail "Mental Today wind choices are not equal-width cards"
+if rg -q 'cx-mental-stale-note|超过24小时的旧航程尚未收束' "$plugin/main.js" "$plugin/styles.css"; then
+  fail "Mental Dashboard still exposes the removed stale-voyage notice"
+fi
+rg -Fq 'cx-mental-wind-row' "$plugin/main.js" "$plugin/styles.css" || fail "Mental Dashboard missing full-width Today wind rows"
+rg -Fq 'cx-mental-static-paper is-back' "$plugin/main.js" || fail "Mental closure missing static two-page icon"
+rg -Fq 'cx-mental-static-envelope-paper' "$plugin/main.js" || fail "Mental closure missing static letter-in-envelope icon"
+rg -Fq 'setIcon(icon, "plane")' "$plugin/main.js" || fail "Mental closure missing conventional airplane icon"
+rg -Fq '{ rerender: false }' "$plugin/main.js" || fail "Mental choices do not update in place"
+rg -Fq 'next.mental_evening_closure = value' "$plugin/main.js" || fail "Mental Dashboard missing closure interaction"
+rg -Fq 'frontmatter.voyage_ended_at = endedAt' "$plugin/main.js" || fail "Mental Dashboard does not close the voyage"
+rg -Fq 'this.plugin.activateHealthView("sleep")' "$plugin/main.js" || fail "Mental closure does not lead to Health Sleep"
+if rg -q '夜间航海日志|cx-mental-sea-portrait|cx-mental-word-slot|is-animating|ui-serif|Georgia' "$plugin/main.js" "$plugin/styles.css"; then
+  fail "Mental Dashboard still contains removed title, scene, sentence slots, motion state, or serif typeface"
+fi
+if rg -q '14-day Mental|mental.*trend|Mental.*14-day' "$plugin/main.js"; then
+  fail "Mental Dashboard prematurely implements deferred 14-day review"
+fi
+pass "Mental Dashboard evening log, context, closure, and Daily summary"
 
 rg -q 'Late entry' "$schema" || fail "Schema missing late-entry rule"
 rg -q '休整日' "$schema" || fail "Schema missing retrospective rest-day rule"
@@ -171,13 +229,17 @@ pass "embedded desktop Project tracker, optional phase timing, and Bridge sessio
 
 rg -q '^```castlex-time-rings$' "$template" || fail "Daily template missing time-ring block"
 previous_line=0
-daily_sections=("## Today’s Wins" "## Completed Today" "## Open Loops" "## Backlog" "## Raw Notes")
+daily_sections=("## Time & Task Log" "## Health Snapshot" "## Mental Log" "## Today’s Wins" "## Completed Today" "## Open Loops" "## Backlog" "## Raw Notes")
 for section in "${daily_sections[@]}"; do
   line="$(rg -n -F -m 1 "$section" "$template" | cut -d: -f1)"
   [[ -n "$line" ]] || fail "Daily template missing section: $section"
   (( line > previous_line )) || fail "Daily template section out of order: $section"
   previous_line="$line"
 done
+rg -Fq '14:00–17:00 window · 1h engaged · System · Dashboard' "$template" "$schema" || fail "Daily task log missing mixed-window example"
+rg -Fq 'Do not create an `End-of-day Evidence` section.' "$schema" || fail "Schema does not prohibit End-of-day Evidence"
+rg -Fq '不得包含时间戳、日期、时段或投入时长' "$template" || fail "Completed Today does not prohibit task-log timing details"
+rg -Fq '**时间补充：**  7 月 26 日凌晨约 01:30–03:00' "$template" "$schema" || fail "Raw Notes bold-label spacing rule is missing"
 if rg -q '^## (Decisions & Insights|AI Summary)$|^### (Project Contributions|Life & Admin)$' "$template"; then
   fail "Daily template contains a removed or nested synthesis section"
 fi
@@ -186,7 +248,7 @@ for deprecated in project_contribution admin_load activity_origin activity_revie
     fail "Daily template still contains deprecated field: $deprecated"
   fi
 done
-pass "time-ring block and four-section Daily synthesis structure"
+pass "time-ring block, Time & Task Log, and four-section Daily synthesis structure"
 
 rg -q '^```castlex-weekly-snapshot$' "$weekly_template" || fail "Weekly template missing weekly snapshot block"
 for field in period_start period_end; do
@@ -202,6 +264,7 @@ rg -q 'Weekly Review' "$schema" || fail "Schema missing Weekly Review rules"
 pass "Weekly Snapshot, source period, and read-only derived data"
 
 for script in "$SYSTEM_ROOT"/scripts/*.sh; do bash -n "$script"; done
+rg -Fq 'args+=(--exclude=data.json)' "$SYSTEM_ROOT/scripts/deploy-system.sh" || fail "System deployment does not preserve private plugin data.json"
 pass "shell script syntax"
 
 obsolete_root="${HOME}/Documents/Castle"
@@ -240,7 +303,7 @@ fi
 
 compare_target() {
   local target="$1"
-  diff -qr "$plugin" "$target/.obsidian/plugins/castlex-dashboard" >/dev/null || fail "plugin differs at $target"
+  diff -qr --exclude=data.json "$plugin" "$target/.obsidian/plugins/castlex-dashboard" >/dev/null || fail "plugin differs at $target"
   diff -qr "$SYSTEM_ROOT/templates" "$target/90_System/Templates" >/dev/null || fail "templates differ at $target"
   diff -qr "$SYSTEM_ROOT/schemas" "$target/90_System/Schemas" >/dev/null || fail "schemas differ at $target"
   while IFS= read -r asset; do

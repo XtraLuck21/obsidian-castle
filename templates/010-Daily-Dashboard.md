@@ -5,6 +5,7 @@ week: {{date:gggg-[W]ww}}
 month: {{date:YYYY-MM}}
 daily_checkin_model: navigation-v1
 voyage_started_at:
+voyage_ended_at:
 navigation_direction:
 navigation_activation:
 navigation_work_energy:
@@ -26,6 +27,7 @@ health_night_sleepiness:
 health_night_calmness:
 health_night_awake_reasons: []
 health_night_completed_at:
+health_morning_started_at:
 health_morning_sleep:
 health_morning_recovery:
 health_morning_body:
@@ -48,6 +50,8 @@ health_afternoon_challenge:
 health_afternoon_completed_at:
 health_afternoon_state:
 health_evening_body:
+health_evening_overall_energy:
+health_evening_appetite_stability:
 health_evening_post_workout:
 health_evening_body_note:
 health_evening_completed_at:
@@ -86,6 +90,17 @@ health_workout_completed_sets: []
 health_workout_sessions: []
 health_actual_workout:
 health_actual_workout_mode:
+mental_evening_mood:
+mental_evening_load:
+mental_evening_clarity:
+mental_evening_thought_occupancy:
+mental_evening_connection:
+mental_evening_stress_source:
+mental_evening_emotions: []
+mental_evening_relief_factors: []
+mental_evening_closure:
+mental_evening_recorded_at:
+mental_evening_completed_at:
 origin: human
 cssclasses:
   - daily-voyage
@@ -102,9 +117,18 @@ cssclasses:
 ```castlex-time-rings
 ```
 
+## Time & Task Log
+
+<!-- 从 2026-07-26 起，Codex 根据 Raw Notes 提取有明确证据的任务投入，按发生顺序写成扁平 bullet。精确连续时段使用「14:00–16:00 · 2h engaged · Research · Direct · 阅读 abstract 和 introduction」；若只知道 14:00–17:00 的混合窗口中约 1h 用于某任务，使用「14:00–17:00 window · 1h engaged · System · Dashboard」，不得把窗口长度当成实际投入。保留人类提供的时间、时长、领域和任务描述；不补全未提供的信息，不要求并行任务的 engaged time 加总等于窗口长度。 -->
+
 ## Health Snapshot
 
 ```castlex-health-summary
+```
+
+## Mental Log
+
+```castlex-mental-summary
 ```
 
 ## Today’s Wins
@@ -113,7 +137,7 @@ cssclasses:
 
 ## Completed Today
 
-<!-- 已完成的可验证任务或结果；使用简短 bullet points，不写鼓励性评价，不分子 section。 -->
+<!-- 已完成的可验证任务或结果；只用最短措辞写“完成了什么”。不得包含时间戳、日期、时段或投入时长，不得把 Time & Task Log 改写成另一份流水账；不写鼓励性评价，不分子 section。 -->
 
 ## Open Loops
 
@@ -125,4 +149,4 @@ cssclasses:
 
 ## Raw Notes
 
-<!-- 你的原始记录放在最后；Codex 整理时不得静默改写。按写入时间从早到晚保留，后续补充或更正一律追加在已有内容之后。 -->
+<!-- 你的原始记录放在最后；Codex 整理时不得静默改写。按写入时间从早到晚保留，后续补充或更正一律追加在已有内容之后。行内粗体标签后若继续写正文，结束的 ** 后必须保留两个 ASCII 空格，例如「**时间补充：**  7 月 26 日凌晨约 01:30–03:00，我也在策划 Mental Dashboard，投入约 1.5 小时。」 -->

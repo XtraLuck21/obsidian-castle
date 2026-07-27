@@ -12,13 +12,18 @@ const {
 
 const VIEW_TYPE = "castlex-home";
 const HEALTH_VIEW_TYPE = "castlex-health";
+const MENTAL_VIEW_TYPE = "castlex-mental";
 const DAILY_ROOT = "10_Journal/Daily";
 const PROJECT_ROOT = "30_Projects";
 const DESKTOP_ASSET_PATH = "90_System/Assets/rain-glass-sunset-beach-v2.webp";
 const MOBILE_ASSET_PATH = "90_System/Assets/rain-glass-sunset-mobile-v1.webp";
 const HEALTH_DESKTOP_ASSET_PATH = "90_System/Assets/rain-glass-outdoor-pool-desktop-v1.webp";
 const HEALTH_MOBILE_ASSET_PATH = "90_System/Assets/rain-glass-outdoor-pool-mobile-v1.webp";
+const MENTAL_DESKTOP_ASSET_PATH = "90_System/Assets/rain-glass-mental-lighthouse-desktop-v2.webp";
+const MENTAL_MOBILE_ASSET_PATH = "90_System/Assets/rain-glass-mental-lighthouse-mobile-v2.webp";
 const NAVIGATION_CUTOVER = "2026-07-25";
+const OVERALL_ENERGY_CUTOVER = "2026-07-26";
+const OPEN_VOYAGE_HOURS = 24;
 const LEGACY_REQUIRED = [
   "sleep_quality",
   "physical_state",
@@ -50,6 +55,83 @@ const NAVIGATION_METRICS = [
   { key: "navigation_focus", label: "专注程度", hint: "注意力进入工作块" },
   { key: "navigation_calmness", label: "内心平和", hint: "紧绷躁动 → 平静安定" },
   { key: "navigation_outlook", label: "今日展望", hint: "沉重消极 → 积极期待" },
+];
+const MENTAL_METRICS = [
+  {
+    key: "mental_evening_mood",
+    label: "情绪亮度",
+    hint: "今天整体的情绪底色",
+    choices: ["低沉", "偏暗", "平静", "轻快", "明亮"],
+  },
+  {
+    key: "mental_evening_load",
+    label: "心理余量",
+    hint: "此刻还剩多少可以安放自己的空间",
+    choices: ["紧绷", "局促", "尚可", "宽裕", "舒展"],
+    inverted: true,
+  },
+  {
+    key: "mental_evening_clarity",
+    label: "思维清晰",
+    hint: "回看今天时，思路有多清楚",
+    choices: ["混沌", "模糊", "一般", "清楚", "通透"],
+  },
+  {
+    key: "mental_evening_thought_occupancy",
+    label: "思绪留白",
+    hint: "此刻心绪里还有多少空白",
+    choices: ["拥挤", "偏满", "尚可", "较松", "留白"],
+    inverted: true,
+  },
+  {
+    key: "mental_evening_connection",
+    label: "连接感受",
+    hint: "今天与自己、他人或世界的连接",
+    choices: ["疏离", "偏远", "一般", "有连接", "很有连接"],
+  },
+];
+const MENTAL_STRESS_SOURCES = [
+  ["none", "无明显压力"],
+  ["work_study", "工作／学习"],
+  ["health_body", "身体与健康"],
+  ["relationships", "关系与社交"],
+  ["uncertainty", "不确定性"],
+  ["life_admin", "生活事务"],
+  ["finance", "财务"],
+  ["environment", "环境"],
+  ["other", "其他"],
+];
+const MENTAL_EMOTIONS = [
+  ["peaceful", "平静"],
+  ["hopeful", "期待"],
+  ["fulfilled", "充实"],
+  ["joyful", "愉快"],
+  ["grateful", "感激"],
+  ["tired", "疲惫"],
+  ["anxious", "焦虑"],
+  ["sad", "低落"],
+  ["frustrated", "挫败"],
+  ["lonely", "孤独"],
+  ["numb", "麻木"],
+  ["conflicted", "矛盾"],
+];
+const MENTAL_RELIEF_FACTORS = [
+  ["rest", "休息"],
+  ["movement", "运动／活动"],
+  ["conversation", "交流与陪伴"],
+  ["progress", "完成与推进"],
+  ["music_reading", "音乐／阅读"],
+  ["solitude", "独处"],
+  ["care", "饮食／洗澡／照顾身体"],
+  ["nature", "自然与户外"],
+  ["structure", "计划与秩序"],
+  ["none", "没有明显帮助"],
+  ["other", "其他"],
+];
+const MENTAL_CLOSURES = [
+  ["active", "还在心上", "两张信纸仍留在这里", "files"],
+  ["shelved", "暂时搁置", "把信纸收入信封", "envelope"],
+  ["released", "可以放下", "让这封信离开这里", "plane"],
 ];
 const ALL_CHECKIN_METRICS = [...LEGACY_METRICS, ...NAVIGATION_METRICS];
 const TIME_METRICS = [
@@ -207,6 +289,7 @@ const HEALTH_SIGNAL_LABELS = {
   nightCalmness: ["思绪很亢奋", "比较活跃", "一般", "逐渐安静", "非常平静"],
   clarity: ["脑雾很重", "比较模糊", "一般", "比较清晰", "很清晰"],
   eveningBody: ["很不舒服", "偏疲惫", "一般", "比较舒服", "很舒服"],
+  appetiteStability: ["很不平稳", "不太平稳", "一般", "比较平稳", "非常平稳"],
   postWorkout: ["消耗过大", "有些透支", "一般", "感觉不错", "恢复良好"],
 };
 
@@ -270,6 +353,16 @@ function rating(value) {
   return Number.isFinite(number) && number >= 1 && number <= 5 ? number : null;
 }
 
+function mentalDisplayValue(metric, value) {
+  const stored = rating(value);
+  if (stored === null) return null;
+  return metric.inverted ? 6 - stored : stored;
+}
+
+function mentalStoredValue(metric, value) {
+  return metric.inverted ? 6 - value : value;
+}
+
 function minutesValue(value) {
   if (value === null || value === undefined || value === "") return null;
   const number = Number(value);
@@ -304,9 +397,9 @@ function healthWorkout(id) {
 
 function healthStageForTime(date = new Date()) {
   const hour = date.getHours();
-  if (hour < 9) return "night";
-  if (hour >= 9 && hour < 17) return "morning";
-  if (hour >= 17 && hour < 22) return "afternoon";
+  if (hour < 9) return "sleep";
+  if (hour < 14) return "morning";
+  if (hour < 21) return "afternoon";
   return "evening";
 }
 
@@ -321,6 +414,59 @@ function healthAfternoonEnergy(frontmatter) {
 
 function healthArray(value) {
   return Array.isArray(value) ? value.map(String) : value ? [String(value)] : [];
+}
+
+const HEALTH_STAGE_REQUIRED = {
+  morning: [
+    ["health_morning_sleep", "signal"],
+    ["health_morning_recovery", "signal"],
+    ["health_morning_body", "signal"],
+    ["health_morning_outlook", "signal"],
+    ["health_morning_dream", "choice"],
+    ["health_morning_regions", "multi"],
+    ["health_morning_discomfort", "multi"],
+    ["health_morning_need", "choice"],
+  ],
+  afternoon: [
+    ["health_afternoon_energy_signal", "signal"],
+    ["health_afternoon_calmness", "signal"],
+    ["health_afternoon_clarity", "signal"],
+    ["health_afternoon_body", "signal"],
+    ["health_afternoon_nap", "choice"],
+    ["health_afternoon_regions", "multi"],
+    ["health_afternoon_discomfort", "multi"],
+    ["health_afternoon_preference", "choice"],
+  ],
+  evening: [
+    ["health_evening_body", "signal"],
+    ["health_evening_overall_energy", "signal"],
+    ["health_evening_appetite_stability", "signal"],
+  ],
+};
+
+function healthFieldAnswered(frontmatter, [key, kind]) {
+  if (kind === "signal") return healthSignal(frontmatter?.[key]) !== null;
+  if (kind === "multi") return healthArray(frontmatter?.[key]).length > 0;
+  return String(frontmatter?.[key] ?? "").trim().length > 0;
+}
+
+function healthStageComplete(frontmatter, stage) {
+  const timestampKeys = {
+    sleep: "health_night_completed_at",
+    morning: "health_morning_completed_at",
+    afternoon: "health_afternoon_completed_at",
+    evening: "health_evening_completed_at",
+  };
+  if (frontmatter?.[timestampKeys[stage]]) return true;
+  if (stage === "sleep") return Boolean(frontmatter?.health_night_bedtime_at);
+  const required = [...(HEALTH_STAGE_REQUIRED[stage] || [])];
+  if (
+    stage === "evening"
+    && ["active", "completed"].includes(String(frontmatter?.health_workout_status || ""))
+  ) {
+    required.push(["health_evening_post_workout", "signal"]);
+  }
+  return required.length > 0 && required.every((field) => healthFieldAnswered(frontmatter, field));
 }
 
 function healthWorkoutIsStrength(id) {
@@ -609,7 +755,7 @@ function healthRecommendation(frontmatter, plannedWorkout, now = new Date()) {
 
   if (!reasons.length) reasons.push("当前先依照训练轮换");
   const completeness = `${answered}/8`;
-  const status = frontmatter.health_afternoon_completed_at ? "final" : answered ? "provisional" : "planned";
+  const status = healthStageComplete(frontmatter, "afternoon") ? "final" : answered ? "provisional" : "planned";
   return {
     workout,
     mode,
@@ -673,6 +819,55 @@ function localTimestamp(date = new Date()) {
 function isoDateValue(value) {
   if (value instanceof Date && !Number.isNaN(value.getTime())) return localISO(value);
   return String(value ?? "").match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
+}
+
+function timestampAgeHours(value, now = new Date()) {
+  const timestamp = new Date(value);
+  if (Number.isNaN(timestamp.getTime())) return null;
+  return (now.getTime() - timestamp.getTime()) / 3600000;
+}
+
+function voyageCandidates(pages, now = new Date()) {
+  return pages
+    .filter((page) => page.frontmatter.voyage_started_at && !page.frontmatter.voyage_ended_at)
+    .map((page) => ({
+      ...page,
+      ageHours: timestampAgeHours(page.frontmatter.voyage_started_at, now),
+    }))
+    .sort((a, b) => String(b.frontmatter.voyage_started_at).localeCompare(String(a.frontmatter.voyage_started_at)));
+}
+
+function voyageLifecycle(pages, now = new Date()) {
+  const todayISO = localISO(now);
+  const today = pages.find((page) => isoDateValue(page.frontmatter.date) === todayISO) ?? null;
+  const open = voyageCandidates(pages, now);
+  const recentOpen = open.filter((page) => page.ageHours !== null && page.ageHours >= 0 && page.ageHours <= OPEN_VOYAGE_HOURS);
+  const staleOpen = open.filter((page) => page.ageHours === null || page.ageHours < 0 || page.ageHours > OPEN_VOYAGE_HOURS);
+  const recentEnded = pages
+    .filter((page) => page.frontmatter.voyage_ended_at)
+    .map((page) => ({ ...page, ageHours: timestampAgeHours(page.frontmatter.voyage_ended_at, now) }))
+    .filter((page) => page.ageHours !== null && page.ageHours >= 0 && page.ageHours <= OPEN_VOYAGE_HOURS)
+    .sort((a, b) => String(b.frontmatter.voyage_ended_at).localeCompare(String(a.frontmatter.voyage_ended_at)));
+  return {
+    today,
+    recentOpen,
+    staleOpen,
+    active: recentOpen.length === 1 ? recentOpen[0] : null,
+    ambiguous: recentOpen.length > 1,
+    latestEnded: recentEnded[0] ?? null,
+  };
+}
+
+function overallEnergyValue(frontmatter) {
+  const date = isoDateValue(frontmatter?.date);
+  if (!date) return { value: null, source: "Missing date" };
+  if (date < NAVIGATION_CUTOVER) {
+    return { value: rating(frontmatter.energy), source: "Legacy Energy" };
+  }
+  if (date < OVERALL_ENERGY_CUTOVER) {
+    return { value: rating(frontmatter.navigation_work_energy), source: "Work Energy fallback" };
+  }
+  return { value: rating(frontmatter.health_evening_overall_energy), source: "Health Evening · Overall Energy" };
 }
 
 function calendarDayDifference(fromValue, toValue) {
@@ -2066,6 +2261,69 @@ class DailyHealthSummaryChild extends MarkdownRenderChild {
   }
 }
 
+class DailyMentalSummaryChild extends MarkdownRenderChild {
+  constructor(container, app, file) {
+    super(container);
+    this.app = app;
+    this.file = file;
+  }
+
+  onload() {
+    this.render();
+    this.registerEvent(this.app.metadataCache.on("changed", (changedFile) => {
+      if (changedFile.path === this.file.path) this.render();
+    }));
+    this.registerEvent(this.app.vault.on("modify", (changedFile) => {
+      if (changedFile.path === this.file.path) this.render();
+    }));
+  }
+
+  async render() {
+    const frontmatter = await freshFrontmatter(this.app, this.file);
+    if (!this.containerEl.isConnected) return;
+    this.containerEl.empty();
+    const wrap = this.containerEl.createDiv({ cls: "cx-mental-daily-summary" });
+    const header = wrap.createDiv({ cls: "cx-health-summary-header" });
+    header.createEl("h3", { text: "Mental Log" });
+    const ended = String(frontmatter.voyage_ended_at || "");
+    header.createSpan({ text: ended ? `航程结束于 ${ended.slice(11, 16)}` : "今日航程尚未收束" });
+    const grid = wrap.createDiv({ cls: "cx-mental-summary-grid" });
+    MENTAL_METRICS.forEach((metric) => {
+      const value = mentalDisplayValue(metric, frontmatter[metric.key]);
+      const item = grid.createDiv({ cls: "cx-mental-summary-item" });
+      item.createSpan({ text: metric.label, cls: "cx-health-summary-label" });
+      const valueRow = item.createDiv({ cls: "cx-mental-summary-value-row" });
+      valueRow.createSpan({
+        text: value === null ? "—" : metric.choices[value - 1],
+        cls: "cx-health-summary-value",
+      });
+      if (value !== null) {
+        valueRow.createSpan({
+          text: `${value}/5`,
+          cls: "cx-mental-summary-score",
+        });
+      }
+    });
+    const context = wrap.createDiv({ cls: "cx-mental-summary-context" });
+    const labelFor = (choices, value) => choices.find(([key]) => key === String(value))?.[1] ?? "";
+    const labelsFor = (choices, values) => healthArray(values)
+      .map((value) => labelFor(choices, value))
+      .filter(Boolean)
+      .join("、");
+    [
+      ["最大压力来源", labelFor(MENTAL_STRESS_SOURCES, frontmatter.mental_evening_stress_source)],
+      ["主要心绪", labelsFor(MENTAL_EMOTIONS, frontmatter.mental_evening_emotions)],
+      ["什么帮助了我", labelsFor(MENTAL_RELIEF_FACTORS, frontmatter.mental_evening_relief_factors)],
+    ].forEach(([label, value]) => {
+      const item = context.createDiv();
+      item.createSpan({ text: label });
+      item.createEl("strong", { text: value || "—" });
+    });
+    const closure = MENTAL_CLOSURES.find(([key]) => key === String(frontmatter.mental_evening_closure));
+    if (closure) wrap.createDiv({ text: `${closure[1]} · ${closure[2]}`, cls: "cx-mental-summary-closure" });
+  }
+}
+
 class CastleXHomeView extends ItemView {
   constructor(leaf, plugin) {
     super(leaf);
@@ -2425,22 +2683,40 @@ class CastleXHomeView extends ItemView {
     this.clockEl = copy.createEl("div", { cls: "cx-clock" });
     this.updateClock();
     copy.createEl("p", { text: "青山一道同云雨，明月何曾是两乡。", cls: "cx-hero-note" });
-    const actions = hero.createDiv({ cls: "cx-hero-actions cx-home-hero-actions" });
+    const actions = hero.createDiv({ cls: "cx-hero-actions cx-dashboard-hero-actions" });
     const today = actions.createEl("button", { text: "今日 Daily", cls: "cx-button cx-button-primary" });
     today.addEventListener("click", () => this.openFile(todayFile));
     const health = actions.createEl("button", { text: "Health Dashboard", cls: "cx-button" });
     health.addEventListener("click", () => this.plugin.activateHealthView());
+    const mental = actions.createEl("button", { text: "Mental Dashboard", cls: "cx-button" });
+    mental.addEventListener("click", () => this.plugin.activateMentalView());
   }
 
-  renderKpis(parent, todayFile, todayFrontmatter, streaks) {
+  renderKpis(parent, todayFile, todayFrontmatter, streaks, lifecycle) {
     const grid = parent.createDiv({ cls: "cx-kpi-grid" });
-    const started = Boolean(todayFrontmatter.voyage_started_at);
+    const todayStarted = Boolean(todayFrontmatter.voyage_started_at);
+    const todayEnded = Boolean(todayFrontmatter.voyage_ended_at);
+    const active = lifecycle.active;
+    const todayOpen = todayStarted && !todayEnded;
+    const sailing = lifecycle.recentOpen.length > 0 || todayOpen;
+    const activeDate = isoDateValue(active?.frontmatter?.date) || (todayOpen ? this.currentDateISO : null);
+    const ended = todayStarted && todayEnded;
+    const state = ended ? "is-ended" : sailing ? "is-sailing" : "is-docked";
+    const label = lifecycle.ambiguous
+      ? "待确认航程"
+      : ended
+      ? "已收帆"
+      : sailing
+        ? activeDate === this.currentDateISO ? "航行中" : "昨日航程中"
+        : "开始航行";
     const voyage = grid.createEl("button", {
-      cls: `cx-kpi cx-glass cx-voyage-ritual${started ? Date.now() < this.voyageAnimationUntil ? " is-starting" : " is-sailing" : " is-docked"}`,
+      cls: `cx-kpi cx-glass cx-voyage-ritual ${Date.now() < this.voyageAnimationUntil ? "is-starting" : state}`,
       attr: {
         type: "button",
-        "aria-label": started ? "今日航行中" : "开始今日航行",
-        "aria-disabled": String(started),
+        "aria-label": label,
+        title: lifecycle.staleOpen.length
+          ? `有 ${lifecycle.staleOpen.length} 次旧航程未收束；不会自动延续`
+          : label,
       },
     });
     const scene = voyage.createSpan({ cls: "cx-voyage-scene", attr: { "aria-hidden": "true" } });
@@ -2448,8 +2724,20 @@ class CastleXHomeView extends ItemView {
     scene.createSpan({ cls: "cx-voyage-wake" });
     const boat = scene.createSpan({ cls: "cx-voyage-boat" });
     setIcon(boat, "sailboat");
-    voyage.createSpan({ text: started ? "航行中" : "开始航行", cls: "cx-voyage-label" });
-    if (!started) voyage.addEventListener("click", () => this.startVoyage(todayFile));
+    const copy = voyage.createSpan({ cls: "cx-voyage-copy" });
+    copy.createSpan({ text: label, cls: "cx-voyage-label" });
+    if (!todayStarted && !sailing && lifecycle.latestEnded) {
+      copy.createSpan({
+        text: `上一航程 ${String(lifecycle.latestEnded.frontmatter.voyage_ended_at).slice(11, 16)} 收帆`,
+        cls: "cx-voyage-note",
+      });
+    } else if (!todayStarted && !sailing && lifecycle.staleOpen.length) {
+      copy.createSpan({ text: "上次航程未收束", cls: "cx-voyage-note" });
+    }
+    if (!todayStarted && !sailing) voyage.addEventListener("click", () => this.startVoyage(todayFile));
+    else voyage.addEventListener("click", () => this.plugin.activateMentalView(
+      lifecycle.ambiguous ? null : activeDate || this.currentDateISO,
+    ));
 
     const streak = grid.createDiv({ cls: "cx-kpi cx-glass cx-streak-kpi" });
     streak.createDiv({ text: String(streaks.active), cls: "cx-kpi-value" });
@@ -2820,22 +3108,24 @@ class CastleXHomeView extends ItemView {
       const date = addDays(new Date(), index - 13);
       const frontmatter = byDate.get(localISO(date));
       const navigation = usesNavigationModel(frontmatter);
-      const key = mode === "energy"
-        ? navigation ? "navigation_work_energy" : "energy"
-        : navigation ? "health_morning_sleep" : "sleep_quality";
+      const energy = overallEnergyValue(frontmatter);
+      const key = navigation ? "health_morning_sleep" : "sleep_quality";
       return {
         date,
         iso: localISO(date),
-        value: rating(frontmatter?.[key]),
+        value: mode === "energy" ? energy.value : rating(frontmatter?.[key]),
         entryType: stateEntryType(frontmatter),
-        source: navigation ? "Navigation v1" : "Legacy",
+        source: mode === "energy" ? energy.source : navigation ? "Health Morning Sleep" : "Legacy Sleep",
       };
     });
   }
 
   renderTrend(parent, pages) {
-    const label = this.trendMode === "energy" ? "Start Energy" : "Sleep Quality";
-    const card = this.createCard(parent, `14-day ${label}`, "7/25 起读取 Navigation Energy 与 Health Morning Sleep");
+    const label = this.trendMode === "energy" ? "Overall Energy" : "Sleep Quality";
+    const subtitle = this.trendMode === "energy"
+      ? "7/26 起读取 Health Evening；7/25 使用 Work Energy fallback"
+      : "7/25 起读取 Health Morning Sleep";
+    const card = this.createCard(parent, `14-day ${label}`, subtitle);
     card.addClass("cx-trend-card");
     const header = card.querySelector(".cx-card-header");
     this.renderModeTabs(header, [["energy", "Energy"], ["sleep_quality", "Sleep"]], this.trendMode, (mode) => {
@@ -2958,7 +3248,7 @@ class CastleXHomeView extends ItemView {
     const top = dashboard.createDiv({ cls: "cx-top-grid" });
     const left = top.createDiv({ cls: "cx-top-left" });
     this.renderHero(left, todayFile);
-    this.renderKpis(left, todayFile, todayFrontmatter, streaks);
+    this.renderKpis(left, todayFile, todayFrontmatter, streaks, voyageLifecycle(pages, now));
     this.renderProjects(top, projects, taskGroups);
     this.renderTasks(top, focusTaskGroups);
 
@@ -2992,6 +3282,7 @@ class CastleXHealthView extends ItemView {
     this.plannedSlot = 0;
     this.addingWorkout = false;
     this.nightRitualAnimationUntil = 0;
+    this.morningRitualAnimationUntil = 0;
   }
 
   getViewType() {
@@ -3047,6 +3338,13 @@ class CastleXHealthView extends ItemView {
       return;
     }
     if (!this.stageOverride && this.renderedStage !== healthStageForTime(now)) this.scheduleRender();
+  }
+
+  async openStage(stage) {
+    const valid = ["sleep", "morning", "afternoon", "evening"];
+    if (!valid.includes(stage)) return;
+    this.stageOverride = stage;
+    await this.renderDashboard();
   }
 
   async ensureFolder(path) {
@@ -3237,6 +3535,7 @@ class CastleXHealthView extends ItemView {
     const write = async () => {
       await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
         mutator(frontmatter);
+        if (isoDateValue(frontmatter.date) !== localISO()) return;
         const recommendation = healthRecommendation(frontmatter, this.plannedWorkout);
         frontmatter.health_recommended_workout = recommendation.workout;
         frontmatter.health_recommended_mode = recommendation.mode;
@@ -3307,14 +3606,16 @@ class CastleXHealthView extends ItemView {
     this.clockEl = copy.createDiv({ cls: "cx-health-clock" });
     this.updateClock();
     copy.createEl("p", { text: "我与我的身体并肩作战", cls: "cx-health-signature" });
-    const actions = hero.createDiv({ cls: "cx-hero-actions" });
-    const home = actions.createEl("button", { text: "返回 CastleX Home", cls: "cx-button cx-button-primary" });
-    home.addEventListener("click", () => this.plugin.activateView());
-    const daily = actions.createEl("button", { text: "打开今日 Daily", cls: "cx-button" });
+    const actions = hero.createDiv({ cls: "cx-hero-actions cx-dashboard-hero-actions" });
+    const daily = actions.createEl("button", { text: "今日 Daily", cls: "cx-button" });
     daily.addEventListener("click", async () => {
       const file = await this.ensureDaily(new Date(), { allowCreate: true });
       if (file instanceof TFile) await this.app.workspace.getLeaf("tab").openFile(file);
     });
+    const mental = actions.createEl("button", { text: "Mental Dashboard", cls: "cx-button" });
+    mental.addEventListener("click", () => this.plugin.activateMentalView());
+    const home = actions.createEl("button", { text: "CastleX Home", cls: "cx-button cx-button-primary" });
+    home.addEventListener("click", () => this.plugin.activateView());
   }
 
   renderSignal(parent, file, frontmatter, key, label, labelSet) {
@@ -3399,6 +3700,34 @@ class CastleXHealthView extends ItemView {
 
   renderMorning(parent, file, frontmatter) {
     const fields = parent.createDiv({ cls: "cx-health-form-grid" });
+    const startedAt = String(frontmatter.health_morning_started_at || "");
+    const startedLabel = startedAt ? startedAt.slice(11, 16) : "";
+    const ritual = fields.createEl("button", {
+      cls: `cx-health-morning-ritual${startedAt ? " is-recorded" : ""}${Date.now() < this.morningRitualAnimationUntil ? " is-activating" : ""}`,
+      attr: {
+        type: "button",
+        "aria-pressed": String(Boolean(startedAt)),
+        "aria-label": startedAt ? `已于 ${startedLabel} 迎接晨光，点击可更新时间` : "迎接晨光",
+      },
+    });
+    const horizon = ritual.createSpan({ cls: "cx-health-morning-horizon", attr: { "aria-hidden": "true" } });
+    const sun = horizon.createSpan({ cls: "cx-health-morning-sun" });
+    setIcon(sun, "sunrise");
+    const ritualCopy = ritual.createSpan({ cls: "cx-health-morning-copy" });
+    ritualCopy.createSpan({ text: startedAt ? `晨光已至 · ${startedLabel}` : "迎接晨光", cls: "cx-health-morning-title" });
+    ritualCopy.createSpan({
+      text: startedAt ? "晨间身体觉察已经开启" : "从身体开始，轻轻打开今天",
+      cls: "cx-health-morning-note",
+    });
+    ritual.addEventListener("click", () => {
+      const recordedAt = localTimestamp();
+      this.morningRitualAnimationUntil = Date.now() + 1400;
+      ritual.addClass("is-activating");
+      window.setTimeout(() => this.scheduleRender(), 1450);
+      this.updateHealth(file, (next) => {
+        next.health_morning_started_at = recordedAt;
+      }, `晨光已至 · ${recordedAt.slice(11, 16)}`);
+    });
     this.renderSignal(fields, file, frontmatter, "health_morning_sleep", "睡眠质量", HEALTH_SIGNAL_LABELS.sleep);
     this.renderSignal(fields, file, frontmatter, "health_morning_recovery", "醒来后的恢复感", HEALTH_SIGNAL_LABELS.recovery);
     this.renderSignal(fields, file, frontmatter, "health_morning_body", "身体可用状态", HEALTH_SIGNAL_LABELS.body);
@@ -3444,6 +3773,8 @@ class CastleXHealthView extends ItemView {
   renderEvening(parent, file, frontmatter) {
     const fields = parent.createDiv({ cls: "cx-health-form-grid" });
     this.renderSignal(fields, file, frontmatter, "health_evening_body", "此刻的身体状态", HEALTH_SIGNAL_LABELS.eveningBody);
+    this.renderSignal(fields, file, frontmatter, "health_evening_overall_energy", "今日整体精力", HEALTH_SIGNAL_LABELS.energy);
+    this.renderSignal(fields, file, frontmatter, "health_evening_appetite_stability", "今日整体食欲平稳度", HEALTH_SIGNAL_LABELS.appetiteStability);
     if (["active", "completed"].includes(String(frontmatter.health_workout_status || ""))) {
       this.renderSignal(fields, file, frontmatter, "health_evening_post_workout", "运动后的身体状态", HEALTH_SIGNAL_LABELS.postWorkout);
     }
@@ -3489,26 +3820,27 @@ class CastleXHealthView extends ItemView {
 
     this.renderSignal(fields, file, frontmatter, "health_night_sleepiness", "当前睡意", HEALTH_SIGNAL_LABELS.sleepiness);
     this.renderSignal(fields, file, frontmatter, "health_night_calmness", "精神平稳度", HEALTH_SIGNAL_LABELS.nightCalmness);
-    const reasons = this.renderMultiChoice(fields, file, frontmatter, "health_night_awake_reasons", "仍未入睡的原因", [
-      ["not_sleepy", "还不困"], ["active_mind", "思绪活跃"], ["screen", "手机或娱乐"],
-      ["work", "工作学习"], ["social", "社交"], ["late_workout", "晚间运动"], ["other", "其他"],
+    const reasons = this.renderMultiChoice(fields, file, frontmatter, "health_night_awake_reasons", "仍未入睡的原因（可多选）", [
+      ["not_sleepy", "还不困"], ["screen", "手机／娱乐"], ["work", "工作／学习"],
+      ["social", "社交"], ["late_workout", "晚间运动"], ["physical_discomfort", "身体不适"],
+      ["hunger_thirst", "饥饿／口渴"], ["active_mind", "普通思绪活跃"], ["anxiety", "担忧／焦虑"],
+      ["panic", "恐惧／恐慌"], ["low_mood", "情绪低落"], ["rumination", "反复想着某件事"],
+      ["environment", "环境影响"], ["other", "其他"],
     ]);
     reasons.addClass("cx-health-night-reasons");
   }
 
-  renderCheckin(parent, file, frontmatter) {
+  renderCheckin(parent, file, frontmatter, stage, timedStage) {
     const card = parent.createDiv({ cls: "cx-card cx-health-checkin-card" });
-    const timedStage = healthStageForTime();
-    const stage = this.stageOverride || timedStage;
     this.renderedStage = timedStage;
     const stageNames = {
-      night: "夜间状态",
+      sleep: "夜间状态",
       morning: "早晨 Check-in",
       afternoon: "傍晚 Check-in",
       evening: "晚间身体回顾",
     };
     const timestampKeys = {
-      night: "health_night_completed_at",
+      sleep: "health_night_completed_at",
       morning: "health_morning_completed_at",
       afternoon: "health_afternoon_completed_at",
       evening: "health_evening_completed_at",
@@ -3516,44 +3848,48 @@ class CastleXHealthView extends ItemView {
     const header = card.createDiv({ cls: "cx-health-card-header" });
     const title = header.createDiv();
     title.createEl("h2", { text: stageNames[stage] });
-    title.createSpan({ text: this.stageOverride ? "补填模式 · 所有输入仍写入今日 Daily" : "当前时段 · 输入后立即保存并更新建议" });
-    const reset = header.createEl("button", {
-      text: this.stageOverride ? "回到当前时段" : "补填",
-      cls: "cx-button",
+    const targetISO = isoDateValue(frontmatter.date) || localISO();
+    title.createSpan({
+      text: this.stageOverride
+        ? `手动选择 · 写入 ${targetISO} Daily`
+        : "时间推荐 · 输入后立即保存",
     });
-    reset.addEventListener("click", () => {
-      if (this.stageOverride) this.stageOverride = null;
-      else this.stageOverride = stage === "morning" ? "afternoon" : "morning";
-      this.renderDashboard();
-    });
+    if (this.stageOverride) {
+      const reset = header.createEl("button", { text: "按时间推荐", cls: "cx-button" });
+      reset.addEventListener("click", () => {
+        this.stageOverride = null;
+        this.renderDashboard();
+      });
+    }
 
     const tracker = card.createDiv({ cls: "cx-health-stage-tracker" });
-    ["night", "morning", "afternoon", "evening"].forEach((item) => {
-      const complete = Boolean(frontmatter[timestampKeys[item]]);
+    ["sleep", "morning", "afternoon", "evening"].forEach((item) => {
+      const complete = healthStageComplete(frontmatter, item);
       const button = tracker.createEl("button", {
         cls: `cx-health-stage${item === stage ? " is-active" : ""}${complete ? " is-complete" : ""}`,
         attr: { type: "button", "aria-pressed": String(item === stage) },
       });
-      const labels = { night: "夜间", morning: "早晨", afternoon: "傍晚", evening: "晚间" };
+      const labels = { sleep: "夜间", morning: "早晨", afternoon: "傍晚", evening: "晚间" };
       button.createSpan({ text: labels[item] });
-      button.createSpan({ text: complete ? "已记录" : item === timedStage ? "当前" : "待记录", cls: "cx-health-stage-state" });
+      button.createSpan({ text: complete ? "已记录" : item === timedStage ? "推荐" : "待记录", cls: "cx-health-stage-state" });
       button.addEventListener("click", () => {
-        this.stageOverride = item === timedStage ? null : item;
+        this.stageOverride = item;
         this.renderDashboard();
       });
     });
 
     const form = card.createDiv({ cls: "cx-health-form" });
-    if (stage === "night") this.renderNight(form, file, frontmatter);
+    if (stage === "sleep") this.renderNight(form, file, frontmatter);
     else if (stage === "morning") this.renderMorning(form, file, frontmatter);
     else if (stage === "afternoon") this.renderAfternoon(form, file, frontmatter);
     else this.renderEvening(form, file, frontmatter);
     const footer = card.createDiv({ cls: "cx-health-form-footer" });
-    if (stage === "night") {
-      footer.createSpan({ text: "每一项都会单独保存；“关灯”会记录准确时间并完成夜间状态。" });
+    if (stage === "sleep") {
+      footer.createSpan({ text: `夜间记录写入 ${targetISO} 自然日；“关灯”保存准确时间。` });
     } else {
       footer.createSpan({ text: "不必填完；每一项都会单独保存。" });
-      const complete = footer.createEl("button", { text: `完成${stageNames[stage]}`, cls: "cx-button cx-button-primary" });
+      const actions = footer.createDiv({ cls: "cx-health-footer-actions" });
+      const complete = actions.createEl("button", { text: `完成${stageNames[stage]}`, cls: "cx-button cx-button-primary" });
       complete.addEventListener("click", () => this.updateHealth(file, (next) => {
         next[timestampKeys[stage]] = localTimestamp();
       }, `${stageNames[stage]}已记录`));
@@ -4100,6 +4436,8 @@ class CastleXHealthView extends ItemView {
   async renderDashboard() {
     const now = new Date();
     this.currentDateISO = localISO(now);
+    const timedStage = healthStageForTime(now);
+    const stage = this.stageOverride || timedStage;
     const todayFile = await this.ensureDaily(now);
     if (!(todayFile instanceof TFile)) {
       this.renderSyncPending(now);
@@ -4114,7 +4452,7 @@ class CastleXHealthView extends ItemView {
     const dashboard = this.createCanvas();
     this.renderHeader(dashboard);
     const main = dashboard.createDiv({ cls: "cx-health-main-grid" });
-    this.renderCheckin(main, todayFile, frontmatter);
+    this.renderCheckin(main, todayFile, frontmatter, stage, timedStage);
     this.renderDirection(main, todayFile, frontmatter, recommendation);
     this.renderWorkout(dashboard, todayFile, frontmatter, recommendation);
     const insights = dashboard.createDiv({ cls: "cx-health-insights-grid" });
@@ -4131,6 +4469,555 @@ class CastleXHealthView extends ItemView {
   }
 }
 
+class CastleXMentalView extends ItemView {
+  constructor(leaf, plugin) {
+    super(leaf);
+    this.plugin = plugin;
+    this.currentDateISO = localISO();
+    this.targetOverrideISO = null;
+    this.renderTimer = null;
+    this.writeQueue = Promise.resolve();
+    this.suppressRenderUntil = 0;
+  }
+
+  getViewType() {
+    return MENTAL_VIEW_TYPE;
+  }
+
+  getDisplayText() {
+    return "Mental Dashboard";
+  }
+
+  getIcon() {
+    return "cloud-moon";
+  }
+
+  async onOpen() {
+    this.contentEl.addClass("castlex-mental-view");
+    this.registerEvent(this.app.metadataCache.on("changed", () => this.scheduleRender()));
+    this.registerEvent(this.app.vault.on("modify", () => this.scheduleRender()));
+    this.registerInterval(window.setInterval(() => this.updateClock(), 30000));
+    await this.renderDashboard();
+  }
+
+  async onClose() {
+    if (this.renderTimer) window.clearTimeout(this.renderTimer);
+  }
+
+  scheduleRender() {
+    if (Date.now() < this.suppressRenderUntil) return;
+    if (this.renderTimer) window.clearTimeout(this.renderTimer);
+    this.renderTimer = window.setTimeout(() => this.renderDashboard(), 280);
+  }
+
+  updateClock() {
+    const now = new Date();
+    if (this.clockEl) {
+      this.clockEl.setText(new Intl.DateTimeFormat("zh-CN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).format(now));
+    }
+    const todayISO = localISO(now);
+    if (todayISO !== this.currentDateISO) {
+      this.currentDateISO = todayISO;
+      this.scheduleRender();
+    }
+  }
+
+  async openVoyage(iso = null) {
+    this.targetOverrideISO = isoDateValue(iso);
+    await this.renderDashboard();
+  }
+
+  async ensureFolder(path) {
+    const normalized = normalizePath(path);
+    if (this.app.vault.getAbstractFileByPath(normalized)) return;
+    const parts = normalized.split("/");
+    let current = "";
+    for (const part of parts) {
+      current = current ? `${current}/${part}` : part;
+      if (!this.app.vault.getAbstractFileByPath(current)) await this.app.vault.createFolder(current);
+    }
+  }
+
+  dailyPath(date = new Date()) {
+    return `${DAILY_ROOT}/${date.getFullYear()}/${pad(date.getMonth() + 1)}/${localISO(date)}.md`;
+  }
+
+  async createDailyContent(date) {
+    const iso = localISO(date);
+    const weekday = new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(date);
+    const templatePath = "90_System/Templates/010-Daily-Dashboard.md";
+    const templateFile = this.app.vault.getAbstractFileByPath(templatePath);
+    if (!(templateFile instanceof TFile)) throw new Error(`Missing Daily template: ${templatePath}`);
+    let content = await this.app.vault.cachedRead(templateFile);
+    [
+      ["{{date:YYYY-MM-DD · dddd}}", `${iso} · ${weekday}`],
+      ["{{date:gggg-[W]ww}}", isoWeek(date)],
+      ["{{date:YYYY-MM-DD}}", iso],
+      ["{{date:YYYY-MM}}", iso.slice(0, 7)],
+      ["{{date:dddd}}", weekday],
+    ].forEach(([token, value]) => {
+      content = content.split(token).join(value);
+    });
+    return content;
+  }
+
+  async ensureDaily(date = new Date(), options = {}) {
+    const path = this.dailyPath(date);
+    const existing = this.app.vault.getAbstractFileByPath(path);
+    if (existing instanceof TFile) return existing;
+    const allowCreate = options.allowCreate ?? !Platform.isMobile;
+    if (!allowCreate) return null;
+    const pending = this.plugin.dailyCreationPromises.get(path);
+    if (pending) return pending;
+    const creation = (async () => {
+      await this.ensureFolder(path.split("/").slice(0, -1).join("/"));
+      const afterFolder = this.app.vault.getAbstractFileByPath(path);
+      if (afterFolder instanceof TFile) return afterFolder;
+      try {
+        return await this.app.vault.create(path, await this.createDailyContent(date));
+      } catch (error) {
+        const concurrent = this.app.vault.getAbstractFileByPath(path);
+        if (concurrent instanceof TFile) return concurrent;
+        throw error;
+      }
+    })();
+    this.plugin.dailyCreationPromises.set(path, creation);
+    try {
+      return await creation;
+    } finally {
+      this.plugin.dailyCreationPromises.delete(path);
+    }
+  }
+
+  dailyPages() {
+    const pages = this.app.vault.getMarkdownFiles()
+      .filter((file) => file.path.startsWith(`${DAILY_ROOT}/`))
+      .map((file) => ({ file, frontmatter: this.app.metadataCache.getFileCache(file)?.frontmatter ?? {} }))
+      .filter((page) => page.frontmatter.type === "daily" && page.frontmatter.date);
+    const byDate = new Map();
+    pages.forEach((page) => {
+      const iso = isoDateValue(page.frontmatter.date);
+      if (!iso) return;
+      const canonicalPath = dailyPathFromISO(iso);
+      const current = byDate.get(iso);
+      const pageCanonical = page.file.path === canonicalPath;
+      const currentCanonical = current?.file.path === canonicalPath;
+      if (!current || (pageCanonical && !currentCanonical) || (!currentCanonical && page.file.stat.mtime > current.file.stat.mtime)) {
+        byDate.set(iso, page);
+      }
+    });
+    return [...byDate.values()].sort((a, b) => String(a.frontmatter.date).localeCompare(String(b.frontmatter.date)));
+  }
+
+  async updateMental(file, mutator, notice = "", options = {}) {
+    if (options.rerender === false) this.suppressRenderUntil = Date.now() + 1200;
+    const write = async () => {
+      await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+        mutator(frontmatter);
+        if (!frontmatter.mental_evening_recorded_at) frontmatter.mental_evening_recorded_at = localTimestamp();
+      });
+      if (notice) new Notice(notice);
+    };
+    this.writeQueue = this.writeQueue.then(write, write);
+    await this.writeQueue;
+    if (options.rerender !== false) await this.renderDashboard();
+  }
+
+  createCanvas() {
+    this.contentEl.empty();
+    this.contentEl.addClass("castlex-mental-view");
+    const shell = this.contentEl.createDiv({ cls: "cx-shell cx-mental-shell" });
+    const desktopAsset = this.app.vault.getAbstractFileByPath(MENTAL_DESKTOP_ASSET_PATH);
+    const mobileAsset = this.app.vault.getAbstractFileByPath(MENTAL_MOBILE_ASSET_PATH);
+    if (desktopAsset instanceof TFile) shell.style.setProperty("--cx-background-desktop", `url("${this.app.vault.getResourcePath(desktopAsset)}")`);
+    if (mobileAsset instanceof TFile) shell.style.setProperty("--cx-background-mobile", `url("${this.app.vault.getResourcePath(mobileAsset)}")`);
+    shell.createDiv({ cls: "cx-background-layer cx-mental-background-layer", attr: { "aria-hidden": "true" } });
+    return shell.createDiv({ cls: "cx-mental-dashboard-content" });
+  }
+
+  renderSyncPending(date) {
+    const dashboard = this.createCanvas();
+    const card = dashboard.createDiv({ cls: "cx-card cx-daily-sync-pending" });
+    card.createEl("h2", { text: `${localISO(date)} Daily 尚未同步` });
+    card.createEl("p", { text: "Mental Dashboard 不会在手机上创建第二份 Daily。请等待 iCloud，或确认在本机创建。" });
+    const actions = card.createDiv({ cls: "cx-daily-sync-actions" });
+    const home = actions.createEl("button", { text: "返回 CastleX Home", cls: "cx-button" });
+    home.addEventListener("click", () => this.plugin.activateView());
+    const retry = actions.createEl("button", { text: "重新检查", cls: "cx-button cx-button-primary" });
+    retry.addEventListener("click", () => this.renderDashboard());
+    const create = actions.createEl("button", { text: "确认在本机创建", cls: "cx-button" });
+    create.addEventListener("click", async () => {
+      await this.ensureDaily(date, { allowCreate: true });
+      await this.renderDashboard();
+    });
+  }
+
+  renderHeader(parent, targetISO, frontmatter) {
+    const hero = parent.createDiv({ cls: "cx-mental-hero cx-glass" });
+    const copy = hero.createDiv({ cls: "cx-mental-hero-copy" });
+    const targetDate = dateFromISO(targetISO) ?? new Date();
+    copy.createEl("p", {
+      text: new Intl.DateTimeFormat("zh-CN", {
+        weekday: "long", year: "numeric", month: "long", day: "numeric",
+      }).format(targetDate),
+      cls: "cx-overline cx-mental-date",
+    });
+    this.clockEl = copy.createDiv({ cls: "cx-mental-clock" });
+    this.updateClock();
+    copy.createEl("p", {
+      text: `正在收束 ${targetISO.slice(5).replace("-", "月")}日航程`,
+      cls: "cx-mental-voyage-date",
+    });
+    copy.createDiv({ text: "用舍由时，行藏在我。", cls: "cx-mental-signature" });
+    const actions = hero.createDiv({ cls: "cx-hero-actions cx-dashboard-hero-actions" });
+    const daily = actions.createEl("button", { text: "今日 Daily", cls: "cx-button" });
+    daily.addEventListener("click", async () => {
+      const path = dailyPathFromISO(targetISO);
+      const file = path ? this.app.vault.getAbstractFileByPath(path) : null;
+      if (file instanceof TFile) await this.app.workspace.getLeaf("tab").openFile(file);
+    });
+    const health = actions.createEl("button", { text: "Health Dashboard", cls: "cx-button" });
+    health.addEventListener("click", () => this.plugin.activateHealthView());
+    const home = actions.createEl("button", { text: "CastleX Home", cls: "cx-button cx-button-primary" });
+    home.addEventListener("click", () => this.plugin.activateView());
+    if (frontmatter.voyage_ended_at) {
+      hero.addClass("is-ended");
+      hero.createDiv({ text: `已于 ${String(frontmatter.voyage_ended_at).slice(11, 16)} 结束今日航程`, cls: "cx-mental-ended-badge" });
+    }
+  }
+
+  renderMetric(parent, file, frontmatter, metric) {
+    let value = mentalDisplayValue(metric, frontmatter[metric.key]);
+    const card = parent.createDiv({ cls: `cx-mental-metric${value !== null ? " is-recorded" : ""}` });
+    const heading = card.createDiv({ cls: "cx-mental-metric-heading" });
+    const copy = heading.createDiv();
+    copy.createEl("strong", { text: metric.label });
+    copy.createSpan({ text: metric.hint });
+    const star = card.createDiv({
+      cls: `cx-mental-star-light${value === null ? " is-unrecorded" : ""}`,
+      attr: { role: "group", "aria-label": `${metric.label}尚未记录` },
+    });
+    const namespace = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(namespace, "svg");
+    svg.setAttribute("viewBox", "0 0 100 100");
+    const petals = [];
+    const point = (angle, radius) => {
+      const radians = angle * Math.PI / 180;
+      return `${50 + Math.cos(radians) * radius} ${50 + Math.sin(radians) * radius}`;
+    };
+    for (let index = 0; index < 5; index += 1) {
+      const outerAngle = -90 + index * 72;
+      const petal = document.createElementNS(namespace, "path");
+      petal.setAttribute(
+        "d",
+        `M50 50 L${point(outerAngle - 36, 20)} L${point(outerAngle, 43)} L${point(outerAngle + 36, 20)} Z`,
+      );
+      petal.setAttribute("class", "cx-mental-star-petal");
+      petal.setAttribute("role", "button");
+      petal.setAttribute("tabindex", "0");
+      petal.setAttribute("aria-label", `${metric.label}：${metric.choices[index]}`);
+      petal.setAttribute("data-level", String(index + 1));
+      svg.appendChild(petal);
+      petals.push(petal);
+    }
+    star.appendChild(svg);
+    const valueLabel = card.createSpan({
+      text: value === null ? "尚未记录" : metric.choices[value - 1],
+      cls: "cx-mental-metric-value",
+    });
+
+    const syncVisual = (nextValue) => {
+      const recorded = nextValue !== null;
+      star.classList.toggle("is-unrecorded", !recorded);
+      card.classList.toggle("is-recorded", recorded);
+      petals.forEach((petal, index) => {
+        petal.classList.toggle("is-lit", recorded && index < nextValue);
+        petal.setAttribute("aria-pressed", String(recorded && index + 1 === nextValue));
+      });
+      valueLabel.setText(recorded ? metric.choices[nextValue - 1] : "尚未记录");
+      star.setAttribute("aria-label", recorded
+        ? `${metric.label}：${metric.choices[nextValue - 1]}，点亮 ${nextValue} 瓣`
+        : `${metric.label}尚未记录`);
+    };
+    syncVisual(value);
+
+    const commit = (nextValue) => {
+      if (value === nextValue) return;
+      value = nextValue;
+      syncVisual(nextValue);
+      this.updateMental(file, (next) => {
+        next[metric.key] = mentalStoredValue(metric, nextValue);
+      }, `${metric.label}：${metric.choices[nextValue - 1]}`, { rerender: false });
+    };
+    petals.forEach((petal, index) => {
+      const nextValue = index + 1;
+      petal.addEventListener("click", () => commit(nextValue));
+      petal.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        commit(nextValue);
+      });
+    });
+  }
+
+  renderMetrics(parent, file, frontmatter) {
+    const section = parent.createDiv({ cls: "cx-mental-metrics-section cx-glass" });
+    const heading = section.createDiv({ cls: "cx-mental-section-heading" });
+    heading.createEl("h2", { text: "今夜状态" });
+    const metrics = section.createDiv({ cls: "cx-mental-metrics" });
+    MENTAL_METRICS.forEach((metric) => this.renderMetric(metrics, file, frontmatter, metric));
+  }
+
+  renderWind(parent, file, frontmatter) {
+    const section = parent.createDiv({ cls: "cx-mental-context-section cx-glass" });
+    const heading = section.createDiv({ cls: "cx-mental-section-heading" });
+    heading.createEl("h2", { text: "今日风向" });
+    heading.createSpan({ text: "可选记录，不需要为了完整而勉强回答" });
+    const rows = section.createDiv({ cls: "cx-mental-wind-rows" });
+    [
+      {
+        key: "mental_evening_stress_source",
+        choices: MENTAL_STRESS_SOURCES,
+        title: "逆风来源",
+        hint: "今天主要是什么增加了心理重量",
+        icon: "compass",
+        selected: [String(frontmatter.mental_evening_stress_source || "")].filter(Boolean),
+        maximum: 1,
+      },
+      {
+        key: "mental_evening_emotions",
+        choices: MENTAL_EMOTIONS,
+        title: "主要心绪",
+        hint: "此刻最接近的感受，最多两项",
+        icon: "cloud-moon",
+        selected: healthArray(frontmatter.mental_evening_emotions),
+        maximum: 2,
+      },
+      {
+        key: "mental_evening_relief_factors",
+        choices: MENTAL_RELIEF_FACTORS,
+        title: "靠岸帮助",
+        hint: "今天什么让我获得了一点空间，最多两项",
+        icon: "anchor",
+        selected: healthArray(frontmatter.mental_evening_relief_factors),
+        maximum: 2,
+      },
+    ].forEach((row) => {
+      const rowEl = rows.createDiv({ cls: "cx-mental-wind-row" });
+      const copy = rowEl.createDiv({ cls: "cx-mental-wind-row-copy" });
+      const icon = copy.createSpan({ cls: "cx-mental-wind-row-icon" });
+      setIcon(icon, row.icon);
+      const text = copy.createDiv();
+      text.createEl("strong", { text: row.title });
+      text.createSpan({ text: row.hint });
+      const options = rowEl.createDiv({ cls: "cx-mental-wind-options" });
+      const selected = new Set(row.selected);
+      const optionButtons = new Map();
+      const syncButtons = () => {
+        optionButtons.forEach((button, value) => {
+          button.classList.toggle("is-selected", selected.has(value));
+          button.setAttr("aria-pressed", String(selected.has(value)));
+        });
+      };
+      row.choices.forEach(([value, label]) => {
+        const button = options.createEl("button", {
+          text: label,
+          cls: `cx-mental-chip${selected.has(value) ? " is-selected" : ""}`,
+          attr: { type: "button", "aria-pressed": String(selected.has(value)) },
+        });
+        optionButtons.set(value, button);
+        button.addEventListener("click", () => {
+          if (row.maximum === 1) {
+            const wasSelected = selected.has(value);
+            selected.clear();
+            if (!wasSelected) selected.add(value);
+            syncButtons();
+            const snapshot = wasSelected ? "" : value;
+            this.updateMental(file, (next) => {
+              if (snapshot) next[row.key] = snapshot;
+              else delete next[row.key];
+            }, "", { rerender: false });
+            return;
+          }
+          if (!selected.has(value) && selected.size >= row.maximum) {
+            new Notice(`${row.title}最多选择 ${row.maximum} 项`);
+            return;
+          }
+          if (selected.has(value)) selected.delete(value);
+          else {
+            if (value === "none") selected.clear();
+            else selected.delete("none");
+            selected.add(value);
+          }
+          syncButtons();
+          const snapshot = [...selected];
+          this.updateMental(file, (next) => {
+            next[row.key] = snapshot;
+          }, "", { rerender: false });
+        });
+      });
+    });
+  }
+
+  renderClosure(parent, file, frontmatter) {
+    const selected = String(frontmatter.mental_evening_closure || "");
+    const card = parent.createDiv({ cls: `cx-mental-closure-card cx-glass${selected ? ` is-${selected}` : ""}` });
+    card.createEl("h2", { text: "今天要如何安放" });
+    card.createEl("p", { text: "这不是评价，只是为今天选择一个暂时的位置。" });
+    const choices = card.createDiv({ cls: "cx-mental-closure-grid" });
+    const buttons = [];
+    MENTAL_CLOSURES.forEach(([value, label, metaphor, iconType]) => {
+      const button = choices.createEl("button", {
+        cls: `cx-mental-closure-choice is-${value}${selected === value ? " is-selected" : ""}`,
+        attr: { type: "button", "aria-pressed": String(selected === value) },
+      });
+      const icon = button.createSpan({ cls: `cx-mental-closure-icon is-${iconType}`, attr: { "aria-hidden": "true" } });
+      if (iconType === "files") {
+        icon.createSpan({ cls: "cx-mental-static-paper is-back" });
+        icon.createSpan({ cls: "cx-mental-static-paper is-front" });
+      } else if (iconType === "envelope") {
+        icon.createSpan({ cls: "cx-mental-static-envelope-paper" });
+        icon.createSpan({ cls: "cx-mental-static-envelope-body" });
+        icon.createSpan({ cls: "cx-mental-static-envelope-flap" });
+      } else {
+        setIcon(icon, "plane");
+      }
+      const copy = button.createSpan({ cls: "cx-mental-closure-choice-copy" });
+      copy.createEl("strong", { text: label });
+      copy.createSpan({ text: metaphor });
+      buttons.push([button, value]);
+      button.addEventListener("click", () => {
+        card.classList.remove("is-active", "is-shelved", "is-released");
+        card.addClass(`is-${value}`);
+        buttons.forEach(([candidate, candidateValue]) => {
+          candidate.classList.toggle("is-selected", candidateValue === value);
+          candidate.setAttr("aria-pressed", String(candidateValue === value));
+        });
+        this.updateMental(file, (next) => {
+          next.mental_evening_closure = value;
+        }, "", { rerender: false });
+      });
+    });
+    return card;
+  }
+
+  async finishVoyage(file) {
+    const endedAt = localTimestamp();
+    await this.updateMental(file, (frontmatter) => {
+      if (!frontmatter.voyage_ended_at) frontmatter.voyage_ended_at = endedAt;
+      if (!frontmatter.mental_evening_completed_at) frontmatter.mental_evening_completed_at = endedAt;
+    }, "今日航程已结束");
+  }
+
+  renderFinish(parent, file, frontmatter) {
+    const card = parent.createDiv({ cls: `cx-mental-finish-card cx-glass${frontmatter.voyage_ended_at ? " is-ended" : ""}` });
+    if (frontmatter.voyage_ended_at) {
+      const icon = card.createSpan({ cls: "cx-mental-finish-icon" });
+      setIcon(icon, "book-check");
+      card.createEl("h2", { text: "今日航程已结束" });
+      card.createEl("p", { text: "日志已经合上。接下来只需要照顾自己，然后准备休息。" });
+      const sleep = card.createEl("button", { text: "前往夜间状态", cls: "cx-button cx-button-primary" });
+      sleep.addEventListener("click", () => this.plugin.activateHealthView("sleep"));
+      return;
+    }
+    card.createEl("h2", { text: "结束今日航程" });
+    card.createEl("p", {
+      text: frontmatter.voyage_started_at
+        ? "按住一秒，让今天的工作航程停在这里。"
+        : "今天没有记录起航时间；仍然可以收束今天。",
+    });
+    const button = card.createEl("button", {
+      cls: "cx-mental-finish-button",
+      attr: { type: "button", "aria-label": "按住一秒结束今日航程" },
+    });
+    const icon = button.createSpan();
+    setIcon(icon, "book-marked");
+    button.createSpan({ text: "按住 · 结束今日航程" });
+    let timer = null;
+    let finished = false;
+    const cancel = () => {
+      if (timer) window.clearTimeout(timer);
+      timer = null;
+      button.removeClass("is-holding");
+    };
+    const begin = () => {
+      if (timer || finished) return;
+      button.addClass("is-holding");
+      timer = window.setTimeout(async () => {
+        timer = null;
+        finished = true;
+        button.removeClass("is-holding");
+        await this.finishVoyage(file);
+      }, 900);
+    };
+    button.addEventListener("pointerdown", begin);
+    button.addEventListener("pointerup", cancel);
+    button.addEventListener("pointerleave", cancel);
+    button.addEventListener("pointercancel", cancel);
+    button.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        this.finishVoyage(file);
+      }
+    });
+  }
+
+  renderAmbiguous(parent, lifecycle) {
+    const card = parent.createDiv({ cls: "cx-card cx-mental-target-card" });
+    card.createEl("h2", { text: "请选择要收束的航程" });
+    card.createEl("p", { text: "最近24小时内有多个未结束航程。CastleX 不会自动猜测目标日期。" });
+    const choices = card.createDiv({ cls: "cx-mental-target-choices" });
+    lifecycle.recentOpen.forEach((page) => {
+      const iso = isoDateValue(page.frontmatter.date);
+      const button = choices.createEl("button", { text: `${iso} · ${String(page.frontmatter.voyage_started_at).slice(11, 16)} 起航`, cls: "cx-button" });
+      button.addEventListener("click", () => {
+        this.targetOverrideISO = iso;
+        this.renderDashboard();
+      });
+    });
+  }
+
+  async renderDashboard() {
+    const now = new Date();
+    this.currentDateISO = localISO(now);
+    let pages = this.dailyPages();
+    let lifecycle = voyageLifecycle(pages, now);
+    if (!this.targetOverrideISO && lifecycle.ambiguous) {
+      const dashboard = this.createCanvas();
+      this.renderAmbiguous(dashboard, lifecycle);
+      return;
+    }
+    let targetPage = this.targetOverrideISO
+      ? pages.find((page) => isoDateValue(page.frontmatter.date) === this.targetOverrideISO)
+      : lifecycle.active || lifecycle.today;
+    if (!targetPage) {
+      const todayFile = await this.ensureDaily(now);
+      if (!(todayFile instanceof TFile)) {
+        this.renderSyncPending(now);
+        return;
+      }
+      targetPage = { file: todayFile, frontmatter: await freshFrontmatter(this.app, todayFile) };
+      pages = [...pages, targetPage];
+      lifecycle = voyageLifecycle(pages, now);
+    } else {
+      targetPage = { file: targetPage.file, frontmatter: await freshFrontmatter(this.app, targetPage.file) };
+    }
+    const targetISO = isoDateValue(targetPage.frontmatter.date) || this.currentDateISO;
+    this.targetOverrideISO = targetISO;
+    const dashboard = this.createCanvas();
+    this.renderHeader(dashboard, targetISO, targetPage.frontmatter);
+    this.renderMetrics(dashboard, targetPage.file, targetPage.frontmatter);
+    this.renderWind(dashboard, targetPage.file, targetPage.frontmatter);
+    this.renderClosure(dashboard, targetPage.file, targetPage.frontmatter);
+    this.renderFinish(dashboard, targetPage.file, targetPage.frontmatter);
+    dashboard.createDiv({ cls: "cx-mobile-scroll-spacer", attr: { "aria-hidden": "true" } });
+  }
+}
+
 module.exports = class CastleXDashboardPlugin extends Plugin {
   async onload() {
     this.mobileHomeButton = null;
@@ -4142,6 +5029,7 @@ module.exports = class CastleXDashboardPlugin extends Plugin {
     this.leetcodeDataWriteQueue = Promise.resolve();
     this.registerView(VIEW_TYPE, (leaf) => new CastleXHomeView(leaf, this));
     this.registerView(HEALTH_VIEW_TYPE, (leaf) => new CastleXHealthView(leaf, this));
+    this.registerView(MENTAL_VIEW_TYPE, (leaf) => new CastleXMentalView(leaf, this));
     this.registerMarkdownCodeBlockProcessor("castlex-status", (_source, element, context) => {
       const file = this.app.vault.getAbstractFileByPath(context.sourcePath);
       if (file instanceof TFile) context.addChild(new DailyStatusChild(element, this.app, file));
@@ -4162,6 +5050,10 @@ module.exports = class CastleXDashboardPlugin extends Plugin {
       const file = this.app.vault.getAbstractFileByPath(context.sourcePath);
       if (file instanceof TFile) context.addChild(new DailyHealthSummaryChild(element, this.app, file));
     });
+    this.registerMarkdownCodeBlockProcessor("castlex-mental-summary", (_source, element, context) => {
+      const file = this.app.vault.getAbstractFileByPath(context.sourcePath);
+      if (file instanceof TFile) context.addChild(new DailyMentalSummaryChild(element, this.app, file));
+    });
     this.registerMarkdownCodeBlockProcessor("castlex-leetcode-tracker", (source, element, context) => {
       const file = this.app.vault.getAbstractFileByPath(context.sourcePath);
       if (!(file instanceof TFile)) return;
@@ -4176,8 +5068,10 @@ module.exports = class CastleXDashboardPlugin extends Plugin {
     });
     this.addRibbonIcon("ship-wheel", "Open CastleX Home", () => this.activateView());
     this.addRibbonIcon("heart-pulse", "Open Health Dashboard", () => this.activateHealthView());
+    this.addRibbonIcon("cloud-moon", "Open Mental Dashboard", () => this.activateMentalView());
     this.addCommand({ id: "open-home", name: "Open CastleX Home", callback: () => this.activateView() });
     this.addCommand({ id: "open-health-dashboard", name: "Open Health Dashboard", callback: () => this.activateHealthView() });
+    this.addCommand({ id: "open-mental-dashboard", name: "Open Mental Dashboard", callback: () => this.activateMentalView() });
     this.app.workspace.onLayoutReady(() => {
       this.activateView();
       this.setupMobileHomeButton();
@@ -4228,13 +5122,24 @@ module.exports = class CastleXDashboardPlugin extends Plugin {
     await this.app.workspace.revealLeaf(leaf);
   }
 
-  async activateHealthView() {
+  async activateHealthView(stage = null) {
     let leaf = this.app.workspace.getLeavesOfType(HEALTH_VIEW_TYPE)[0];
     if (!leaf) {
       leaf = this.app.workspace.getLeaf("tab");
       await leaf.setViewState({ type: HEALTH_VIEW_TYPE, active: true });
     }
     await this.app.workspace.revealLeaf(leaf);
+    if (stage && typeof leaf.view?.openStage === "function") await leaf.view.openStage(stage);
+  }
+
+  async activateMentalView(targetISO = null) {
+    let leaf = this.app.workspace.getLeavesOfType(MENTAL_VIEW_TYPE)[0];
+    if (!leaf) {
+      leaf = this.app.workspace.getLeaf("tab");
+      await leaf.setViewState({ type: MENTAL_VIEW_TYPE, active: true });
+    }
+    await this.app.workspace.revealLeaf(leaf);
+    if (typeof leaf.view?.openVoyage === "function") await leaf.view.openVoyage(targetISO);
   }
 
   onunload() {
@@ -4242,5 +5147,6 @@ module.exports = class CastleXDashboardPlugin extends Plugin {
     this.mobileHomeButton = null;
     this.app.workspace.detachLeavesOfType(VIEW_TYPE);
     this.app.workspace.detachLeavesOfType(HEALTH_VIEW_TYPE);
+    this.app.workspace.detachLeavesOfType(MENTAL_VIEW_TYPE);
   }
 };

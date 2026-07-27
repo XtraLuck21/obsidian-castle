@@ -33,7 +33,9 @@ sync_tree() {
   local source="$1"
   local target="$2"
   local apply="$3"
+  local preserve_plugin_data="${4:-no}"
   local args=(-a --delete --itemize-changes)
+  [[ "$preserve_plugin_data" == "yes" ]] && args+=(--exclude=data.json)
   [[ "$apply" != "yes" ]] && args+=(-n)
   rsync "${args[@]}" "$source/" "$target/"
 }
@@ -51,7 +53,7 @@ deploy_to() {
   local apply="$2"
   [[ -d "$target" ]] || { echo "Vault not found: $target" >&2; exit 1; }
   echo "System deployment to: $target (apply=$apply)"
-  sync_tree "$SYSTEM_ROOT/plugin/castlex-dashboard" "$target/.obsidian/plugins/castlex-dashboard" "$apply"
+  sync_tree "$SYSTEM_ROOT/plugin/castlex-dashboard" "$target/.obsidian/plugins/castlex-dashboard" "$apply" yes
   sync_tree "$SYSTEM_ROOT/templates" "$target/90_System/Templates" "$apply"
   sync_tree "$SYSTEM_ROOT/schemas" "$target/90_System/Schemas" "$apply"
   sync_assets "$target" "$apply"
@@ -74,4 +76,3 @@ case "$mode" in
     "$SCRIPT_DIR/verify-system.sh" --with-icloud
     ;;
 esac
-

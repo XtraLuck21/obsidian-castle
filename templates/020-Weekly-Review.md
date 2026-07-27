@@ -29,7 +29,7 @@ cssclasses:
 ## AI Weekly Summary
 
 > [!ai-summary]+ AI · Weekly Summary
-> **Generated:** —  
+> **Generated:** —
 > **Sources:** 本周七篇 Daily Notes  
 > **Rule:** 最多三条；综合本周主线、模式与变化，不逐日复述。只陈述有证据的事实，推断必须标注为推断。
 >
@@ -43,6 +43,21 @@ cssclasses:
 > **Rule:** 最多两条；没有可靠基线时明确说明，不制造趋势。
 >
 > 尚未生成。
+
+## AI Cross-Domain Review
+
+> [!ai-analysis]+ AI · Evidence Across Daily Notes
+> **Generated:** —
+> **Sources:** 本周与上周 Daily Note YAML、Time & Task Log、Completed Today、Open Loops、Raw Notes；本人 Weekly Reflection
+> **Rule:** 选择 4–6 个本周真正重要的维度，交叉比较时间、具体行为、主观体验和实际产出。必须区分直接工作与规划/系统建设、投入时间与完成结果、单次状态评分与全天情绪；指出正在进步、进程缓慢和应进入下周 Priority 的事项，不为填满表格制造结论。
+>
+> | Dimension | Daily evidence | Current reading | Higher-value next step |
+> |---|---|---|---|
+> | — | — | — | — |
+>
+> - **正在进步：**—
+> - **进程缓慢：**—
+> - **下周优先：**—
 
 ## AI Navigation Advice
 
