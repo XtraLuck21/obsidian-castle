@@ -674,7 +674,7 @@ function healthRecommendation(frontmatter, plannedWorkout, now = new Date()) {
   const soreFor = (workoutId) => hasSoreness && (
     (workoutId === "legs" && ["legs", "lower_back"].some((item) => regions.has(item)))
     || (workoutId === "back" && ["shoulders", "upper_back", "lower_back", "arms"].some((item) => regions.has(item)))
-    || (workoutId === "upper" && ["shoulders", "upper_back", "arms"].some((item) => regions.has(item)))
+    || (workoutId === "upper" && ["shoulders", "upper_back", "chest", "arms"].some((item) => regions.has(item)))
   );
   const preference = String(frontmatter.health_afternoon_preference || "none");
   const reasons = [];
@@ -997,13 +997,37 @@ function renderDailyStatus(frontmatter, container, onSelect) {
   let host = container;
   if (definition.model === "navigation-v1") {
     host = container.createDiv({ cls: "cx-daily-navigation" });
-    const start = host.createDiv({ cls: `cx-navigation-daily-start${frontmatter.voyage_started_at ? " is-started" : ""}` });
-    const boat = start.createSpan({ cls: "cx-navigation-daily-boat", attr: { "aria-hidden": "true" } });
+    const startedAt = String(frontmatter.voyage_started_at ?? "");
+    const endedAt = String(frontmatter.voyage_ended_at ?? "");
+    const startTime = startedAt.match(/T(\d{2}:\d{2})/)?.[1] ?? null;
+    const endTime = endedAt.match(/T(\d{2}:\d{2})/)?.[1] ?? null;
+    const dayOffset = endedAt ? calendarDayDifference(frontmatter.date, endedAt) : null;
+    const ticket = host.createDiv({
+      cls: `cx-navigation-voyage-ticket${startTime ? " is-started" : ""}${endTime ? " is-ended" : ""}`,
+    });
+
+    const departure = ticket.createDiv({ cls: "cx-navigation-voyage-stop is-departure" });
+    departure.createSpan({ text: "今日起航", cls: "cx-navigation-voyage-label" });
+    departure.createSpan({ text: startTime ?? "尚未启航", cls: "cx-navigation-voyage-time" });
+
+    const route = ticket.createDiv({ cls: "cx-navigation-voyage-route", attr: { "aria-hidden": "true" } });
+    const routeMark = route.createDiv({ cls: "cx-navigation-voyage-mark" });
+    const boat = routeMark.createSpan({ cls: "cx-navigation-voyage-boat" });
     setIcon(boat, "sailboat");
-    const copy = start.createDiv({ cls: "cx-navigation-daily-copy" });
-    copy.createSpan({ text: "今日起航", cls: "cx-navigation-daily-label" });
-    const match = String(frontmatter.voyage_started_at ?? "").match(/T(\d{2}:\d{2})/);
-    copy.createSpan({ text: match?.[1] ?? "尚未启航", cls: "cx-navigation-daily-time" });
+    routeMark.createSpan({ text: "航行" });
+    route.createSpan({ cls: "cx-navigation-voyage-line" });
+
+    const arrival = ticket.createDiv({ cls: "cx-navigation-voyage-stop is-arrival" });
+    arrival.createSpan({ text: "今日收帆", cls: "cx-navigation-voyage-label" });
+    const arrivalTime = arrival.createSpan({ cls: "cx-navigation-voyage-time" });
+    arrivalTime.createSpan({ text: endTime ?? (startTime ? "航行中" : "尚未收帆") });
+    if (endTime && dayOffset !== null && dayOffset > 0) {
+      arrivalTime.createEl("sup", {
+        text: `+${dayOffset}`,
+        cls: "cx-navigation-voyage-day-offset",
+        attr: { "aria-label": `次日加 ${dayOffset}` },
+      });
+    }
   }
   const wrap = host.createDiv({ cls: "cx-daily-status" });
   const presentation = stateStatusPresentation(frontmatter);
@@ -1098,6 +1122,15 @@ const TRACKER_PHASES = [
   { id: "debugging", label: "Debugging" },
 ];
 
+function trackerPhaseTrackingEnabled(timer) {
+  if (!timer) return false;
+  if (timer.phase_tracking === true) return true;
+  if (TRACKER_PHASES.some(({ id }) => id === timer.phase)) return true;
+  const stored = timer.phase_seconds;
+  return Boolean(stored && typeof stored === "object" && !Array.isArray(stored)
+    && TRACKER_PHASES.some(({ id }) => Object.prototype.hasOwnProperty.call(stored, id)));
+}
+
 function trackerPhaseSeconds(timer, now = Date.now()) {
   const phases = {};
   const stored = timer?.phase_seconds;
@@ -1117,13 +1150,24 @@ function trackerPhaseSeconds(timer, now = Date.now()) {
 }
 
 function trackerTimerSnapshot(timer, now = Date.now()) {
-  const phases = trackerPhaseSeconds(timer, now);
+  const phaseTracking = trackerPhaseTrackingEnabled(timer);
+  const recordedPhases = trackerPhaseSeconds(timer, now);
+  const phases = phaseTracking
+    ? Object.fromEntries(TRACKER_PHASES.map(({ id }) => [id, Math.max(0, Number(recordedPhases[id]) || 0)]))
+    : {};
   return {
     active_seconds: Math.max(0, trackerTimerSeconds(timer, now)),
-    phase_seconds: Object.fromEntries(
-      Object.entries(phases).map(([phase, seconds]) => [phase, Math.max(0, seconds)]),
-    ),
+    phase_tracking: phaseTracking,
+    phase_seconds: phases,
   };
+}
+
+function trackerUnclassifiedSeconds(timer, now = Date.now()) {
+  if (!trackerPhaseTrackingEnabled(timer)) return null;
+  const total = Math.max(0, trackerTimerSeconds(timer, now));
+  const classified = Object.values(trackerPhaseSeconds(timer, now))
+    .reduce((sum, seconds) => sum + Math.max(0, Number(seconds) || 0), 0);
+  return Math.max(0, total - classified);
 }
 
 function trackerEventId() {
@@ -1167,6 +1211,7 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
     this.timerMeta = null;
     this.phaseDisplays = new Map();
     this.phaseStatus = null;
+    this.phaseUnclassifiedDisplay = null;
     this.hintLevel = "";
     this.userNote = "";
     this.savingSession = false;
@@ -1421,6 +1466,7 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
     this.timerRing = ring;
     this.phaseDisplays = new Map();
     this.phaseStatus = null;
+    this.phaseUnclassifiedDisplay = null;
     const inner = ring.createDiv({ cls: "cx-lc-timer-inner" });
     this.timerDisplay = inner.createDiv({ cls: "cx-lc-clock", text: "00:00:00" });
     this.timerMeta = inner.createDiv({ cls: "cx-lc-clock-meta", text: "Ready to begin" });
@@ -1461,16 +1507,21 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
   }
 
   renderPhaseSelector(parent, timer) {
+    const phaseTracking = trackerPhaseTrackingEnabled(timer);
     const panel = parent.createDiv({ cls: "cx-lc-phase-panel" });
     const heading = panel.createDiv({ cls: "cx-lc-phase-heading" });
     heading.createSpan({ text: "Optional phase" });
     this.phaseStatus = heading.createSpan({
       cls: "cx-lc-phase-status",
-      text: timer.phase ? `Tracking ${trackerPatternLabel(timer.phase)}` : "Total only",
+      text: timer.phase
+        ? `Tracking ${trackerPatternLabel(timer.phase)}`
+        : phaseTracking ? "Breakdown on · no active phase" : "Not recorded",
     });
     panel.createDiv({
       cls: "cx-lc-phase-help",
-      text: "Choose only when useful. Tap the active phase again to return to Total only.",
+      text: phaseTracking
+        ? "Switch phases as you work. Tap the active phase again to leave time unclassified."
+        : "Choose a phase to start the breakdown. Until then, only Total is recorded.",
     });
     const choices = panel.createDiv({ cls: "cx-lc-phase-choices" });
     const phaseSeconds = trackerPhaseSeconds(timer);
@@ -1485,10 +1536,16 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
       button.createSpan({ cls: "cx-lc-phase-label", text: label });
       const display = button.createSpan({
         cls: "cx-lc-phase-time",
-        text: Object.prototype.hasOwnProperty.call(phaseSeconds, id) ? trackerClock(phaseSeconds[id]) : "N/A",
+        text: phaseTracking ? trackerClock(phaseSeconds[id] || 0) : "N/A",
       });
       this.phaseDisplays.set(id, display);
       button.addEventListener("click", () => this.selectPhase(timer.phase === id ? null : id));
+    });
+    const coverage = panel.createDiv({ cls: `cx-lc-phase-coverage${phaseTracking ? "" : " is-hidden"}` });
+    coverage.createSpan({ text: "Unclassified" });
+    this.phaseUnclassifiedDisplay = coverage.createSpan({
+      cls: "cx-lc-phase-unclassified-time",
+      text: phaseTracking ? trackerClock(trackerUnclassifiedSeconds(timer) || 0) : "N/A",
     });
   }
 
@@ -1594,11 +1651,20 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
       const phases = event.phase_seconds && typeof event.phase_seconds === "object"
         ? event.phase_seconds
         : {};
+      const hasBreakdown = Object.keys(phases).length > 0;
       const phaseLine = main.createDiv({ cls: "cx-lc-session-phases" });
       TRACKER_PHASES.forEach(({ id, label }) => {
         const hasValue = Object.prototype.hasOwnProperty.call(phases, id);
         phaseLine.createSpan({ text: `${label} ${hasValue ? trackerDuration(phases[id]) : "N/A"}` });
       });
+      if (hasBreakdown) {
+        const classified = Object.values(phases)
+          .reduce((sum, seconds) => sum + Math.max(0, Number(seconds) || 0), 0);
+        const unclassified = event.schema_version >= 3 && Number.isFinite(Number(event.unclassified_seconds))
+          ? Math.max(0, Number(event.unclassified_seconds))
+          : Math.max(0, Number(event.active_seconds || 0) - classified);
+        phaseLine.createSpan({ cls: "is-unclassified", text: `Unclassified ${trackerDuration(unclassified)}` });
+      }
       if (event.user_note) main.createDiv({ cls: "cx-lc-session-note", text: event.user_note });
     });
   }
@@ -1647,6 +1713,7 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
       running_since: now,
       active_seconds: 0,
       phase: null,
+      phase_tracking: false,
       phase_seconds: {},
       status: "running",
     });
@@ -1682,13 +1749,17 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
     const timer = this.timer();
     if (!timer || (phase !== null && !TRACKER_PHASES.some(({ id }) => id === phase))) return;
     const snapshot = trackerTimerSnapshot(timer);
-    if (phase && !Object.prototype.hasOwnProperty.call(snapshot.phase_seconds, phase)) {
-      snapshot.phase_seconds[phase] = 0;
+    const phaseTracking = snapshot.phase_tracking || Boolean(phase);
+    if (phaseTracking) {
+      TRACKER_PHASES.forEach(({ id }) => {
+        if (!Object.prototype.hasOwnProperty.call(snapshot.phase_seconds, id)) snapshot.phase_seconds[id] = 0;
+      });
     }
     await this.plugin.setLeetcodeTimer(this.timerKey(), {
       ...timer,
       ...snapshot,
       phase,
+      phase_tracking: phaseTracking,
       running_since: timer.status === "running" ? new Date().toISOString() : null,
     });
     this.renderTracker();
@@ -1713,7 +1784,7 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
       }
       const snapshot = trackerTimerSnapshot(timer);
       const event = {
-        schema_version: 2,
+        schema_version: 3,
         event_id: eventId,
         event_type: "session_completed",
         task_id: timer.task_id,
@@ -1723,10 +1794,14 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
         completion_status: completionStatus,
         obsidian_note_path: this.file.path,
       };
-      if (Object.keys(snapshot.phase_seconds).length) {
-        event.phase_seconds = Object.fromEntries(
-          Object.entries(snapshot.phase_seconds).map(([phase, seconds]) => [phase, Math.max(0, Math.floor(seconds))]),
-        );
+      if (snapshot.phase_tracking) {
+        event.phase_seconds = Object.fromEntries(TRACKER_PHASES.map(({ id }) => [
+          id,
+          Math.max(0, Math.floor(snapshot.phase_seconds[id] || 0)),
+        ]));
+        const classifiedSeconds = Object.values(event.phase_seconds)
+          .reduce((sum, seconds) => sum + seconds, 0);
+        event.unclassified_seconds = Math.max(0, event.active_seconds - classifiedSeconds);
       }
       if (this.hintLevel) event.hint_level = this.hintLevel;
       const note = this.userNote.trim().slice(0, 500);
@@ -1760,20 +1835,30 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
     if (!timer || timer.task_id !== task?.task_id) {
       this.timerMeta.setText("Ready to begin");
     } else if (timer.status === "paused") {
-      this.timerMeta.setText(`Paused · ${timer.phase ? trackerPatternLabel(timer.phase) : "Total only"}`);
+      this.timerMeta.setText(`Paused · ${timer.phase
+        ? trackerPatternLabel(timer.phase)
+        : trackerPhaseTrackingEnabled(timer) ? "Unclassified" : "Total only"}`);
     } else if (seconds >= expectedSeconds) {
       this.timerMeta.setText(`Reached the ${task.expected_active_minutes}m check-in point`);
     } else {
-      this.timerMeta.setText(`Active · ${timer.phase ? trackerPatternLabel(timer.phase) : "Total only"}`);
+      this.timerMeta.setText(`Active · ${timer.phase
+        ? trackerPatternLabel(timer.phase)
+        : trackerPhaseTrackingEnabled(timer) ? "Unclassified" : "Total only"}`);
     }
     if (timer?.task_id === task?.task_id) {
       const phaseSeconds = trackerPhaseSeconds(timer);
+      const phaseTracking = trackerPhaseTrackingEnabled(timer);
       TRACKER_PHASES.forEach(({ id }) => {
         const display = this.phaseDisplays.get(id);
         if (!display) return;
-        display.setText(Object.prototype.hasOwnProperty.call(phaseSeconds, id) ? trackerClock(phaseSeconds[id]) : "N/A");
+        display.setText(phaseTracking ? trackerClock(phaseSeconds[id] || 0) : "N/A");
       });
-      this.phaseStatus?.setText(timer.phase ? `Tracking ${trackerPatternLabel(timer.phase)}` : "Total only");
+      this.phaseStatus?.setText(timer.phase
+        ? `Tracking ${trackerPatternLabel(timer.phase)}`
+        : phaseTracking ? "Breakdown on · no active phase" : "Not recorded");
+      if (this.phaseUnclassifiedDisplay && phaseTracking) {
+        this.phaseUnclassifiedDisplay.setText(trackerClock(trackerUnclassifiedSeconds(timer) || 0));
+      }
     }
   }
 }
@@ -3737,7 +3822,7 @@ class CastleXHealthView extends ItemView {
     ]);
     this.renderMultiChoice(fields, file, frontmatter, "health_morning_regions", "身体哪里需要被看见", [
       ["shoulders", "肩颈"], ["upper_back", "上背"], ["lower_back", "下背"], ["arms", "手臂"],
-      ["legs", "腿部"], ["whole_body", "全身"], ["none", "无明显不适"],
+      ["chest", "胸部"], ["legs", "腿部"], ["whole_body", "全身"], ["none", "无明显不适"],
     ]);
     this.renderMultiChoice(fields, file, frontmatter, "health_morning_discomfort", "身体感受", [
       ["none", "没有不适"], ["tightness", "紧绷"], ["soreness", "训练酸痛"],
@@ -3758,7 +3843,7 @@ class CastleXHealthView extends ItemView {
     ]);
     this.renderMultiChoice(fields, file, frontmatter, "health_afternoon_regions", "现在仍有感觉的部位", [
       ["shoulders", "肩颈"], ["upper_back", "上背"], ["lower_back", "下背"], ["arms", "手臂"],
-      ["legs", "腿部"], ["whole_body", "全身"], ["none", "无明显不适"],
+      ["chest", "胸部"], ["legs", "腿部"], ["whole_body", "全身"], ["none", "无明显不适"],
     ]);
     this.renderMultiChoice(fields, file, frontmatter, "health_afternoon_discomfort", "当前身体感受", [
       ["none", "没有不适"], ["tightness", "紧绷"], ["soreness", "训练酸痛"],
@@ -4668,10 +4753,21 @@ class CastleXMentalView extends ItemView {
     });
     this.clockEl = copy.createDiv({ cls: "cx-mental-clock" });
     this.updateClock();
-    copy.createEl("p", {
-      text: `正在收束 ${targetISO.slice(5).replace("-", "月")}日航程`,
-      cls: "cx-mental-voyage-date",
-    });
+    const voyageLabel = `${targetDate.getMonth() + 1}月${targetDate.getDate()}日航程`;
+    const startedAt = String(frontmatter.voyage_started_at || "");
+    const endedAt = String(frontmatter.voyage_ended_at || "");
+    if (startedAt) {
+      copy.createEl("p", {
+        text: endedAt ? voyageLabel : `正在收束 ${voyageLabel}`,
+        cls: "cx-mental-voyage-date",
+      });
+      if (endedAt) {
+        copy.createDiv({
+          text: `已于 ${endedAt.slice(11, 16)} 结束今日航程`,
+          cls: "cx-mental-ended-status",
+        });
+      }
+    }
     copy.createDiv({ text: "用舍由时，行藏在我。", cls: "cx-mental-signature" });
     const actions = hero.createDiv({ cls: "cx-hero-actions cx-dashboard-hero-actions" });
     const daily = actions.createEl("button", { text: "今日 Daily", cls: "cx-button" });
@@ -4684,9 +4780,8 @@ class CastleXMentalView extends ItemView {
     health.addEventListener("click", () => this.plugin.activateHealthView());
     const home = actions.createEl("button", { text: "CastleX Home", cls: "cx-button cx-button-primary" });
     home.addEventListener("click", () => this.plugin.activateView());
-    if (frontmatter.voyage_ended_at) {
+    if (endedAt) {
       hero.addClass("is-ended");
-      hero.createDiv({ text: `已于 ${String(frontmatter.voyage_ended_at).slice(11, 16)} 结束今日航程`, cls: "cx-mental-ended-badge" });
     }
   }
 
@@ -4993,7 +5088,7 @@ class CastleXMentalView extends ItemView {
     }
     let targetPage = this.targetOverrideISO
       ? pages.find((page) => isoDateValue(page.frontmatter.date) === this.targetOverrideISO)
-      : lifecycle.active || lifecycle.today;
+      : lifecycle.active || lifecycle.latestEnded || lifecycle.today;
     if (!targetPage) {
       const todayFile = await this.ensureDaily(now);
       if (!(todayFile instanceof TFile)) {
@@ -5007,7 +5102,6 @@ class CastleXMentalView extends ItemView {
       targetPage = { file: targetPage.file, frontmatter: await freshFrontmatter(this.app, targetPage.file) };
     }
     const targetISO = isoDateValue(targetPage.frontmatter.date) || this.currentDateISO;
-    this.targetOverrideISO = targetISO;
     const dashboard = this.createCanvas();
     this.renderHeader(dashboard, targetISO, targetPage.frontmatter);
     this.renderMetrics(dashboard, targetPage.file, targetPage.frontmatter);

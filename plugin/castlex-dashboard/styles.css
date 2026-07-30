@@ -423,32 +423,91 @@ body.theme-dark {
 .daily-voyage .inline-title { display: none !important; }
 
 .cx-daily-navigation { margin: 8px 0 22px; }
-.cx-navigation-daily-start {
+.cx-navigation-voyage-ticket {
   align-items: center;
   background: linear-gradient(145deg, rgba(255,255,255,.04), rgba(255,255,255,.012)), rgba(20,31,42,.42);
   border: 1px solid rgba(225,235,239,.12);
   border-radius: 16px;
-  display: flex;
-  gap: 12px;
-  min-height: 72px;
-  padding: 12px 16px;
+  display: grid;
+  gap: clamp(10px, 2.5vw, 28px);
+  grid-template-columns: minmax(88px, 1fr) minmax(110px, 1.35fr) minmax(88px, 1fr);
+  min-height: 86px;
+  overflow: hidden;
+  padding: 13px clamp(15px, 3vw, 28px);
+  position: relative;
 }
-.cx-navigation-daily-boat {
+.cx-navigation-voyage-stop {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.cx-navigation-voyage-stop.is-arrival { align-items: flex-end; text-align: right; }
+.cx-navigation-voyage-label {
+  color: rgba(231,241,243,.54);
+  font-size: .52rem;
+  letter-spacing: .04em;
+}
+.cx-navigation-voyage-time {
+  align-items: flex-start;
+  color: #eef4f4;
+  display: inline-flex;
+  font-size: 1.18rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 680;
+  gap: 2px;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.cx-navigation-voyage-day-offset {
+  color: #b9d4dd;
+  font-size: .48rem;
+  font-weight: 750;
+  line-height: 1;
+  margin-left: 1px;
+  position: relative;
+  top: -.12em;
+}
+.cx-navigation-voyage-route {
   align-items: center;
-  background: rgba(104, 160, 184, .12);
-  border: 1px solid rgba(154, 196, 213, .18);
-  border-radius: 50%;
-  color: rgba(214, 235, 241, .78);
   display: flex;
-  height: 42px;
+  flex-direction: column;
+  gap: 5px;
   justify-content: center;
-  width: 42px;
+  min-width: 0;
 }
-.cx-navigation-daily-start.is-started .cx-navigation-daily-boat { color: #dcecef; }
-.cx-navigation-daily-boat svg { height: 22px; width: 22px; }
-.cx-navigation-daily-copy { display: flex; flex-direction: column; gap: 2px; }
-.cx-navigation-daily-label { color: rgba(231,241,243,.58); font-size: .54rem; }
-.cx-navigation-daily-time { color: #eef4f4; font-size: 1.14rem; font-variant-numeric: tabular-nums; font-weight: 680; }
+.cx-navigation-voyage-mark {
+  align-items: center;
+  color: rgba(214, 235, 241, .48);
+  display: flex;
+  font-size: .48rem;
+  font-weight: 650;
+  gap: 5px;
+  letter-spacing: .08em;
+}
+.cx-navigation-voyage-boat { display: inline-flex; }
+.cx-navigation-voyage-boat svg { height: 15px; width: 15px; }
+.cx-navigation-voyage-line {
+  background: linear-gradient(90deg, rgba(151,187,200,.2), rgba(191,216,224,.62));
+  display: block;
+  height: 1px;
+  position: relative;
+  width: 100%;
+}
+.cx-navigation-voyage-line::after {
+  border-bottom: 3px solid transparent;
+  border-left: 6px solid rgba(191,216,224,.62);
+  border-top: 3px solid transparent;
+  content: "";
+  position: absolute;
+  right: -1px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.cx-navigation-voyage-ticket.is-started .cx-navigation-voyage-mark { color: rgba(220,238,242,.78); }
+.cx-navigation-voyage-ticket.is-ended .cx-navigation-voyage-line {
+  background: linear-gradient(90deg, rgba(151,187,200,.34), rgba(218,229,229,.78));
+}
 .cx-daily-navigation > .cx-daily-status { margin: 8px 0 0; }
 
 .cx-daily-status {
@@ -645,6 +704,15 @@ body.theme-dark {
 }
 
 @media (max-width: 520px) {
+  .cx-navigation-voyage-ticket {
+    gap: 9px;
+    grid-template-columns: minmax(72px,1fr) minmax(70px,.8fr) minmax(72px,1fr);
+    min-height: 78px;
+    padding: 11px 12px;
+  }
+  .cx-navigation-voyage-time { font-size: 1rem; }
+  .cx-navigation-voyage-mark { font-size: .44rem; gap: 3px; }
+  .cx-navigation-voyage-boat svg { height: 13px; width: 13px; }
   .cx-daily-status-meta { align-items: flex-start; flex-direction: column; gap: 5px; }
   .cx-daily-status-detail { text-align: left; white-space: normal; }
   .cx-time-editor { grid-template-columns: 1fr; }
@@ -1450,16 +1518,11 @@ body.theme-dark {
   font-weight: 650;
   letter-spacing: .08em;
 }
-.cx-mental-ended-badge {
-  background: rgba(184, 145, 93, .16);
-  border: 1px solid rgba(226, 193, 148, .2);
-  border-radius: 999px;
-  bottom: 20px;
+.cx-mental-ended-status {
   color: rgba(244, 226, 201, .82);
   font-size: .58rem;
-  padding: 6px 10px;
-  position: absolute;
-  right: 28px;
+  line-height: 1.35;
+  margin-top: 3px;
 }
 .cx-mental-metrics-section { padding: clamp(15px, 1.6vw, 23px); }
 .cx-mental-metrics {
@@ -1876,7 +1939,7 @@ body.theme-dark {
   padding: 11px;
 }
 .cx-lc-phase-heading { align-items: center; display: flex; gap: 10px; justify-content: space-between; }
-.cx-lc-phase-heading > span:first-child { color: rgba(230, 239, 243, .8); font-size: .59rem; font-weight: 680; }
+.cx-lc-phase-heading > span:first-child { color: rgba(238, 245, 248, .92); font-size: .68rem; font-weight: 720; }
 .cx-lc-phase-status {
   color: rgba(183, 211, 225, .62);
   font-size: .5rem;
@@ -1885,7 +1948,7 @@ body.theme-dark {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.cx-lc-phase-help { color: rgba(195, 215, 225, .42); font-size: .48rem; line-height: 1.45; margin: 4px 0 9px; }
+.cx-lc-phase-help { color: rgba(203, 221, 230, .56); font-size: .52rem; line-height: 1.5; margin: 5px 0 10px; }
 .cx-lc-phase-choices { display: grid; gap: 6px; grid-template-columns: repeat(3,minmax(0,1fr)); }
 .cx-lc-phase-button {
   align-items: center;
@@ -1897,9 +1960,15 @@ body.theme-dark {
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 6px;
+  height: auto !important;
+  justify-content: center;
+  line-height: 1.2;
+  min-height: 64px;
   min-width: 0;
-  padding: 8px 5px 7px;
+  overflow: visible;
+  padding: 10px 7px 9px;
+  position: relative;
 }
 .cx-lc-phase-button:hover { background: rgba(255,255,255,.075); color: #edf4f6; }
 .cx-lc-phase-button.is-active {
@@ -1908,9 +1977,31 @@ body.theme-dark {
   box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
   color: #f3f7f8;
 }
-.cx-lc-phase-label { font-size: .49rem; font-weight: 680; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; }
-.cx-lc-phase-time { color: rgba(196, 218, 229, .55); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .48rem; }
+.cx-lc-phase-label {
+  color: rgba(235, 243, 246, .9);
+  display: block;
+  font-size: .6rem;
+  font-weight: 720;
+  line-height: 1.2;
+  overflow: visible;
+  text-align: center;
+  white-space: nowrap;
+  width: 100%;
+}
+.cx-lc-phase-time { color: rgba(196, 218, 229, .62); display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .54rem; line-height: 1.2; }
 .cx-lc-phase-button.is-active .cx-lc-phase-time { color: rgba(230, 240, 244, .82); }
+.cx-lc-phase-coverage {
+  align-items: center;
+  border-top: 1px solid rgba(181, 208, 222, .09);
+  color: rgba(199, 219, 229, .56);
+  display: flex;
+  font-size: .51rem;
+  justify-content: space-between;
+  margin-top: 9px;
+  padding: 8px 2px 0;
+}
+.cx-lc-phase-coverage.is-hidden { display: none; }
+.cx-lc-phase-unclassified-time { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .cx-lc-button, .cx-lc-row-button {
   appearance: none;
   background: rgba(255,255,255,.055);
@@ -2071,6 +2162,18 @@ body.theme-dark {
   .cx-health-summary-grid { grid-template-columns: 1fr; }
   .cx-health-hero,
   .cx-mental-hero { align-items: stretch; flex-direction: column; gap: 18px; }
+  .cx-health-hero-copy,
+  .cx-mental-hero-copy {
+    align-items: flex-start;
+    align-self: stretch;
+    text-align: left;
+    width: 100%;
+  }
+  .cx-health-hero-copy > *,
+  .cx-mental-hero-copy > * {
+    align-self: flex-start;
+    text-align: left;
+  }
   .cx-health-hero .cx-dashboard-hero-actions,
   .cx-mental-hero .cx-dashboard-hero-actions { min-width: 0; width: 100%; }
   .cx-mental-metric {

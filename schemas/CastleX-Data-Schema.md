@@ -116,8 +116,8 @@ after that date remains missing. The UI tabs remain `Energy` and `Sleep`.
 
 Navigation v1 Daily Notes contain, in order:
 
-1. `Daily Navigation`, beginning with the exact voyage start time and followed
-   by the six Navigation dimensions
+1. `Daily Navigation`, beginning with a derived voyage ticket containing the
+   exact start and end times, followed by the six Navigation dimensions
 2. Editable `Time Allocation`
 3. `Time & Task Log` as a source-backed chronological list extracted from Raw
    Notes for Daily Notes dated 2026-07-26 or later
@@ -132,6 +132,12 @@ Navigation v1 Daily Notes contain, in order:
 
 Daily Notes do not contain task checkboxes or a Timeline. Project tasks exist
 only in Project notes. All four synthesis sections use flat bullet lists.
+
+The voyage ticket reads `voyage_started_at` and `voyage_ended_at` without
+writing derived values. Its center shows a static sailing arrow. When the end
+timestamp falls one or more natural dates after the Daily `date`, the arrival
+time displays a superscript `+N`; for example, a July 26 voyage ending at 00:54
+on July 27 displays `00:54` with `+1`.
 `Today’s Wins` must not repeat the accomplishment list: it recognizes how the
 day was handled, while `Completed Today` records what was finished. AI must not
 invent an Open Loop or Backlog item when the source provides no evidence.
@@ -348,6 +354,11 @@ health_evening_body_note:
 health_evening_completed_at:
 ```
 
+`health_morning_regions` and `health_afternoon_regions` accept `chest` in
+addition to the existing shoulder, back, arm, leg, whole-body, and none values.
+When paired with soreness, `chest` is treated as relevant to Upper-body
+training recommendations.
+
 Sleep State belongs to the natural calendar date on which the entry begins. For
 example, an entry opened at 23:50 on July 24 remains in the July 24 Daily if the
 user presses `关灯` after midnight. An entry first opened at 00:08 on July 25
@@ -420,6 +431,12 @@ an animation or rebuilding the full background. Holding `结束今日航程` rec
 `mental_evening_completed_at` and `voyage_ended_at`; afterward the view links to
 Health's 夜间 stage. Unlike Mental, Health does not follow voyage ownership
 across midnight.
+
+Mental target selection prefers one open voyage, then the most recently ended
+voyage within 24 hours, and only then the current-date Daily. This keeps a
+completed reflection visible after closure. The Header renders `正在收束` only
+when the selected Daily contains `voyage_started_at` without `voyage_ended_at`;
+a selected Daily that has never started a voyage has no voyage-status line.
 
 ### Deterministic workout recommendation
 
@@ -677,15 +694,25 @@ The LeetCode repository owns plan order, test evidence, mastery, and review
 scheduling through the Bridge `to_obsidian/` files. The Project tracker owns
 only execution sessions. Start is clicked when the problem is first read.
 Pause and Resume persist local timer state in plugin data. Finish appends
-exactly one schema-v2 `session_completed` event to
+exactly one schema-v3 `session_completed` event to
 `from_obsidian/session_events.jsonl`; it never writes Daily Note time fields.
 
 Total active time always accumulates while the session is running. After Start,
 the user may optionally classify time as `thinking`, `implementation`, or
-`debugging`. Only a selected phase accumulates classified seconds. Missing
-phase keys render as `N/A`, not zero, and unclassified time remains included in
-Total. Selecting a different phase changes classification without interrupting
-Total; tapping the active phase again returns to Total-only timing.
+`debugging`. Before the first phase selection, all three values render as
+`N/A`, meaning that no phase breakdown was recorded. The first phase selection
+enables the breakdown and initializes all three values to zero. From then on,
+an unused phase remains an intentional `0`, while the selected phase
+accumulates classified seconds. Selecting a different phase changes
+classification without interrupting Total; tapping the active phase again
+records subsequent time as Unclassified. Once enabled, a breakdown does not
+return to the `N/A` state during that Session.
+
+Schema-v3 events omit both `phase_seconds` and `unclassified_seconds` when no
+phase was ever selected. When phase tracking was enabled, `phase_seconds`
+contains all three integer keys, including zero values, and
+`unclassified_seconds` stores the Total time not assigned to a phase. Existing
+schema-v2 events remain readable with their legacy partial-key semantics.
 
 `completion_status: completed` is clicked only after all tests pass and records
 the user's completion declaration. The coding repository remains the source of

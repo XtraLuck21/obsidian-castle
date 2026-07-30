@@ -36,6 +36,7 @@ committed to this repository.
 - Health records always belong to the current natural-date Daily; stage tabs reset at midnight instead of holding a prior-date Night entry
 - Health stages become recorded when all core answers are present or the explicit completion action is used; optional notes never block completion
 - Health Evening records whole-day appetite stability and Overall Energy; Morning and Sleep retain their own start/end rituals
+- Morning and Afternoon body-region choices include the chest; chest soreness participates in Upper-body recommendation safeguards
 - Deterministic live workout recommendations, manual override, rotation tracking, and set-level Workout Mode with a progress bar
 - Viewport-sized sticky background layer prevents long mobile dashboards from upscaling one image across the full scroll height
 - Persistent mobile ship-wheel button returns directly to CastleX Home from notes and other views
@@ -45,6 +46,7 @@ committed to this repository.
 - Same-device Daily creation is locked and Dashboard date queries prefer the canonical `YYYY-MM-DD.md` path over iCloud conflict copies
 - When a canonical Daily exists, device-local same-date conflict copies are moved into `99_Archive/Sync-Conflicts/<date>/` without deletion or automatic value merging
 - Desktop cards use a light background blur for contrast; mobile cards stay blur-free for sharp rendering
+- Health and Mental title content stays left-aligned on mobile while remaining vertically centered within its copy area
 - Deep-navy Obsidian color system for app chrome, notes, controls, and accents
 - Six-dimension start-of-voyage Navigation check-in stored in YAML
 - Full-card animated `开始航行` ritual beside the voyage streak, with a preserved Daily start timestamp
@@ -164,7 +166,11 @@ day. CastleX records the first complete time in `navigation_recorded_at`.
 Selecting `开始航行` stores `voyage_started_at`, plays a short launch animation,
 and then leaves only `航行中` on CastleX Home; it does not start a timer or
 qualify the day on its own. Mental Dashboard's `结束今日航程` stores
-`voyage_ended_at`. An open voyage is eligible for automatic evening continuation
+`voyage_ended_at`. Daily Navigation derives a boarding-pass-style route from
+those two timestamps: departure time, a static sailing arrow, and arrival time.
+An arrival on a later natural date carries a superscript `+N`, such as
+`14:48 → 00:54⁺¹`, without adding another YAML field. An open voyage is eligible
+for automatic evening continuation
 for 24 hours only; older unfinished voyages are disclosed but never treated as
 still sailing or chosen as a new Mental target. Entries
 completed later are shown as **休整日 · Retrospective**: their values remain in
@@ -185,7 +191,13 @@ Daily Note that owns the open voyage. If reflection occurs after midnight, the
 most recent single open voyage within 24 hours remains the target. Multiple
 recent open voyages require an explicit date selection. The final action links
 directly to Health's `夜间` stage; it does not perform the Health lights-out
-ritual. Its date-and-time header, responsive rainy-coast lighthouse background,
+ritual. After closure, the header replaces `正在收束` with the voyage date and
+places the unframed completion time directly below it in the left copy column.
+Until a new voyage starts, reopening Mental keeps the most recently completed
+voyage within 24 hours as its read-only context instead of switching to an empty
+current-date Daily. A Daily with no `voyage_started_at` shows no voyage-status
+line.
+Its date-and-time header, responsive rainy-coast lighthouse background,
 typeface, and glass cards use a dedicated warm dusk-brown and honey-gold palette.
 Five compact desktop columns each contain one contiguous five-petal star: the
 petals are directly selectable, accumulate to the chosen level, and merge into
