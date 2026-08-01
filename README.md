@@ -243,10 +243,12 @@ to five most important observations. `Completed Today` uses the shortest useful
 task or outcome wording and never repeats timestamps, clock ranges, dates, or
 durations from `Time & Task Log`.
 
-When Codex appends a bold inline label inside Raw Notes, two ASCII spaces
-separate the closing `**` from same-line text—for example
-`**时间补充：**  7 月 26 日凌晨约 01:30–03:00，我也在策划 Mental Dashboard，投入约 1.5 小时。`—
-so Obsidian does not extend the bold styling across the full line.
+Codex-generated Daily content uses plain Markdown text by default, including
+bullet titles, prefixes, labels, callout metadata, explanatory text, and
+Codex-appended Raw Notes. Codex does not add bold unless the user explicitly
+requests it or the user's own source writing already contains bold that must be
+preserved verbatim. This rule applies prospectively; existing Daily Notes are
+not rewritten.
 
 ### Projects
 

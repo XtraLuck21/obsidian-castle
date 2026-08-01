@@ -289,7 +289,11 @@ done
 rg -Fq '14:00–17:00 window · 1h engaged · System · Dashboard' "$template" "$schema" || fail "Daily task log missing mixed-window example"
 rg -Fq 'Do not create an `End-of-day Evidence` section.' "$schema" || fail "Schema does not prohibit End-of-day Evidence"
 rg -Fq '不得包含时间戳、日期、时段或投入时长' "$template" || fail "Completed Today does not prohibit task-log timing details"
-rg -Fq '**时间补充：**  7 月 26 日凌晨约 01:30–03:00' "$template" "$schema" || fail "Raw Notes bold-label spacing rule is missing"
+rg -Fq '不得为 bullet title、前缀、标签、callout 元数据或说明主动添加 Markdown 粗体' "$template" || fail "Daily template does not prohibit Codex-added bold styling"
+rg -Fq 'not add bold styling to bullet titles' "$schema" || fail "Daily Schema does not prohibit Codex-added bold styling"
+if rg -Fq '**时间补充：**' "$template" "$schema"; then
+  fail "Daily template or Schema still prescribes a bold Raw Notes label"
+fi
 if rg -q '^## (Decisions & Insights|AI Summary)$|^### (Project Contributions|Life & Admin)$' "$template"; then
   fail "Daily template contains a removed or nested synthesis section"
 fi

@@ -131,7 +131,8 @@ Navigation v1 Daily Notes contain, in order:
 10. `Raw Notes` at the end
 
 Daily Notes do not contain task checkboxes or a Timeline. Project tasks exist
-only in Project notes. All four synthesis sections use flat bullet lists.
+only in Project notes. All four synthesis sections use flat bullet lists and
+plain text.
 
 The voyage ticket reads `voyage_started_at` and `voyage_ended_at` without
 writing derived values. Its center shows a static sailing arrow. When the end
@@ -151,15 +152,20 @@ states only what was completed in the fewest useful words. It contains no
 timestamp, date, clock range, or duration and must not reproduce the
 chronological activity ledger.
 
-When Codex appends a bold inline label to `Raw Notes`, text on that same line
-begins after exactly two ASCII spaces following the closing `**`, for example:
+Codex-generated Daily Note content uses plain Markdown text by default. It must
+not add bold styling to bullet titles, prefixes, labels, callout metadata, or
+explanatory text. This applies to AI Time Allocation notes, `Time & Task Log`,
+`Today’s Wins`, `Completed Today`, `Open Loops`, `Backlog`, and Codex-appended
+`Raw Notes`. The only exceptions are an explicit user request for bold or
+verbatim preservation of bold already present in the user's own writing.
 
 ```text
-**时间补充：**  7 月 26 日凌晨约 01:30–03:00，我也在策划 Mental Dashboard，投入约 1.5 小时。
+时间补充：7 月 26 日凌晨约 01:30–03:00，我也在策划 Mental Dashboard，投入约 1.5 小时。
 ```
 
-This is a rendering rule for Obsidian and does not change the preserved source
-meaning or chronological append-only policy.
+This formatting rule is prospective. Existing Daily Notes are not rewritten to
+remove bold. User-authored formatting remains part of the preserved source and
+does not change the chronological append-only policy.
 
 Daily Notes do not contain an `AI Summary` or `Decisions & Insights` section.
 Cross-day AI synthesis belongs in the Weekly Review under `AI Weekly Summary`,
