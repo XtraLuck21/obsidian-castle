@@ -630,16 +630,24 @@ Workstream lifecycle is stored in the existing `status` field:
 
 ```yaml
 type: project
-status: active
-focus: true
-area: Learning
-priority: 1
+status: incubating
+focus: false
+area:
+priority:
 progress_sections:
-  Execution: 90
-  Retrospective: 10
+  Tasks: 100
+created: 2026-08-01
 started:
 target:
+origin:
 ```
+
+`created` records when the canonical Project note was established. It is note
+provenance only: it does not mean execution started, the Proposal received
+capacity, or Manager accepted a Commitment. `started` records the actual Project
+start and remains blank while that decision has not been made. `priority` and
+`target` likewise remain blank until Manager or the user commits them. File
+creation never fills those Commitment properties by inference.
 
 The five canonical values and capacity semantics are:
 
@@ -651,10 +659,36 @@ The five canonical values and capacity semantics are:
 | `paused` | Paused | Retains context and history but receives no current capacity until explicitly resumed. |
 | `closed` | Closed | Is ended and retained for history; it receives no current capacity. |
 
-New Project notes default to `incubating`, so creating a note does not silently
-create an Active Commitment. A Manager or the user changes the single `status`
-selection only when the lifecycle changes. There is no recurring lifecycle
-check-in or closure form.
+New Project notes default to `incubating` and `focus: false`, so creating a note
+does not silently create an Active Commitment or place proposed tasks in
+Upcoming Tasks. A user-authorized Domain Expert may establish this one canonical
+note directly under `30_Projects/`; no Proposal folder, duplicate intake note,
+copy, move, or later conversion is required. Note creation authorizes durable
+Proposal drafting, not portfolio capacity.
+
+While the Project remains Incubating, its Outcome, evidence, milestones, tasks,
+timeline, effort, risks, assumptions, and expectations are advisory. They stay
+in the canonical Project body so Manager can review and edit the same file.
+Manager or the user owns lifecycle, `focus`, committed `priority`, `started`,
+`target`, capacity, scope, effort, and expectations. A Manager or the user
+changes `status` only when the lifecycle decision changes. There is no recurring
+lifecycle check-in, Proposal database, or closure form.
+
+### Project creation provenance
+
+The Project creator sets the top-level `origin` explicitly:
+
+- `origin: human` means the initial Project content was human-authored.
+- `origin: ai` means a user-authorized AI Expert created the initial draft.
+- `origin: mixed` may be used after material human and AI contributions coexist.
+
+The canonical Template deliberately leaves `origin` blank because it cannot
+know who invoked it. An AI workflow must set `origin: ai` before saving and must
+record generation time and evidence sources in `AI Project Brief`; it must not
+silently retain or invent `origin: human`. AI-proposed priority, dates, effort,
+capacity, or expectations remain advisory body content until Manager or the
+user writes the accepted Commitment properties. Changing provenance does not by
+itself change lifecycle or authorize capacity.
 
 The Workstreams card groups every Project under one of the five lifecycle
 headings. `priority` controls order within a lifecycle group; lower numbers

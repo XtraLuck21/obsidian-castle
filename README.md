@@ -255,15 +255,16 @@ Project notes live under `30_Projects/` and use frontmatter to control state:
 ```yaml
 ---
 type: project
-status: active
-focus: true
-area: Example Area
-priority: 1
+status: incubating
+focus: false
+area:
+priority:
 progress_sections:
-  Execution: 90
-  Retrospective: 10
-started: 2099-01-01
-target: 2099-03-31
+  Tasks: 100
+created: 2099-01-01
+started:
+target:
+origin:
 ---
 ```
 
@@ -276,8 +277,22 @@ lifecycle states:
 - `paused`: intentionally suspended with history retained;
 - `closed`: ended and retained for history.
 
-New Project notes default to `incubating`; the Manager or user makes one
-lifecycle selection when the Workstream is accepted or later changes state.
+New Project notes default to `incubating` and `focus: false`. `created` records
+only when the canonical note was established; blank `started`, `target`, and
+`priority` mean that no start, target, or portfolio priority has been committed.
+A user-authorized Domain Expert may create the one canonical note directly under
+`30_Projects/` and draft evidence, outcome, milestones, tasks, timeline, effort,
+risks, and assumptions there. No Proposal folder or later copy is required.
+
+Creation is Proposal authorization, not capacity authorization. Expert planning
+remains advisory while the Project is Incubating. Manager or the user reviews
+and edits that same file, then owns lifecycle, `focus`, priority, committed
+dates, capacity, scope, effort, and expectations.
+
+The Template leaves `origin` blank for explicit attribution: a human creator
+sets `origin: human`; an AI Expert sets `origin: ai` and records generation time
+and evidence sources in `AI Project Brief`; materially mixed authorship may use
+`origin: mixed`. An AI workflow must never silently keep a false human origin.
 Upcoming Tasks are limited to `active` Projects with `focus: true`, grouped by
 selected Focus Project, and show the first three unchecked checkboxes from the
 Project's first unfinished `progress_sections` entry in file order, with `+n`

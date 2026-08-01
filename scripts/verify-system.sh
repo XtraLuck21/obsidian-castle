@@ -20,6 +20,7 @@ template="$SYSTEM_ROOT/templates/010-Daily-Dashboard.md"
 weekly_template="$SYSTEM_ROOT/templates/020-Weekly-Review.md"
 daily_example="$SYSTEM_ROOT/examples/Daily-Example.md"
 weekly_example="$SYSTEM_ROOT/examples/Weekly-Review-Example.md"
+project_example="$SYSTEM_ROOT/examples/Project-Example.md"
 schema="$SYSTEM_ROOT/schemas/CastleX-Data-Schema.md"
 manifest="$plugin/manifest.json"
 project_template="$SYSTEM_ROOT/templates/100-Project.md"
@@ -222,10 +223,26 @@ pass "Navigation and legacy timing and voyage eligibility rules"
 
 rg -q '^status: incubating$' "$project_template" || fail "Project template must default to non-committed Incubating"
 rg -q '^focus: false$' "$project_template" || fail "Project template missing focus default"
+rg -q '^priority:$' "$project_template" || fail "Project template must leave committed priority blank"
 rg -q '^progress_sections:$' "$project_template" || fail "Project template missing progress sections"
 rg -q '^  Tasks: 100$' "$project_template" || fail "Project template missing default Tasks weight"
+rg -Fqx 'created: {{date:YYYY-MM-DD}}' "$project_template" || fail "Project template missing note-creation date"
+rg -q '^started:$' "$project_template" || fail "Project template must leave actual start blank"
+rg -q '^target:$' "$project_template" || fail "Project template must leave committed target blank"
+rg -q '^origin:$' "$project_template" || fail "Project template must require explicit creator provenance"
+if rg -Fq 'started: {{date:' "$project_template"; then
+  fail "Project template still treats note creation as Project start"
+fi
+rg -Fq 'Incubating Proposal · Not a Commitment' "$project_template" || fail "Project template does not disclose Proposal state"
+rg -Fq 'An AI Expert must also complete Generated and Sources' "$project_template" || fail "Project template missing AI Expert provenance guidance"
+for section in '## Evidence & Sources' '## Timeline & Effort' '## Risks & Assumptions'; do
+  rg -Fq "$section" "$project_template" || fail "Project template missing Expert proposal section: $section"
+done
 rg -q '`focus`|focus:' "$schema" || fail "Schema missing Project focus field"
 rg -q '`progress_sections`|progress_sections:' "$schema" || fail "Schema missing Project progress sections"
+rg -Fq '`created` records when the canonical Project note was established' "$schema" || fail "Schema does not distinguish note creation from Project start"
+rg -Fq 'The canonical Template deliberately leaves `origin` blank' "$schema" || fail "Schema does not require explicit Project provenance"
+rg -Fq 'no Proposal folder, duplicate intake note' "$schema" || fail "Schema does not preserve one canonical Expert-created Project"
 rg -q 'Upcoming Tasks' "$schema" || fail "Schema missing Upcoming Tasks behavior"
 for state in active maintenance incubating paused closed; do
   rg -q "\`${state}\`" "$schema" || fail "Schema missing canonical Workstream state: $state"
@@ -325,7 +342,10 @@ fi
 if ! diff -u <(section_headings "$weekly_template") <(section_headings "$weekly_example"); then
   fail "Weekly example section order drifted from the canonical template"
 fi
-pass "Daily and Weekly examples match canonical template structure"
+if ! diff -u <(frontmatter_keys "$project_template") <(frontmatter_keys "$project_example"); then
+  fail "Project example top-level frontmatter keys drifted from the canonical template"
+fi
+pass "Daily, Weekly, and Project examples match canonical template structure"
 
 for script in "$SYSTEM_ROOT"/scripts/*.sh; do bash -n "$script"; done
 rg -Fq 'args+=(--exclude=data.json)' "$SYSTEM_ROOT/scripts/deploy-system.sh" || fail "System deployment does not preserve private plugin data.json"

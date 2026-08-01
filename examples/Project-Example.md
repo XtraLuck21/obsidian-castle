@@ -7,6 +7,7 @@ priority: 1
 progress_sections:
   Draft: 80
   Review: 20
+created: 2099-01-01
 started: 2099-01-01
 target: 2099-03-31
 origin: human
@@ -19,6 +20,10 @@ origin: human
 
 Publish a fictional ten-page field guide for testing CastleX project views.
 
+## Evidence & Sources
+
+- Fictional field notes created solely for public system testing.
+
 ## Draft
 
 - [x] Define the fictional structure
@@ -28,6 +33,15 @@ Publish a fictional ten-page field guide for testing CastleX project views.
 
 - [ ] Review the example layout 📅 2099-02-01
 - [ ] Publish the fictional guide
+
+## Timeline & Effort
+
+- Target: 2099-03-31
+- Expected effort: two fictional review passes
+
+## Risks & Assumptions
+
+- Assumes the fictional reviewer remains available.
 
 ## Progress Log
 
