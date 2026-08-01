@@ -13,6 +13,8 @@ origin: human
 ---
 # Example Project
 
+> Lifecycle: **Active** — this fictional example currently receives growth capacity.
+
 ## Outcome
 
 Publish a fictional ten-page field guide for testing CastleX project views.

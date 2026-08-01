@@ -623,9 +623,10 @@ Finishing a session updates total `workout_minutes`, keeps
 completion bullet summarizing all sessions under `Completed Today`. It never
 rewrites Raw Notes.
 
-## Project organization
+## Project and Workstream organization
 
-All Project notes live under `30_Projects/`. Status is controlled only by YAML:
+All Project notes live under `30_Projects/`. The canonical Manager-facing
+Workstream lifecycle is stored in the existing `status` field:
 
 ```yaml
 type: project
@@ -640,23 +641,55 @@ started:
 target:
 ```
 
-Allowed status values:
+The five canonical values and capacity semantics are:
 
-- `active`
-- `on-hold`
-- `completed`
-- `someday`
-- `cancelled`
+| `status` | Manager label | Capacity semantics |
+| --- | --- | --- |
+| `active` | Active | Receives deliberate growth capacity and may produce current tasks. |
+| `maintenance` | Maintenance | Receives only the minimum recurring capacity needed to preserve continuity; it is not growth work. |
+| `incubating` | Incubating | Remains exploratory or proposed and receives no default scheduled capacity. |
+| `paused` | Paused | Retains context and history but receives no current capacity until explicitly resumed. |
+| `closed` | Closed | Is ended and retained for history; it receives no current capacity. |
 
-Dashboard Active Projects includes every Project with `status: active`, whether
-focused or not. `priority` controls Project order; lower numbers appear first.
-Upcoming Tasks reads only active Projects with `focus: true`, groups tasks by
-Project, lets the user select the source Project, and displays only the first
-three unchecked Markdown checkboxes from the first unfinished section declared
-in `progress_sections`. A `+n` indicator shows how many unchecked items remain
-hidden. Dashboard completion appends `✅ YYYY-MM-DD`, matching checkbox
-completion inside the Project note. Changing Project status never requires
-moving the file.
+New Project notes default to `incubating`, so creating a note does not silently
+create an Active Commitment. A Manager or the user changes the single `status`
+selection only when the lifecycle changes. There is no recurring lifecycle
+check-in or closure form.
+
+The Workstreams card groups every Project under one of the five lifecycle
+headings. `priority` controls order within a lifecycle group; lower numbers
+appear first. Active is the only state that receives growth capacity by default.
+Maintenance stays visible in the portfolio but is separated from Active.
+Incubating, Paused, and Closed remain visible for portfolio context but do not
+enter current execution surfaces.
+
+Upcoming Tasks reads only Projects with `status: active` and `focus: true`,
+groups tasks by Project, lets the user select the source Project, and displays
+only the first three unchecked Markdown checkboxes from the first unfinished
+section declared in `progress_sections`. A `+n` indicator shows how many
+unchecked items remain hidden. `focus` remains an independent execution-display
+flag; it is not a lifecycle state and does not make a non-Active Workstream a
+current Commitment. Dashboard completion appends `✅ YYYY-MM-DD`, matching
+checkbox completion inside the Project note. Changing Project status never
+requires moving the file.
+
+### Legacy Project status compatibility
+
+CastleX reads the earlier status vocabulary without rewriting private notes:
+
+| Legacy value | Manager-facing lifecycle | Preserved fact |
+| --- | --- | --- |
+| `on-hold` | Paused | The raw `on-hold` value remains in the note. |
+| `someday` | Incubating | The raw `someday` value remains in the note. |
+| `completed` | Closed | Completion remains distinguishable in the raw YAML. |
+| `cancelled` | Closed | Cancellation remains distinguishable in the raw YAML. |
+
+The Dashboard labels these compatibility reads as legacy. A missing or unknown
+status is conservatively displayed under Incubating and is not given capacity.
+CastleX never writes the normalized value back automatically. Explicit Manager
+or user review is required before changing a private Project to a canonical
+five-state value, so completion and cancellation history cannot be silently
+collapsed.
 
 ## Project progress
 

@@ -24,6 +24,19 @@ const MENTAL_MOBILE_ASSET_PATH = "90_System/Assets/rain-glass-mental-lighthouse-
 const NAVIGATION_CUTOVER = "2026-07-25";
 const OVERALL_ENERGY_CUTOVER = "2026-07-26";
 const OPEN_VOYAGE_HOURS = 24;
+const WORKSTREAM_STATES = [
+  { id: "active", label: "Active", capacity: "Growth capacity" },
+  { id: "maintenance", label: "Maintenance", capacity: "Continuity only" },
+  { id: "incubating", label: "Incubating", capacity: "No default capacity" },
+  { id: "paused", label: "Paused", capacity: "No current capacity" },
+  { id: "closed", label: "Closed", capacity: "History only" },
+];
+const LEGACY_WORKSTREAM_STATES = {
+  "on-hold": "paused",
+  someday: "incubating",
+  completed: "closed",
+  cancelled: "closed",
+};
 const LEGACY_REQUIRED = [
   "sleep_quality",
   "physical_state",
@@ -968,6 +981,19 @@ function progressSections(value) {
   return entries
     .map(([section, weight]) => ({ section: String(section).trim(), weight: Number(weight) }))
     .filter(({ section, weight }) => section && Number.isFinite(weight) && weight > 0);
+}
+
+function workstreamStatus(value) {
+  const raw = String(value ?? "").trim().toLowerCase();
+  const canonical = WORKSTREAM_STATES.some(({ id }) => id === raw)
+    ? raw
+    : LEGACY_WORKSTREAM_STATES[raw] ?? "incubating";
+  return {
+    ...WORKSTREAM_STATES.find(({ id }) => id === canonical),
+    raw,
+    legacy: Boolean(raw && raw !== canonical),
+    missing: !raw,
+  };
 }
 
 function createSvgElement(parent, tag, attributes = {}) {
@@ -2604,15 +2630,19 @@ class CastleXHomeView extends ItemView {
   projectPages() {
     return this.app.vault.getMarkdownFiles()
       .filter((file) => file.path.startsWith(`${PROJECT_ROOT}/`))
-      .map((file) => ({ file, frontmatter: this.frontmatter(file) }))
-      .filter((page) => page.frontmatter.type === "project" && page.frontmatter.status === "active")
+      .map((file) => {
+        const frontmatter = this.frontmatter(file);
+        return { file, frontmatter, lifecycle: workstreamStatus(frontmatter.status) };
+      })
+      .filter((page) => page.frontmatter.type === "project")
       .sort((a, b) => {
+        const stateOrder = (page) => WORKSTREAM_STATES.findIndex(({ id }) => id === page.lifecycle.id);
         const priority = (page) => {
           const raw = page.frontmatter.priority;
           const value = raw === null || raw === undefined || raw === "" ? Number.MAX_SAFE_INTEGER : Number(raw);
           return Number.isFinite(value) ? value : Number.MAX_SAFE_INTEGER;
         };
-        return priority(a) - priority(b) || a.file.path.localeCompare(b.file.path);
+        return stateOrder(a) - stateOrder(b) || priority(a) - priority(b) || a.file.path.localeCompare(b.file.path);
       });
   }
 
@@ -2836,34 +2866,47 @@ class CastleXHomeView extends ItemView {
   }
 
   renderProjects(parent, projects, taskGroups) {
-    const card = this.createCard(parent, `Active Projects · ${projects.length}`, "status: active");
+    const card = this.createCard(parent, `Workstreams · ${projects.length}`, "Five-state lifecycle");
     card.addClass("cx-project-card");
-    const list = card.createDiv({ cls: "cx-project-list" });
-    if (!projects.length) {
-      list.createDiv({ text: "尚无 Active Project", cls: "cx-empty" });
-      return;
-    }
-    projects.slice(0, 6).forEach((project) => {
-      const derived = taskGroups.find((group) => group.project.file.path === project.file.path)?.progress;
-      const progress = clamp(derived ?? Number(project.frontmatter.progress ?? 0), 0, 100);
-      const item = list.createDiv({ cls: "cx-project" });
-      const line = item.createDiv({ cls: "cx-project-line" });
-      const link = line.createEl("button", { text: project.file.basename, cls: "cx-text-link" });
-      link.addEventListener("click", () => this.openFile(project.file));
-      line.createSpan({ text: `${Math.round(progress * 10) / 10}%` });
-      const track = item.createDiv({ cls: "cx-progress-track" });
-      const bar = track.createSpan({ cls: "cx-progress-bar" });
-      bar.style.width = `${progress}%`;
+    const portfolio = card.createDiv({ cls: "cx-workstream-portfolio" });
+    WORKSTREAM_STATES.forEach((state) => {
+      const stateProjects = projects.filter((project) => project.lifecycle.id === state.id);
+      const group = portfolio.createDiv({ cls: `cx-workstream-group is-${state.id}` });
+      const heading = group.createDiv({ cls: "cx-workstream-heading" });
+      const title = heading.createDiv({ cls: "cx-workstream-title" });
+      title.createSpan({ text: state.label });
+      title.createSpan({ text: String(stateProjects.length), cls: "cx-workstream-count" });
+      heading.createSpan({ text: state.capacity, cls: "cx-workstream-capacity" });
+      const list = group.createDiv({ cls: "cx-project-list" });
+      stateProjects.slice(0, 3).forEach((project) => {
+        const derived = taskGroups.find((item) => item.project.file.path === project.file.path)?.progress;
+        const progress = clamp(derived ?? Number(project.frontmatter.progress ?? 0), 0, 100);
+        const item = list.createDiv({ cls: "cx-project" });
+        const line = item.createDiv({ cls: "cx-project-line" });
+        const link = line.createEl("button", { text: project.file.basename, cls: "cx-text-link" });
+        link.addEventListener("click", () => this.openFile(project.file));
+        const rawStatus = project.lifecycle.missing ? "missing status" : project.lifecycle.legacy ? `legacy ${project.lifecycle.raw}` : null;
+        line.createSpan({
+          text: `${Math.round(progress * 10) / 10}%${rawStatus ? ` · ${rawStatus}` : ""}`,
+          cls: rawStatus ? "cx-project-meta is-legacy" : "cx-project-meta",
+        });
+        const track = item.createDiv({ cls: "cx-progress-track" });
+        const bar = track.createSpan({ cls: "cx-progress-bar" });
+        bar.style.width = `${progress}%`;
+      });
+      if (stateProjects.length > 3) {
+        list.createDiv({ text: `+${stateProjects.length - 3} more`, cls: "cx-workstream-more" });
+      }
     });
   }
 
   renderTasks(parent, taskGroups) {
-    const card = this.createCard(parent, "Upcoming Tasks", "Focused Project");
+    const card = this.createCard(parent, "Upcoming Tasks", "Active + focus");
     card.addClass("cx-task-card");
     const header = card.querySelector(".cx-card-header");
     const list = card.createDiv({ cls: "cx-task-list" });
     if (!taskGroups.length) {
-      list.createDiv({ text: "尚无 Focus Project", cls: "cx-empty" });
+      list.createDiv({ text: "尚无 Active Focus Project", cls: "cx-empty" });
       return;
     }
 
@@ -3329,7 +3372,7 @@ class CastleXHomeView extends ItemView {
     ].sort((a, b) => String(a.frontmatter.date).localeCompare(String(b.frontmatter.date)));
     const projects = this.projectPages();
     const taskGroups = await this.collectProjectTasks(projects);
-    const focusTaskGroups = taskGroups.filter((group) => group.project.frontmatter.focus === true);
+    const focusTaskGroups = taskGroups.filter((group) => group.project.lifecycle.id === "active" && group.project.frontmatter.focus === true);
     const streaks = this.calculateStreaks(pages);
 
     const dashboard = this.createDashboardCanvas();

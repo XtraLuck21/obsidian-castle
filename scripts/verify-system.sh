@@ -218,16 +218,27 @@ rg -q 'navigation_recorded_at' "$plugin/main.js" || fail "Dashboard missing Navi
 rg -q 'state_recorded_at' "$plugin/main.js" || fail "Dashboard missing legacy Daily State timestamp support"
 pass "Navigation and legacy timing and voyage eligibility rules"
 
+rg -q '^status: incubating$' "$project_template" || fail "Project template must default to non-committed Incubating"
 rg -q '^focus: false$' "$project_template" || fail "Project template missing focus default"
 rg -q '^progress_sections:$' "$project_template" || fail "Project template missing progress sections"
 rg -q '^  Tasks: 100$' "$project_template" || fail "Project template missing default Tasks weight"
 rg -q '`focus`|focus:' "$schema" || fail "Schema missing Project focus field"
 rg -q '`progress_sections`|progress_sections:' "$schema" || fail "Schema missing Project progress sections"
 rg -q 'Upcoming Tasks' "$schema" || fail "Schema missing Upcoming Tasks behavior"
+for state in active maintenance incubating paused closed; do
+  rg -q "\`${state}\`" "$schema" || fail "Schema missing canonical Workstream state: $state"
+done
+rg -Fq 'const WORKSTREAM_STATES = [' "$plugin/main.js" || fail "Dashboard missing canonical Workstream state registry"
+rg -Fq '"on-hold": "paused"' "$plugin/main.js" || fail "Dashboard missing legacy on-hold compatibility"
+rg -Fq 'completed: "closed"' "$plugin/main.js" || fail "Dashboard missing legacy completed compatibility"
+rg -Fq 'group.project.lifecycle.id === "active" && group.project.frontmatter.focus === true' "$plugin/main.js" || fail "Upcoming Tasks are not restricted to Active focused Workstreams"
+rg -Fq 'Five-state lifecycle' "$plugin/main.js" || fail "Dashboard missing five-state Workstreams portfolio"
+rg -q 'cx-workstream-group' "$plugin/styles.css" || fail "Dashboard missing Workstream lifecycle styling"
+rg -Fq 'CastleX never writes the normalized value back automatically' "$schema" || fail "Schema missing no-inferred-backfill rule"
 if rg -q '^task_section:|^progress:' "$project_template"; then
   fail "Project template contains deprecated task_section or manual progress"
 fi
-pass "Project focus, weighted progress sections, and Upcoming Tasks fields"
+pass "five-state Workstream lifecycle, legacy compatibility, Project focus, and weighted progress"
 
 rg -q 'castlex-leetcode-tracker' "$plugin/main.js" "$schema" || fail "Plugin or Schema missing embedded LeetCode Project tracker"
 rg -q 'class LeetCodeTrackerChild' "$plugin/main.js" || fail "Plugin missing LeetCode Tracker render child"

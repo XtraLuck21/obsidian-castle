@@ -267,15 +267,29 @@ target: 2099-03-31
 ---
 ```
 
-The Dashboard displays every active Project with its progress bar. Upcoming
-Tasks are limited to active Projects with `focus: true`, grouped by selected
-Focus Project, and show the first three unchecked checkboxes from the Project's
-first unfinished `progress_sections` entry in file order, with `+n` for
-remaining hidden tasks. Each section has a fixed share of total progress; its
-checkboxes divide that share equally and are recalculated when scope changes.
+The Dashboard Workstreams card displays every Project in one of five canonical
+lifecycle states:
 
-Supported status values are `active`, `on-hold`, `completed`, `someday`, and
-`cancelled`. The `focus` property only controls Upcoming Tasks visibility.
+- `active`: current growth capacity and current execution;
+- `maintenance`: minimum continuity capacity, visibly separate from growth;
+- `incubating`: proposal or exploration with no default capacity;
+- `paused`: intentionally suspended with history retained;
+- `closed`: ended and retained for history.
+
+New Project notes default to `incubating`; the Manager or user makes one
+lifecycle selection when the Workstream is accepted or later changes state.
+Upcoming Tasks are limited to `active` Projects with `focus: true`, grouped by
+selected Focus Project, and show the first three unchecked checkboxes from the
+Project's first unfinished `progress_sections` entry in file order, with `+n`
+for remaining hidden tasks. The `focus` property remains an execution-display
+choice and is not a lifecycle state. Each section has a fixed share of total
+progress; its checkboxes divide that share equally and are recalculated when
+scope changes.
+
+Legacy `on-hold`, `someday`, `completed`, and `cancelled` values remain readable
+as Paused, Incubating, or Closed compatibility states. Their raw YAML remains
+untouched, preserving completion versus cancellation history. CastleX never
+backfills private notes automatically.
 
 ### Time Allocation Heatmap and AI provenance
 

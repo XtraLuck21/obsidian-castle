@@ -1,6 +1,6 @@
 ---
 type: project
-status: active
+status: incubating
 focus: false
 area:
 priority:
@@ -16,6 +16,7 @@ origin: human
 ## Outcome
 
 <!-- What observable result means this project is complete? -->
+<!-- Lifecycle status: active, maintenance, incubating, paused, or closed. -->
 
 ## Milestones
 

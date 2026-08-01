@@ -303,6 +303,22 @@ body.theme-dark {
 .cx-task-card .cx-card-header span { font-size: .58rem; }
 
 .cx-project-list, .cx-task-list { display: grid; gap: 6px; }
+.cx-workstream-portfolio { display: grid; gap: 7px; }
+.cx-workstream-group { border-top: 1px solid rgba(228,236,238,.065); padding-top: 5px; }
+.cx-workstream-group:first-child { border-top: 0; padding-top: 0; }
+.cx-workstream-heading { align-items: center; display: flex; justify-content: space-between; margin-bottom: 3px; }
+.cx-workstream-title { align-items: center; color: rgba(237,244,246,.78); display: flex; font-size: .55rem; font-weight: 720; gap: 5px; }
+.cx-workstream-count { align-items: center; background: rgba(255,255,255,.075); border-radius: 999px; color: rgba(232,240,243,.66); display: inline-flex; font-size: .44rem; justify-content: center; min-width: 17px; padding: 2px 5px; }
+.cx-workstream-capacity { color: rgba(221,233,238,.38); font-size: .45rem; }
+.cx-workstream-group.is-active .cx-workstream-title { color: #eaf2f3; }
+.cx-workstream-group.is-maintenance .cx-workstream-title { color: #bad1d7; }
+.cx-workstream-group.is-incubating .cx-workstream-title,
+.cx-workstream-group.is-paused .cx-workstream-title,
+.cx-workstream-group.is-closed .cx-workstream-title { color: rgba(210,224,230,.54); }
+.cx-workstream-group:has(.cx-project-list:empty) { opacity: .72; }
+.cx-project-meta { flex: 0 0 auto; }
+.cx-project-meta.is-legacy { color: rgba(221,190,139,.68); font-size: .48rem; }
+.cx-workstream-more { color: rgba(226,236,239,.4); font-size: .48rem; text-align: right; }
 .cx-project { min-width: 0; }
 .cx-project-line { align-items: center; color: rgba(239,244,246,.66); display: flex; font-size: .58rem; justify-content: space-between; margin-bottom: 3px; }
 .cx-shell button.cx-text-link { appearance: none; background: transparent !important; border: 1px solid transparent !important; border-radius: 8px; box-shadow: none !important; color: #edf3f5; cursor: pointer; font-size: .63rem; line-height: 1.2; max-width: 100%; min-height: 0; overflow: hidden; padding: 2px 4px 2px 0; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
