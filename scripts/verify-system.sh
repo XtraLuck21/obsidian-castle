@@ -18,6 +18,8 @@ pass() { echo "✓ $*"; }
 plugin="$SYSTEM_ROOT/plugin/castlex-dashboard"
 template="$SYSTEM_ROOT/templates/010-Daily-Dashboard.md"
 weekly_template="$SYSTEM_ROOT/templates/020-Weekly-Review.md"
+daily_example="$SYSTEM_ROOT/examples/Daily-Example.md"
+weekly_example="$SYSTEM_ROOT/examples/Weekly-Review-Example.md"
 schema="$SYSTEM_ROOT/schemas/CastleX-Data-Schema.md"
 manifest="$plugin/manifest.json"
 project_template="$SYSTEM_ROOT/templates/100-Project.md"
@@ -293,6 +295,37 @@ if rg -q 'cx-weekly-review|Verify AI review|Weekly AI review' "$plugin/main.js" 
 fi
 rg -q 'Weekly Review' "$schema" || fail "Schema missing Weekly Review rules"
 pass "Weekly Snapshot, source period, and read-only derived data"
+
+frontmatter_keys() {
+  awk '
+    BEGIN { block = 0 }
+    /^---$/ { block++; next }
+    block == 1 && /^[A-Za-z0-9_-]+:/ {
+      line = $0
+      sub(/:.*/, "", line)
+      print line
+    }
+    block >= 2 { exit }
+  ' "$1"
+}
+
+section_headings() {
+  rg '^## ' "$1"
+}
+
+if ! diff -u <(frontmatter_keys "$template") <(frontmatter_keys "$daily_example"); then
+  fail "Daily example top-level frontmatter keys drifted from the canonical template"
+fi
+if ! diff -u <(section_headings "$template") <(section_headings "$daily_example"); then
+  fail "Daily example section order drifted from the canonical template"
+fi
+if ! diff -u <(frontmatter_keys "$weekly_template") <(frontmatter_keys "$weekly_example"); then
+  fail "Weekly example top-level frontmatter keys drifted from the canonical template"
+fi
+if ! diff -u <(section_headings "$weekly_template") <(section_headings "$weekly_example"); then
+  fail "Weekly example section order drifted from the canonical template"
+fi
+pass "Daily and Weekly examples match canonical template structure"
 
 for script in "$SYSTEM_ROOT"/scripts/*.sh; do bash -n "$script"; done
 rg -Fq 'args+=(--exclude=data.json)' "$SYSTEM_ROOT/scripts/deploy-system.sh" || fail "System deployment does not preserve private plugin data.json"

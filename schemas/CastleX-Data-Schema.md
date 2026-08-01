@@ -807,3 +807,13 @@ Weekly AI output is intentionally brief:
 - Raw Notes remain in chronological insertion order from earliest to latest.
   Later additions and corrections are appended after existing content; they are
   never prepended or used to reorder earlier entries.
+
+## Canonical Templates and examples
+
+Files under `templates/` are the canonical creation contract deployed to
+`90_System/Templates/`. Files under `examples/` are fictional filled instances,
+not alternate templates. The Daily and Weekly examples retain the same top-level
+frontmatter key set and the same level-two section sequence as their canonical
+Templates; they differ only in placeholder replacement, fictional values, and
+illustrative body content. Verification fails when those structural contracts
+drift.

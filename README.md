@@ -342,7 +342,9 @@ Task-level comparison uses explicit engaged durations rather than the length of
 a wider mixed window.
 
 See [`examples/`](examples/) for deliberately fictional Daily, Project, and
-Weekly Review notes.
+Weekly Review notes. Daily and Weekly examples are filled instances of their
+canonical Templates: they preserve the same top-level frontmatter keys and
+level-two section order so examples cannot become a competing note design.
 
 ## Optional local-mirror and iCloud workflow
 
