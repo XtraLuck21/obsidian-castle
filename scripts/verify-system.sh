@@ -241,6 +241,8 @@ rg -q 'phase_tracking' "$plugin/main.js" || fail "LeetCode Tracker cannot distin
 rg -q 'unclassified_seconds' "$plugin/main.js" "$schema" || fail "LeetCode Tracker missing unclassified time"
 rg -q 'initializes all three values to zero' "$schema" || fail "Schema does not define N/A-to-zero phase transition"
 rg -Fq 'height: auto !important' "$plugin/styles.css" || fail "LeetCode phase labels may be clipped by theme button height"
+rg -Fq '{ id: "implementation", label: "Implementing" }' "$plugin/main.js" || fail "LeetCode phase labels are not consistently action-oriented"
+rg -Fq '.cx-lc-phase-choices { display: grid; gap: 7px; grid-template-columns: 1fr; }' "$plugin/styles.css" || fail "LeetCode phase controls are not stacked full-width rows"
 rg -Fq 'Finish · Completed' "$plugin/main.js" || fail "LeetCode Tracker missing explicit completion action"
 rg -q 'never writes Daily Note time fields' "$schema" || fail "Schema does not preserve LeetCode/Daily time boundary"
 pass "embedded desktop Project tracker, optional phase timing, and Bridge session boundary"

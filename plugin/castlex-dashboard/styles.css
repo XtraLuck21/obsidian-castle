@@ -1949,7 +1949,7 @@ body.theme-dark {
   white-space: nowrap;
 }
 .cx-lc-phase-help { color: rgba(203, 221, 230, .56); font-size: .52rem; line-height: 1.5; margin: 5px 0 10px; }
-.cx-lc-phase-choices { display: grid; gap: 6px; grid-template-columns: repeat(3,minmax(0,1fr)); }
+.cx-lc-phase-choices { display: grid; gap: 7px; grid-template-columns: 1fr; }
 .cx-lc-phase-button {
   align-items: center;
   appearance: none;
@@ -1959,15 +1959,15 @@ body.theme-dark {
   color: rgba(218,231,237,.65);
   cursor: pointer;
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  flex-direction: row;
+  gap: 12px;
   height: auto !important;
-  justify-content: center;
+  justify-content: space-between;
   line-height: 1.2;
-  min-height: 64px;
+  min-height: 44px;
   min-width: 0;
   overflow: visible;
-  padding: 10px 7px 9px;
+  padding: 10px 13px;
   position: relative;
 }
 .cx-lc-phase-button:hover { background: rgba(255,255,255,.075); color: #edf4f6; }
@@ -1984,11 +1984,11 @@ body.theme-dark {
   font-weight: 720;
   line-height: 1.2;
   overflow: visible;
-  text-align: center;
+  text-align: left;
   white-space: nowrap;
-  width: 100%;
+  width: auto;
 }
-.cx-lc-phase-time { color: rgba(196, 218, 229, .62); display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .54rem; line-height: 1.2; }
+.cx-lc-phase-time { color: rgba(196, 218, 229, .62); display: block; flex: 0 0 auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .56rem; line-height: 1.2; text-align: right; }
 .cx-lc-phase-button.is-active .cx-lc-phase-time { color: rgba(230, 240, 244, .82); }
 .cx-lc-phase-coverage {
   align-items: center;

@@ -1118,9 +1118,13 @@ function trackerTimerSeconds(timer, now = Date.now()) {
 
 const TRACKER_PHASES = [
   { id: "thinking", label: "Thinking" },
-  { id: "implementation", label: "Implementation" },
+  { id: "implementation", label: "Implementing" },
   { id: "debugging", label: "Debugging" },
 ];
+
+function trackerPhaseLabel(phase) {
+  return TRACKER_PHASES.find(({ id }) => id === phase)?.label ?? trackerPatternLabel(phase);
+}
 
 function trackerPhaseTrackingEnabled(timer) {
   if (!timer) return false;
@@ -1514,8 +1518,8 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
     this.phaseStatus = heading.createSpan({
       cls: "cx-lc-phase-status",
       text: timer.phase
-        ? `Tracking ${trackerPatternLabel(timer.phase)}`
-        : phaseTracking ? "Breakdown on · no active phase" : "Not recorded",
+        ? `Tracking ${trackerPhaseLabel(timer.phase)}`
+        : phaseTracking ? "Breakdown on · no active phase" : "Total only",
     });
     panel.createDiv({
       cls: "cx-lc-phase-help",
@@ -1536,7 +1540,7 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
       button.createSpan({ cls: "cx-lc-phase-label", text: label });
       const display = button.createSpan({
         cls: "cx-lc-phase-time",
-        text: phaseTracking ? trackerClock(phaseSeconds[id] || 0) : "N/A",
+        text: phaseTracking ? trackerClock(phaseSeconds[id] || 0) : "/",
       });
       this.phaseDisplays.set(id, display);
       button.addEventListener("click", () => this.selectPhase(timer.phase === id ? null : id));
@@ -1545,7 +1549,7 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
     coverage.createSpan({ text: "Unclassified" });
     this.phaseUnclassifiedDisplay = coverage.createSpan({
       cls: "cx-lc-phase-unclassified-time",
-      text: phaseTracking ? trackerClock(trackerUnclassifiedSeconds(timer) || 0) : "N/A",
+      text: phaseTracking ? trackerClock(trackerUnclassifiedSeconds(timer) || 0) : "/",
     });
   }
 
@@ -1655,7 +1659,7 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
       const phaseLine = main.createDiv({ cls: "cx-lc-session-phases" });
       TRACKER_PHASES.forEach(({ id, label }) => {
         const hasValue = Object.prototype.hasOwnProperty.call(phases, id);
-        phaseLine.createSpan({ text: `${label} ${hasValue ? trackerDuration(phases[id]) : "N/A"}` });
+        phaseLine.createSpan({ text: `${label} ${hasValue ? trackerDuration(phases[id]) : "/"}` });
       });
       if (hasBreakdown) {
         const classified = Object.values(phases)
@@ -1836,13 +1840,13 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
       this.timerMeta.setText("Ready to begin");
     } else if (timer.status === "paused") {
       this.timerMeta.setText(`Paused · ${timer.phase
-        ? trackerPatternLabel(timer.phase)
+        ? trackerPhaseLabel(timer.phase)
         : trackerPhaseTrackingEnabled(timer) ? "Unclassified" : "Total only"}`);
     } else if (seconds >= expectedSeconds) {
       this.timerMeta.setText(`Reached the ${task.expected_active_minutes}m check-in point`);
     } else {
       this.timerMeta.setText(`Active · ${timer.phase
-        ? trackerPatternLabel(timer.phase)
+        ? trackerPhaseLabel(timer.phase)
         : trackerPhaseTrackingEnabled(timer) ? "Unclassified" : "Total only"}`);
     }
     if (timer?.task_id === task?.task_id) {
@@ -1851,11 +1855,11 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
       TRACKER_PHASES.forEach(({ id }) => {
         const display = this.phaseDisplays.get(id);
         if (!display) return;
-        display.setText(phaseTracking ? trackerClock(phaseSeconds[id] || 0) : "N/A");
+        display.setText(phaseTracking ? trackerClock(phaseSeconds[id] || 0) : "/");
       });
       this.phaseStatus?.setText(timer.phase
-        ? `Tracking ${trackerPatternLabel(timer.phase)}`
-        : phaseTracking ? "Breakdown on · no active phase" : "Not recorded");
+        ? `Tracking ${trackerPhaseLabel(timer.phase)}`
+        : phaseTracking ? "Breakdown on · no active phase" : "Total only");
       if (this.phaseUnclassifiedDisplay && phaseTracking) {
         this.phaseUnclassifiedDisplay.setText(trackerClock(trackerUnclassifiedSeconds(timer) || 0));
       }
