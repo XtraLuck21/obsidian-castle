@@ -1,7 +1,7 @@
 {
   "id": "castlex-dashboard",
   "name": "CastleX Dashboard",
-  "version": "0.35.1",
+  "version": "0.36.0",
   "minAppVersion": "1.8.0",
   "description": "A full-screen command center for CastleX backed by Markdown and YAML.",
   "author": "CastleX",

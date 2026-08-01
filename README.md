@@ -270,8 +270,7 @@ origin:
 ---
 ```
 
-The Dashboard Workstreams card displays every Project in one of five canonical
-lifecycle states:
+Project records retain five canonical lifecycle states:
 
 - `active`: current growth capacity and current execution;
 - `maintenance`: minimum continuity capacity, visibly separate from growth;
@@ -295,6 +294,12 @@ The Template leaves `origin` blank for explicit attribution: a human creator
 sets `origin: human`; an AI Expert sets `origin: ai` and records generation time
 and evidence sources in `AI Project Brief`; materially mixed authorship may use
 `origin: mixed`. An AI workflow must never silently keep a false human origin.
+CastleX Home intentionally presents only canonical `active` Projects in the
+`Active Projects` card, ordered by priority with weighted progress and note
+opening intact. Maintenance, Incubating, Paused, Closed, missing, and legacy
+compatibility states remain part of the data model but do not render in that
+execution card. When there are no Active Projects, the card shows one concise
+empty state.
 Upcoming Tasks are limited to `active` Projects with `focus: true`, grouped by
 selected Focus Project, and show the first three unchecked checkboxes from the
 Project's first unfinished `progress_sections` entry in file order, with `+n`

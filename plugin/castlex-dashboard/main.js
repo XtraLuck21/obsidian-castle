@@ -2870,37 +2870,24 @@ class CastleXHomeView extends ItemView {
   }
 
   renderProjects(parent, projects, taskGroups) {
-    const card = this.createCard(parent, `Workstreams · ${projects.length}`, "Five-state lifecycle");
+    const card = this.createCard(parent, "Active Projects");
     card.addClass("cx-project-card");
-    const portfolio = card.createDiv({ cls: "cx-workstream-portfolio" });
-    WORKSTREAM_STATES.forEach((state) => {
-      const stateProjects = projects.filter((project) => project.lifecycle.id === state.id);
-      const group = portfolio.createDiv({ cls: `cx-workstream-group is-${state.id}` });
-      const heading = group.createDiv({ cls: "cx-workstream-heading" });
-      const title = heading.createDiv({ cls: "cx-workstream-title" });
-      title.createSpan({ text: state.label });
-      title.createSpan({ text: String(stateProjects.length), cls: "cx-workstream-count" });
-      heading.createSpan({ text: state.capacity, cls: "cx-workstream-capacity" });
-      const list = group.createDiv({ cls: "cx-project-list" });
-      stateProjects.slice(0, 3).forEach((project) => {
-        const derived = taskGroups.find((item) => item.project.file.path === project.file.path)?.progress;
-        const progress = clamp(derived ?? Number(project.frontmatter.progress ?? 0), 0, 100);
-        const item = list.createDiv({ cls: "cx-project" });
-        const line = item.createDiv({ cls: "cx-project-line" });
-        const link = line.createEl("button", { text: project.file.basename, cls: "cx-text-link" });
-        link.addEventListener("click", () => this.openFile(project.file));
-        const rawStatus = project.lifecycle.missing ? "missing status" : project.lifecycle.legacy ? `legacy ${project.lifecycle.raw}` : null;
-        line.createSpan({
-          text: `${Math.round(progress * 10) / 10}%${rawStatus ? ` · ${rawStatus}` : ""}`,
-          cls: rawStatus ? "cx-project-meta is-legacy" : "cx-project-meta",
-        });
-        const track = item.createDiv({ cls: "cx-progress-track" });
-        const bar = track.createSpan({ cls: "cx-progress-bar" });
-        bar.style.width = `${progress}%`;
-      });
-      if (stateProjects.length > 3) {
-        list.createDiv({ text: `+${stateProjects.length - 3} more`, cls: "cx-workstream-more" });
-      }
+    const list = card.createDiv({ cls: "cx-project-list" });
+    if (!projects.length) {
+      list.createDiv({ text: "尚无 Active Project", cls: "cx-empty" });
+      return;
+    }
+    projects.slice(0, 6).forEach((project) => {
+      const derived = taskGroups.find((item) => item.project.file.path === project.file.path)?.progress;
+      const progress = clamp(derived ?? Number(project.frontmatter.progress ?? 0), 0, 100);
+      const item = list.createDiv({ cls: "cx-project" });
+      const line = item.createDiv({ cls: "cx-project-line" });
+      const link = line.createEl("button", { text: project.file.basename, cls: "cx-text-link" });
+      link.addEventListener("click", () => this.openFile(project.file));
+      line.createSpan({ text: `${Math.round(progress * 10) / 10}%` });
+      const track = item.createDiv({ cls: "cx-progress-track" });
+      const bar = track.createSpan({ cls: "cx-progress-bar" });
+      bar.style.width = `${progress}%`;
     });
   }
 
@@ -3376,6 +3363,7 @@ class CastleXHomeView extends ItemView {
     ].sort((a, b) => String(a.frontmatter.date).localeCompare(String(b.frontmatter.date)));
     const projects = this.projectPages();
     const taskGroups = await this.collectProjectTasks(projects);
+    const activeProjects = projects.filter((project) => project.lifecycle.id === "active");
     const focusTaskGroups = taskGroups.filter((group) => group.project.lifecycle.id === "active" && group.project.frontmatter.focus === true);
     const streaks = this.calculateStreaks(pages);
 
@@ -3385,7 +3373,7 @@ class CastleXHomeView extends ItemView {
     const left = top.createDiv({ cls: "cx-top-left" });
     this.renderHero(left, todayFile);
     this.renderKpis(left, todayFile, todayFrontmatter, streaks, voyageLifecycle(pages, now));
-    this.renderProjects(top, projects, taskGroups);
+    this.renderProjects(top, activeProjects, taskGroups);
     this.renderTasks(top, focusTaskGroups);
 
     this.renderRoute(dashboard, streaks);

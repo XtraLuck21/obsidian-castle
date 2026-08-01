@@ -250,14 +250,24 @@ done
 rg -Fq 'const WORKSTREAM_STATES = [' "$plugin/main.js" || fail "Dashboard missing canonical Workstream state registry"
 rg -Fq '"on-hold": "paused"' "$plugin/main.js" || fail "Dashboard missing legacy on-hold compatibility"
 rg -Fq 'completed: "closed"' "$plugin/main.js" || fail "Dashboard missing legacy completed compatibility"
+rg -Fq 'const activeProjects = projects.filter((project) => project.lifecycle.id === "active");' "$plugin/main.js" || fail "Home does not filter canonical Active Projects"
+rg -Fq 'this.renderProjects(top, activeProjects, taskGroups);' "$plugin/main.js" || fail "Home Project card is not fed the Active-only collection"
+rg -Fq 'const card = this.createCard(parent, "Active Projects");' "$plugin/main.js" || fail "Home Project card title is not exactly Active Projects"
+rg -Fq 'list.createDiv({ text: "尚无 Active Project", cls: "cx-empty" });' "$plugin/main.js" || fail "Active Projects card missing concise empty state"
+rg -Fq 'projects.slice(0, 6).forEach((project) =>' "$plugin/main.js" || fail "Active Projects card no longer preserves bounded priority rendering"
+if sed -n '/^  renderProjects(/,/^  renderTasks(/p' "$plugin/main.js" | rg -q 'Workstreams|Five-state lifecycle|Growth capacity|Maintenance|Incubating|Paused|Closed|cx-workstream'; then
+  fail "Active Projects card still renders lifecycle portfolio framing"
+fi
+if rg -q 'cx-workstream' "$plugin/styles.css"; then
+  fail "Styles still reserve Home space for lifecycle portfolio groups"
+fi
+rg -Fq "CastleX Home's \`Active Projects\` card is an execution view" "$schema" || fail "Schema missing Active-only Home card contract"
 rg -Fq 'group.project.lifecycle.id === "active" && group.project.frontmatter.focus === true' "$plugin/main.js" || fail "Upcoming Tasks are not restricted to Active focused Workstreams"
-rg -Fq 'Five-state lifecycle' "$plugin/main.js" || fail "Dashboard missing five-state Workstreams portfolio"
-rg -q 'cx-workstream-group' "$plugin/styles.css" || fail "Dashboard missing Workstream lifecycle styling"
 rg -Fq 'CastleX never writes the normalized value back automatically' "$schema" || fail "Schema missing no-inferred-backfill rule"
 if rg -q '^task_section:|^progress:' "$project_template"; then
   fail "Project template contains deprecated task_section or manual progress"
 fi
-pass "five-state Workstream lifecycle, legacy compatibility, Project focus, and weighted progress"
+pass "five-state Workstream data, Active-only Home card, Project focus, and weighted progress"
 
 rg -q 'castlex-leetcode-tracker' "$plugin/main.js" "$schema" || fail "Plugin or Schema missing embedded LeetCode Project tracker"
 rg -q 'class LeetCodeTrackerChild' "$plugin/main.js" || fail "Plugin missing LeetCode Tracker render child"

@@ -696,12 +696,18 @@ capacity, or expectations remain advisory body content until Manager or the
 user writes the accepted Commitment properties. Changing provenance does not by
 itself change lifecycle or authorize capacity.
 
-The Workstreams card groups every Project under one of the five lifecycle
-headings. `priority` controls order within a lifecycle group; lower numbers
-appear first. Active is the only state that receives growth capacity by default.
-Maintenance stays visible in the portfolio but is separated from Active.
-Incubating, Paused, and Closed remain visible for portfolio context but do not
-enter current execution surfaces.
+CastleX Home's `Active Projects` card is an execution view, not a lifecycle
+browser. It filters normalized lifecycle to canonical `active` before rendering
+and shows no Project count, lifecycle subtitle, group headings, capacity labels,
+or reserved space for non-Active states. Lower numeric `priority` values appear
+first. Active Project names, weighted progress bars, and note-opening behavior
+remain available. When no canonical Active Project exists, the card renders one
+concise empty state.
+
+Maintenance, Incubating, Paused, Closed, missing, and legacy compatibility
+states remain fully readable in the data model for Manager decisions and other
+contexts, but they never render in the Home `Active Projects` card. Active
+remains the only state that receives growth capacity by default.
 
 Upcoming Tasks reads only Projects with `status: active` and `focus: true`,
 groups tasks by Project, lets the user select the source Project, and displays
