@@ -1348,10 +1348,7 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
     if (active?.task_id) return this.task(active.task_id);
     const completed = this.completedTaskIds();
     const open = this.tasks().filter((task) => !completed.has(task.task_id));
-    const today = localISO();
-    return open.find((task) => task.scheduled_date === today)
-      ?? open.find((task) => task.scheduled_date <= today)
-      ?? open[0]
+    return open[0]
       ?? this.tasks()[this.tasks().length - 1]
       ?? null;
   }
@@ -1400,9 +1397,13 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
   renderHeader(shell) {
     const problems = this.problemTasks();
     const technicalCompleted = Math.max(0, Number(this.data.current.completed_problem_count) || 0);
-    const technicalTotal = technicalCompleted + problems.length;
     const completed = this.completedTaskIds();
     const executionCompleted = problems.filter((task) => completed.has(task.task_id)).length;
+    const configuredTechnicalTotal = Number(this.data.current.round_target_problem_count);
+    const inferredTechnicalTotal = technicalCompleted + problems.length - executionCompleted;
+    const technicalTotal = Number.isFinite(configuredTechnicalTotal) && configuredTechnicalTotal > 0
+      ? Math.max(technicalCompleted, configuredTechnicalTotal)
+      : Math.max(technicalCompleted, inferredTechnicalTotal);
     const events = this.sessions();
     const totalSeconds = events.reduce((sum, event) => sum + Math.max(0, Number(event.active_seconds) || 0), 0);
     const milestone = this.data.current.next_milestone;
@@ -1632,7 +1633,10 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
   }
 
   renderPlan(parent) {
-    this.renderListHeader(parent, "Round 1 Plan", `${this.problemTasks().length} upcoming problems · dates are planning anchors`);
+    const problems = this.problemTasks();
+    const completed = this.completedTaskIds();
+    const openCount = problems.filter((task) => !completed.has(task.task_id)).length;
+    this.renderListHeader(parent, "Round 1 Plan", `${openCount} open problems · ${problems.length} total · dates are planning anchors`);
     let currentPattern = "";
     this.tasks().forEach((task) => {
       if (task.pattern !== currentPattern) {

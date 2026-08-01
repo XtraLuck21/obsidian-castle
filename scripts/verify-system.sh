@@ -274,6 +274,10 @@ rg -Fq 'height: auto !important' "$plugin/styles.css" || fail "LeetCode phase la
 rg -Fq '{ id: "implementation", label: "Implementing" }' "$plugin/main.js" || fail "LeetCode phase labels are not consistently action-oriented"
 rg -Fq '.cx-lc-phase-choices { display: grid; gap: 7px; grid-template-columns: 1fr; }' "$plugin/styles.css" || fail "LeetCode phase controls are not stacked full-width rows"
 rg -Fq 'Finish · Completed' "$plugin/main.js" || fail "LeetCode Tracker missing explicit completion action"
+rg -Fq 'return open[0]' "$plugin/main.js" || fail "LeetCode Tracker does not preserve canonical open-task order"
+rg -Fq 'round_target_problem_count' "$plugin/main.js" "$schema" || fail "LeetCode Tracker missing explicit Technical Coverage target"
+rg -Fq 'technicalCompleted + problems.length - executionCompleted' "$plugin/main.js" || fail "LeetCode Tracker may double-count completed plan tasks in Technical Coverage"
+rg -Fq 'open problems · ${problems.length} total' "$plugin/main.js" || fail "LeetCode Plan header does not distinguish open and total problems"
 rg -q 'never writes Daily Note time fields' "$schema" || fail "Schema does not preserve LeetCode/Daily time boundary"
 pass "embedded desktop Project tracker, optional phase timing, and Bridge session boundary"
 

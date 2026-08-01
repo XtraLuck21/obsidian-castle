@@ -795,6 +795,14 @@ short note are optional. Planned dates remain anchors, while actual
 `started_at`, `ended_at`, `active_seconds`, and optional `phase_seconds`
 preserve what happened.
 
+The Today recommendation follows the task-array order in `plan_export.json` and
+selects the first task without a completed Session. A later task scheduled for
+today never jumps ahead of an earlier unfinished task; completing work early
+simply advances to the next open task in the same canonical order. The optional
+`round_target_problem_count` in `current_state.json` supplies the Technical
+Coverage denominator. When it is absent, the tracker infers the target without
+double-counting plan tasks that already have completed Sessions.
+
 ## Weekly Review
 
 Weekly Review files live under `10_Journal/Weekly/` and declare their source
