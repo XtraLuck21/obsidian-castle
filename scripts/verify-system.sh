@@ -56,7 +56,7 @@ rg -Fq 'options.allowCreate ?? !Platform.isMobile' "$plugin/main.js" || fail "Mo
 rg -q 'archiveDailyConflicts' "$plugin/main.js" || fail "Dashboard missing device-local conflict archiving"
 pass "single canonical Daily creation and conflict-archiving policy"
 
-fields=(daily_checkin_model voyage_started_at voyage_ended_at navigation_direction navigation_activation navigation_work_energy navigation_focus navigation_calmness navigation_outlook navigation_recorded_at project_minutes admin_minutes workout_minutes enrichment_minutes project_minutes_origin admin_minutes_origin workout_minutes_origin enrichment_minutes_origin time_data_reviewed)
+fields=(daily_checkin_model time_log_model core_snapshot voyage_started_at voyage_ended_at navigation_direction navigation_activation navigation_work_energy navigation_focus navigation_calmness navigation_outlook navigation_recorded_at project_minutes admin_minutes workout_minutes enrichment_minutes project_minutes_origin admin_minutes_origin workout_minutes_origin enrichment_minutes_origin time_data_reviewed)
 for field in "${fields[@]}"; do
   rg -q "^${field}:" "$template" || fail "Daily template missing $field"
   rg -q "\`${field}\`|${field}:" "$schema" || fail "Schema missing $field"
@@ -86,6 +86,9 @@ rg -Fq 'body.theme-light .cx-heatmap-project .cx-heat-cell.cx-intensity-4 {' "$p
 rg -Fq 'body.theme-light .cx-heatmap-admin .cx-heat-cell.cx-intensity-4,' "$plugin/styles.css" || fail "Light-mode Admin heatmap lacks the shared darkest level"
 rg -Fq 'body.theme-light .cx-health-rotation-node.is-current {' "$plugin/styles.css" || fail "Light-mode Health rotation missing current-workout highlight"
 rg -Fq 'body.theme-light .cx-health-reasons ul {' "$plugin/styles.css" || fail "Light-mode Health recommendation reasons are not readable"
+rg -Fq 'body.theme-light .weekly-voyage .cx-weekly-snapshot {' "$plugin/styles.css" || fail "Weekly Snapshot missing explicit light-mode surface"
+rg -Fq 'body.theme-light .weekly-voyage .cx-weekly-grid-line {' "$plugin/styles.css" || fail "Weekly Snapshot light-mode chart grid is not adapted"
+rg -Fq 'body.theme-light .weekly-voyage .cx-weekly-allocation-track {' "$plugin/styles.css" || fail "Weekly Snapshot light-mode allocation track is not adapted"
 rg -Fq '@media print {' "$plugin/styles.css" || fail "CastleX missing theme-independent print styles"
 rg -Fq 'background-image: none !important' "$plugin/styles.css" || fail "Print mode does not suppress scenic backgrounds"
 rg -Fq 'print-color-adjust: exact' "$plugin/styles.css" || fail "Print mode missing deterministic color handling"
@@ -318,7 +321,15 @@ for section in "${daily_sections[@]}"; do
   (( line > previous_line )) || fail "Daily template section out of order: $section"
   previous_line="$line"
 done
-rg -Fq '14:00–17:00 window · 1h engaged · System · Dashboard' "$template" "$schema" || fail "Daily task log missing mixed-window example"
+rg -Fq 'HH:MM–HH:MM · Engaged:' "$template" "$schema" || fail "Daily task log missing nested-bullet header format"
+rg -Fq -- '- Activity: ' "$template" "$schema" || fail "Daily task log missing Activity bullet"
+rg -Fq -- '- Source: ' "$template" "$schema" || fail "Daily task log missing Source bullet"
+rg -Fq -- '- Project: [[' "$template" "$schema" || fail "Daily task log missing Project Wikilink bullet"
+rg -Fq -- '- Admin' "$template" "$schema" || fail "Daily task log missing non-Project category bullet"
+rg -Fq '23:00–24:00' "$template" "$schema" || fail "Daily task log missing natural-date boundary rule"
+rg -Fq 'core_snapshot' "$template" "$schema" || fail "Daily task log missing frozen Core snapshot rule"
+rg -Fq 'Action Day' "$schema" || fail "Schema missing Action Day rule"
+rg -Fq 'Execution Day' "$schema" || fail "Schema missing Execution Day rule"
 rg -Fq 'Do not create an `End-of-day Evidence` section.' "$schema" || fail "Schema does not prohibit End-of-day Evidence"
 rg -Fq '不得包含时间戳、日期、时段或投入时长' "$template" || fail "Completed Today does not prohibit task-log timing details"
 rg -Fq '不得为 bullet title、前缀、标签、callout 元数据或说明主动添加 Markdown 粗体' "$template" || fail "Daily template does not prohibit Codex-added bold styling"

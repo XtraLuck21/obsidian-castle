@@ -2642,6 +2642,69 @@ body.theme-light .cx-time-input { background: #f9fcfe !important; border-color: 
 body.theme-light .cx-time-step,
 body.theme-light .cx-time-clear { color: #53788e; }
 
+/* Weekly Snapshot needs an explicit paper-blue palette in light mode.
+   Do not inherit translucent dark-theme surfaces or low-contrast chart ink. */
+body.theme-light .weekly-voyage .cx-weekly-snapshot {
+  --cx-weekly-sleep: #1678d3;
+  --cx-weekly-energy: #149854;
+  --cx-weekly-agency: #7652d9;
+  --cx-weekly-project: #3a9f6d;
+  --cx-weekly-enrichment: #378bc0;
+  --cx-weekly-workout: #e47d2b;
+  --cx-weekly-admin: #8060c7;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: linear-gradient(145deg, rgba(255,255,255,.97), rgba(225,242,251,.94)) !important;
+  background-image: linear-gradient(145deg, rgba(255,255,255,.97), rgba(225,242,251,.94)) !important;
+  border-color: rgba(45, 111, 151, .24) !important;
+  box-shadow: 0 10px 28px rgba(45, 94, 124, .1), inset 0 1px 0 rgba(255,255,255,.9);
+  color: #173a53;
+  filter: none;
+  opacity: 1;
+}
+body.theme-light .weekly-voyage .cx-weekly-stat {
+  background: rgba(247, 252, 255, .92) !important;
+  border-color: rgba(45, 111, 151, .2) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.92);
+}
+body.theme-light .weekly-voyage :is(
+  .cx-weekly-header h3,
+  .cx-weekly-stat-value,
+  .cx-weekly-section-heading h4
+) { color: #173a53 !important; }
+body.theme-light .weekly-voyage :is(
+  .cx-weekly-period,
+  .cx-weekly-stat-label,
+  .cx-weekly-section-subtitle,
+  .cx-weekly-allocation-date,
+  .cx-weekly-allocation-total,
+  .cx-weekly-legend,
+  .cx-weekly-snapshot-footer
+) { color: #4f748a !important; }
+body.theme-light .weekly-voyage .cx-weekly-state-chart {
+  background: transparent !important;
+  filter: none;
+  opacity: 1;
+}
+body.theme-light .weekly-voyage :is(.cx-weekly-axis-label, .cx-weekly-date-label) {
+  fill: #527990 !important;
+}
+body.theme-light .weekly-voyage .cx-weekly-grid-line {
+  stroke: rgba(45, 111, 151, .2) !important;
+}
+body.theme-light .weekly-voyage .cx-weekly-state-point {
+  stroke: #f8fcff;
+  stroke-width: 2;
+}
+body.theme-light .weekly-voyage .cx-weekly-allocation-track {
+  background: #d2e4ef !important;
+  border: 1px solid rgba(45, 111, 151, .14);
+  box-shadow: inset 0 1px 2px rgba(45, 94, 124, .08);
+}
+body.theme-light .weekly-voyage .cx-weekly-snapshot-footer {
+  border-top-color: rgba(45, 111, 151, .18);
+}
+
 body.theme-light .markdown-preview-view.castle-dashboard,
 body.theme-light .markdown-source-view.castle-dashboard {
   background-color: #e7f3fa !important;
@@ -2695,9 +2758,9 @@ body.theme-dark .monthly-voyage {
   --dusk: #9068d3;
   --brass: #f0a15a;
   --signal: #e85f78;
-  --mode-direct: #51bd95;
+  --mode-direct: #245f51;
   --mode-planning: #3f9778;
-  --mode-system: #31745f;
+  --mode-system: #65c8a5;
   --mode-unclassified: #566576;
   --event-start: #45bd86;
   --event-restart: #9768d6;
@@ -2732,9 +2795,9 @@ body.theme-light .monthly-voyage {
   --dusk: #8e5dd3;
   --brass: #d97621;
   --signal: #e34f78;
-  --mode-direct: #2db98a;
+  --mode-direct: #17634e;
   --mode-planning: #258e6d;
-  --mode-system: #246b57;
+  --mode-system: #65c9a4;
   --mode-unclassified: #68798b;
   --event-start: #22ad78;
   --event-restart: #8856d0;
@@ -2886,9 +2949,9 @@ body.theme-light .monthly-voyage :is(.cx-hero-svg, .cx-mode-svg, .cx-day-band-sv
     --dusk: #655286;
     --brass: #7d5c0b;
     --signal: #9f382c;
-    --mode-direct: #176f67;
-    --mode-planning: #315f5b;
-    --mode-system: #425a59;
+    --mode-direct: #205c54;
+    --mode-planning: #3d847a;
+    --mode-system: #79bdb1;
     --mode-unclassified: #596572;
     --event-start: #176f67;
     --event-restart: #655286;

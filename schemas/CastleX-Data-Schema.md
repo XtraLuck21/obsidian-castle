@@ -14,6 +14,8 @@ without starting a timer or displaying elapsed voyage time:
 
 ```yaml
 daily_checkin_model: navigation-v1
+time_log_model: allocation-v2
+core_snapshot: []
 voyage_started_at: 2026-07-25T09:30:00-07:00
 voyage_ended_at: 2026-07-25T22:40:00-07:00
 ```
@@ -119,8 +121,8 @@ Navigation v1 Daily Notes contain, in order:
 1. `Daily Navigation`, beginning with a derived voyage ticket containing the
    exact start and end times, followed by the six Navigation dimensions
 2. Editable `Time Allocation`
-3. `Time & Task Log` as a source-backed chronological list extracted from Raw
-   Notes for Daily Notes dated 2026-07-26 or later
+3. `Time & Task Log` as a source-backed chronological nested-bullet ledger
+   extracted from Raw Notes for Daily Notes dated 2026-08-01 or later
 4. Read-only `Health Snapshot`
 5. Read-only `Mental Log`
 6. `Today’s Wins` as encouraging bullet points about effective habits, choices,
@@ -145,7 +147,10 @@ invent an Open Loop or Backlog item when the source provides no evidence.
 `Today’s Wins` contains three to five highest-priority observations. Overlapping
 observations are consolidated rather than expanded into an exhaustive list. Cross-day
 patterns are not repeated in Daily Notes; Weekly Review decides whether the
-accumulated evidence supports a pattern.
+accumulated evidence supports a pattern. The 2026-07-26–2026-07-31 legacy
+bullets remain frozen. Weekly and Monthly views may read them through a
+read-only derived mapping, but inferred fields must be marked `legacy-derived`
+or `unknown` and are never written back or treated as human-confirmed data.
 
 `Completed Today` is deliberately shorter than `Time & Task Log`. Each bullet
 states only what was completed in the fewest useful words. It contains no
@@ -174,34 +179,70 @@ single day’s Raw Notes.
 
 ### Time & Task Log
 
-Starting with Daily Notes dated 2026-07-26, Codex extracts explicit task-time
-evidence from `Raw Notes` into `Time & Task Log`. This is a compact factual
-activity ledger for later Weekly Review comparison; it is not a Timeline,
-dashboard visualization, or end-of-day reflection.
+Starting with the 2026-08-01 cutover, Codex extracts explicit task-time evidence
+from `Raw Notes` into a nested-bullet ledger. It is a compact factual activity
+ledger for later Weekly and Monthly comparison; it is not a Timeline, dashboard
+visualization, or end-of-day reflection.
 
-Use one chronological flat bullet per attributable task:
+```markdown
+- 14:00–16:00 · Engaged: 2h
+  - Activity: Drafted a section
+  - Activity Mode: Execution
+  - Project: [[30_Projects/Example-Project|Example Project]]
+  - Source: human
 
-```text
-- 14:00–16:00 · 2h engaged · Research · Direct · 阅读 abstract 和 introduction
-- 14:00–17:00 window · 1h engaged · System · Dashboard
+- 14:00–17:00 · Engaged: 1h
+  - Activity: Commute to campus
+  - Admin
+  - Source: human
 ```
 
-- An exact continuous block keeps its start, end, and explicit engaged
-  duration.
-- When Raw Notes describe a wider mixed or interrupted window plus a smaller
-  task duration, preserve both by adding `window`; never convert the whole
-  window into engaged time.
-- Parallel tasks may appear as separate bullets when the user gives an
-  attributable duration for each. Their engaged durations are not required to
-  add up to the enclosing window.
-- Preserve the user's task domain and description. `Direct`, `Planning`,
-  `System`, or another mode may be used only when the source supports it.
-- Do not infer missing clock times, durations, task modes, or task boundaries.
-- The ledger is derived from Raw Notes but never replaces or silently rewrites
-  them. Human corrections take precedence.
-- Do not copy its timestamps, ranges, or durations into `Completed Today`;
-  that section contains only terse completed outcomes.
-- Do not backfill Daily Notes dated before 2026-07-26.
+- Each top-level bullet is one time block in the form `HH:MM–HH:MM · Engaged:
+  duration`. `Window` preserves the exact clock range when it is known.
+  `Engaged` is the attributable duration and never silently becomes the
+  enclosing window length.
+- A block crossing midnight is split at the natural-date boundary: 23:00–24:00
+  belongs to the previous date and 00:00–01:00 belongs to the next date.
+- `Activity` and `Source` are required nested bullets for every time block. A
+  Project block also has `Activity Mode` and `Project` nested bullets. A Project
+  backed by a canonical note under `30_Projects/` uses a complete Wikilink with
+  an optional short alias. Its `Activity Mode` is exactly one of `Execution`,
+  `Planning`, `System`, or `Not Classified`.
+- Cognitive work, document writing, planning, system maintenance, and review
+  belong to Project / Domain even when the linked Domain is non-core. A link that
+  does not resolve to a canonical `type: project` note is written as a plain
+  task or Domain title, without a Wikilink, and is conservatively non-core; use
+  `status_at_generation: non-project-domain` in the snapshot.
+- A non-Project block records only a bare category bullet (`Enrichment`, `Admin`,
+  or `Workout`) and `Activity`; it omits `Activity Mode` and `Project`. Workout
+  and Counseling are never forced into `Execution`.
+- `Source` is a single provenance bullet. Controlled values include `human`,
+  `dashboard`, `ai`, `legacy-derived`, and `unknown`; derived legacy mappings
+  must use `legacy-derived` or `unknown`.
+- `core_snapshot` is internal derived metadata. For every Project appearing in
+  the ledger, it freezes whether that Project was Core at Daily generation:
+
+  ```yaml
+  core_snapshot:
+    - project: "[[30_Projects/Example-Project]]"
+      core: true
+      status_at_generation: active
+      generated_for: 2099-01-01
+    - project: "CastleX System"
+      core: false
+      status_at_generation: non-project-domain
+      generated_for: 2099-01-01
+  ```
+
+  `status: active` means Core; every other status means non-core. The snapshot
+  is frozen per Daily/Weekly generation so later Project status changes cannot
+  rewrite historical rollups. It is not a user-facing Project property and
+  does not use `project_role`.
+- Daily is the time ledger source of truth. Human corrections take precedence,
+  while Raw Notes remain unchanged and append-only.
+- Do not copy timestamps, ranges, or durations into `Completed Today`.
+- Do not rewrite Daily Notes dated before 2026-08-01. Their legacy bullets are
+  read-only compatibility input only.
 - Do not create an `End-of-day Evidence` section.
 
 ## Time allocation
@@ -241,8 +282,11 @@ time_data_reviewed: false
 
 - `Project`: time that directly advances a defined Project, Milestone, or
   observable work/study output.
-- `Admin`: email, appointments, errands, household maintenance, purchasing,
-  organizing, and similar life/work upkeep.
+- `Admin`: routine life/work upkeep such as buying groceries, commuting,
+  replying to routine email, making customer-service calls, appointments,
+  errands, household maintenance, purchasing, and organizing. Brainwork,
+  document writing, planning, system maintenance, and review are not Admin;
+  they belong to a Project / Domain instead.
 - `Workout`: deliberately recorded exercise, training, or physical activity.
 - `Enrichment`: reading, learning, art, media, reflection, or hobbies
   that do not directly advance a defined Project.
@@ -250,6 +294,22 @@ time_data_reviewed: false
 Assign a time block to one primary category unless the source explicitly splits
 it. Project-directed learning belongs to `Project`, not both Project and
 Enrichment.
+
+### Action and Execution days
+
+- An **Action Day** is a natural date whose frozen Core Project rows total at
+  least 120 engaged minutes, regardless of whether those rows are Execution,
+  Planning, System, or Not Classified.
+- An **Execution Day** is a natural date whose Project rows with
+  `Activity Mode: Execution` total at least 120 engaged minutes. Non-Project
+  rows and `Not Classified` time do not count.
+- `23:00–24:00` is assigned to the previous natural date; `00:00–01:00` is
+  assigned to the next natural date. A cross-midnight window is split before
+  aggregation.
+- Weekly Reviews may display the current period's Action Day and Execution Day
+  counts. Monthly Reviews may display total Action Days and Longest Execution
+  Streak. These metrics remain separate from Voyage Day and are not rendered on
+  the Main Dashboard for now.
 
 ### Four Heatmap levels
 

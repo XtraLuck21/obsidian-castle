@@ -4,6 +4,12 @@ date: 2099-01-01
 week: 2099-W01
 month: 2099-01
 daily_checkin_model: navigation-v1
+time_log_model: allocation-v2
+core_snapshot:
+  - project: "[[30_Projects/Example-Project]]"
+    core: true
+    status_at_generation: active
+    generated_for: 2099-01-01
 voyage_started_at: 2099-01-01T09:20:00-08:00
 voyage_ended_at: 2099-01-01T22:40:00-08:00
 navigation_direction: 4
@@ -123,8 +129,16 @@ cssclasses:
 
 ## Time & Task Log
 
-- 09:00–11:00 · 2h engaged · Example Project · Direct · Drafted a fictional section
-- 14:00–16:00 window · 1h engaged · System · Reference organization
+- 09:00–11:00 · Engaged: 2h
+  - Activity: Drafted a fictional section
+  - Activity Mode: Execution
+  - Project: [[30_Projects/Example-Project|Example Project]]
+  - Source: human
+
+- 14:00–16:00 · Engaged: 1h
+  - Activity: Commute to campus
+  - Admin
+  - Source: human
 
 ## Health Snapshot
 

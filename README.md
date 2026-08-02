@@ -219,21 +219,51 @@ than prepended or reordered.
 
 Daily Notes also include a `Time Allocation` card. Its four rings can be edited
 manually in 15-minute steps or filled by an AI-assisted review. After Raw Notes
-are provided, Daily Notes dated 2026-07-26 or later also receive a chronological
+are provided, Daily Notes dated 2026-08-01 or later receive a nested-bullet
 `Time & Task Log`. Codex preserves explicit clock windows, attributable engaged
-durations, task domains, modes, and descriptions. For example:
+durations, Project links or non-Project categories, Activity Modes, activities,
+and a single Source bullet. For example:
 
-```text
-- 14:00–16:00 · 2h engaged · Research · Direct · 阅读 abstract 和 introduction
-- 14:00–17:00 window · 1h engaged · System · Dashboard
+```markdown
+- 14:00–16:00 · Engaged: 2h
+  - Activity: Read a section
+  - Activity Mode: Execution
+  - Project: [[30_Projects/Example-Project|Example Project]]
+  - Source: human
+
+- 14:00–17:00 · Engaged: 1h
+  - Activity: Commute to campus
+  - Admin
+  - Source: human
 ```
 
-The second form means that several activities occurred between 14:00 and 17:00,
-while approximately one hour was attributable to the named task. Codex must not
-replace that one-hour duration with the three-hour window or require parallel
-task durations to fill the window. The ledger remains textual source for later
-Weekly Reviews; it does not add a visualization, dashboard component, or
-`End-of-day Evidence` section, and notes before 2026-07-26 are not backfilled.
+Each top-level bullet is one time block in the form `HH:MM–HH:MM · Engaged:
+duration`. Project rows backed by a `30_Projects/` note use a full Wikilink
+with an optional short alias. Under each block, `Activity` and `Source` are
+always present; Project rows also include `Activity Mode` and `Project`.
+Rows without a corresponding Project note use a plain task or Domain title and
+default to non-core. Their Activity Mode is one of `Execution`, `Planning`,
+`System`, or `Not Classified`. Brainwork, document
+writing, planning, system maintenance, and review belong to Project / Domain,
+including when that Domain is non-core. `Admin` is reserved for routine
+activities such as groceries, commuting, routine email, and customer-service
+calls. Non-Project rows use a category such as `Enrichment`, `Admin`, or
+`Workout` as a bare nested bullet and omit Activity Mode. Workout and
+Counseling are never forced into Execution. A window crossing
+midnight is split at the natural-date boundary. The ledger remains textual
+source for later Weekly and Monthly Reviews; it does not add a dashboard
+component or `End-of-day Evidence` section. Daily Notes from 2026-07-26 through
+2026-07-31 remain frozen legacy input and are only read through marked derived
+mapping.
+
+Each new Daily may carry an internal `core_snapshot`: `status: active` is Core
+and every other Project status is non-core, frozen at generation time. This is
+not a user-facing Project property and does not use `project_role`. Action Day
+means at least 120 minutes of frozen Core Project time, including Not Classified;
+Execution Day means at least 120 minutes of Project Execution time, excluding
+Not Classified and all non-Project categories. Weekly shows both counts,
+Monthly shows total Action Days and Longest Execution Streak, and Main Dashboard
+does not show these metrics yet.
 
 AI may also populate four non-overlapping flat bullet lists: `Today’s Wins`
 recognizes effective habits and choices, `Completed Today` records factual
@@ -361,8 +391,9 @@ earlier AI-filled value. Human reflection and decisions remain normal prose,
 while AI summary, comparison, and advice remain visibly marked callouts.
 For weeks beginning 2026-07-26, the cross-domain review also reads each Daily
 `Time & Task Log` alongside Completed Today, Open Loops, Raw Notes, and YAML.
-Task-level comparison uses explicit engaged durations rather than the length of
-a wider mixed window.
+The 2026-07-26–2026-07-31 portion is legacy-derived and read-only; from the
+2026-08-01 cutover onward, task-level comparison uses the nested ledger's explicit
+engaged durations rather than the length of a wider mixed window.
 
 See [`examples/`](examples/) for deliberately fictional Daily, Project, and
 Weekly Review notes. Daily and Weekly examples are filled instances of their

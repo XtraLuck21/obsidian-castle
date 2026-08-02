@@ -4,6 +4,8 @@ date: {{date:YYYY-MM-DD}}
 week: {{date:gggg-[W]ww}}
 month: {{date:YYYY-MM}}
 daily_checkin_model: navigation-v1
+time_log_model: allocation-v2
+core_snapshot: []
 voyage_started_at:
 voyage_ended_at:
 navigation_direction:
@@ -121,7 +123,28 @@ cssclasses:
 
 ## Time & Task Log
 
-<!-- 从 2026-07-26 起，Codex 根据 Raw Notes 提取有明确证据的任务投入，按发生顺序写成扁平 bullet。精确连续时段使用「14:00–16:00 · 2h engaged · Research · Direct · 阅读 abstract 和 introduction」；若只知道 14:00–17:00 的混合窗口中约 1h 用于某任务，使用「14:00–17:00 window · 1h engaged · System · Dashboard」，不得把窗口长度当成实际投入。保留人类提供的时间、时长、领域和任务描述；不补全未提供的信息，不要求并行任务的 engaged time 加总等于窗口长度。 -->
+<!--
+从 2026-08-01 起，Codex 根据 Raw Notes 提取有明确证据的投入，按自然日顺序写入 nested bullet ledger。
+每个顶层 bullet 是一个时间块，格式为「HH:MM–HH:MM · Engaged: 时长」；Window 是时段，Engaged 是可归属的实际投入。跨午夜的记录在 00:00 处分成两条对应自然日记录。
+每个时间块下面固定写 Activity 与 Source；Project 行再写 Activity Mode 与 Project。Activity Mode 只使用 Execution、Planning、System、Not Classified；没有对应 `30_Projects/` Project 文件的标题直接写普通文本，不使用 Wikilink，默认为 non-core。
+凡涉及脑力工作、写文件、规划、系统维护或 review 的投入都归 Project / Domain（即使该 Domain 是 non-core）；Admin 只用于买菜、通勤、回邮件、打客服电话等日常事务。非 Project 时间块只写 category 与 activity，并使用 Enrichment、Admin、Workout 等裸 category bullet；不要给 Workout 或 Counseling 强行套用 Execution。
+Source 只使用 human、dashboard、ai、legacy-derived、unknown 等受控值。无法可靠分类的旧资料只标记为 legacy-derived 或 unknown。
+core_snapshot 是按本 Daily 生成时 Project 的 status 冻结出的内部派生数据，不要求每天手填，也不要追溯改写。
+旧格式的 2026-07-26–2026-07-31 仅供 Weekly/Monthly 只读 derived mapping 使用，不回写旧 Daily。
+-->
+
+<!-- 新格式示例：
+- 14:00–16:00 · Engaged: 2h
+  - Activity: Drafted a section
+  - Activity Mode: Execution
+  - Project: [[30_Projects/Example-Project|Example Project]]
+  - Source: human
+
+- 14:00–17:00 · Engaged: 1h
+  - Activity: Commute to campus
+  - Admin
+  - Source: human
+-->
 
 ## Health Snapshot
 
