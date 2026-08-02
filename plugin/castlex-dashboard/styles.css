@@ -2637,7 +2637,7 @@ body.theme-dark .monthly-voyage {
   --hairline: rgba(230, 233, 239, .08);
   --chart-100: #e6e9ef;
   --chart-400: #97a3b6;
-  --chart-600: #5f6c82;
+  --chart-600: #73859a;
   --tide: #4e9c93;
   --depth: #5b7fb8;
   --clay: #a8705a;
@@ -2657,7 +2657,7 @@ body.theme-light .monthly-voyage {
   --hairline: rgba(31, 83, 116, .16);
   --chart-100: #17384f;
   --chart-400: #4e6f84;
-  --chart-600: #718b9c;
+  --chart-600: #5f7a8c;
   --tide: #15877c;
   --depth: #336fc0;
   --clay: #b85e3e;
