@@ -47,7 +47,8 @@ committed to this repository.
 - When a canonical Daily exists, device-local same-date conflict copies are moved into `99_Archive/Sync-Conflicts/<date>/` without deletion or automatic value merging
 - Desktop cards use a light background blur for contrast; mobile cards stay blur-free for sharp rendering
 - Health and Mental title content stays left-aligned on mobile while remaining vertically centered within its copy area
-- Deep-navy Obsidian color system for app chrome, notes, controls, and accents
+- System-following appearance: the existing deep-navy Dark mode and an airy coastal-blue Light mode cover app chrome, all three Dashboards, embedded note components, and the desktop Project tracker
+- Theme-independent Paper mode exports notes with a white page, dark text, print-safe cards and charts, no scenic backgrounds, and page-break protection for major components
 - Six-dimension start-of-voyage Navigation check-in stored in YAML
 - Full-card animated `开始航行` ritual beside the voyage streak, with a preserved Daily start timestamp
 - Editable Navigation gauges with Late entry and Retrospective provenance

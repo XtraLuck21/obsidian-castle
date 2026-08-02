@@ -42,6 +42,50 @@ body.theme-dark {
   --divider-color: rgba(128, 161, 185, .14);
 }
 
+body.theme-light {
+  --accent-h: 202;
+  --accent-s: 52%;
+  --accent-l: 48%;
+  --background-primary: #eef7fc;
+  --background-primary-alt: #e6f2fa;
+  --background-secondary: #dcecf7;
+  --background-secondary-alt: #d2e7f4;
+  --background-modifier-border: rgba(50, 111, 149, .17);
+  --background-modifier-border-hover: rgba(45, 112, 154, .3);
+  --background-modifier-border-focus: rgba(39, 119, 169, .48);
+  --background-modifier-hover: rgba(74, 151, 196, .13);
+  --background-modifier-active-hover: rgba(60, 139, 187, .2);
+  --background-modifier-form-field: rgba(247, 252, 255, .9);
+  --interactive-normal: #d8ebf7;
+  --interactive-hover: #c9e2f1;
+  --interactive-accent: #3d8fbd !important;
+  --interactive-accent-hover: #287dac !important;
+  --interactive-accent-rgb: 61, 143, 189;
+  --text-normal: #17384f;
+  --text-muted: #56758a;
+  --text-faint: #829bad;
+  --text-accent: #287eae !important;
+  --text-accent-hover: #176b98 !important;
+  --link-color: #287eae;
+  --link-color-hover: #176b98;
+  --checkbox-color: #4a98c3 !important;
+  --checkbox-color-hover: #2f83b2 !important;
+  --tag-color: #326d91;
+  --tag-background: rgba(69, 151, 196, .13);
+  --titlebar-background: #d8eaf6;
+  --titlebar-background-focused: #cfe5f3;
+  --ribbon-background: #dcecf7;
+  --tab-container-background: #dcecf7;
+  --nav-item-color-active: #153a54;
+  --nav-item-background-active: rgba(62, 143, 190, .15);
+  --nav-item-background-hover: rgba(74, 151, 196, .11);
+  --code-background: #e2f0f8;
+  --modal-background: #eff8fc;
+  --prompt-background: #eff8fc;
+  --metadata-property-background-hover: rgba(74, 151, 196, .1);
+  --divider-color: rgba(50, 111, 149, .14);
+}
+
 .workspace-leaf-content[data-type="castlex-home"] .view-content {
   overflow: auto;
   padding: 0;
@@ -2191,4 +2235,653 @@ body.theme-dark {
   .cx-lc-phase-choices { grid-template-columns: 1fr; }
   .cx-lc-phase-button { align-items: center; flex-direction: row; justify-content: space-between; padding: 9px 10px; }
   .cx-lc-phase-label { width: auto; }
+}
+
+/* Light appearance: airy coastal blue, automatically selected by Obsidian. */
+body.theme-light .cx-shell {
+  --cx-accent: #2f7fae;
+  --cx-blue: #58a5cf;
+  --cx-glass: rgba(241, 249, 254, .79);
+  --cx-border: rgba(45, 111, 151, .23);
+  --cx-light-text: #173a53;
+  --cx-light-muted: #58788d;
+  --cx-light-faint: #7f9aab;
+  --cx-light-surface: rgba(247, 252, 255, .76);
+  --cx-light-surface-soft: rgba(221, 240, 250, .62);
+  background-color: #cfe9f7;
+  color: var(--cx-light-text);
+}
+
+body.theme-light .cx-health-shell {
+  --cx-accent: #2f888d;
+  --cx-blue: #4aa1b5;
+  --cx-glass: rgba(239, 250, 253, .82);
+  --cx-border: rgba(49, 127, 145, .23);
+}
+
+body.theme-light .cx-mental-shell {
+  --cx-accent: #b5793d;
+  --cx-blue: #5598be;
+  --cx-glass: rgba(247, 249, 247, .82);
+  --cx-border: rgba(77, 126, 154, .23);
+  background-color: #d7eaf5;
+}
+
+body.theme-light .cx-background-layer {
+  background-image:
+    linear-gradient(180deg, rgba(218, 239, 250, .3), rgba(237, 248, 253, .48)),
+    var(--cx-background-desktop);
+  filter: saturate(82%) brightness(108%);
+}
+
+body.theme-light .cx-health-shell .cx-background-layer {
+  background-image:
+    linear-gradient(180deg, rgba(218, 244, 248, .32), rgba(239, 250, 252, .54)),
+    var(--cx-background-desktop);
+}
+
+body.theme-light .cx-mental-shell .cx-mental-background-layer {
+  background-image:
+    radial-gradient(circle at 70% 15%, rgba(241, 190, 118, .13), transparent 36%),
+    linear-gradient(180deg, rgba(219, 239, 249, .34), rgba(242, 248, 250, .58)),
+    var(--cx-background-desktop);
+}
+
+body.theme-light .cx-glass,
+body.theme-light .cx-card,
+body.theme-light .cx-mental-shell .cx-card {
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.3), rgba(255,255,255,.08) 42%, rgba(111,181,216,.08)),
+    var(--cx-glass);
+  border-color: var(--cx-border);
+  box-shadow:
+    0 12px 30px rgba(45, 94, 124, .14),
+    inset 0 1px 0 rgba(255,255,255,.72),
+    inset 0 -1px 0 rgba(68, 133, 169, .08);
+}
+
+@media (min-width: 761px) {
+  body.theme-light .cx-glass,
+  body.theme-light .cx-card {
+    -webkit-backdrop-filter: blur(6px) saturate(96%) brightness(108%);
+    backdrop-filter: blur(6px) saturate(96%) brightness(108%);
+  }
+}
+
+body.theme-light .cx-shell :is(h1, h2, h3, h4, strong),
+body.theme-light .cx-shell :is(
+  .cx-clock, .cx-health-clock, .cx-mental-clock,
+  .cx-kpi-value, .cx-kpi-label, .cx-task-label,
+  .cx-gauge-label, .cx-health-field-label, .cx-health-field-value,
+  .cx-health-direction-item strong, .cx-health-preview-row strong,
+  .cx-health-exercise-header strong, .cx-health-session-header strong,
+  .cx-mental-metric-heading strong, .cx-mental-metric-value,
+  .cx-mental-wind-row-copy strong, .cx-mental-ended-status
+) {
+  color: var(--cx-light-text) !important;
+  text-shadow: none;
+}
+
+body.theme-light .cx-shell :is(
+  .cx-overline, .cx-hero-note, .cx-voyage-note,
+  .cx-kpi-detail, .cx-card-header span, .cx-project-line,
+  .cx-task-more, .cx-empty, .cx-route-label, .cx-route-milestone,
+  .cx-route-weekday, .cx-gauge-hint, .cx-radar-legend,
+  .cx-calendar-weekday, .cx-trend-summary, .cx-heatmap-legend,
+  .cx-health-signature, .cx-mental-signature, .cx-mental-voyage-date,
+  .cx-health-card-header span, .cx-health-stage-state,
+  .cx-health-morning-note, .cx-health-night-ritual-note,
+  .cx-health-range-marks, .cx-health-form-footer,
+  .cx-health-direction-label, .cx-health-direction-hint,
+  .cx-health-workout-purpose, .cx-health-preview-row div > span,
+  .cx-health-preview-meta, .cx-health-workout-empty span,
+  .cx-health-workout-timer, .cx-health-set-breakdown,
+  .cx-health-exercise-header span, .cx-health-workout-complete > span,
+  .cx-health-session-header span, .cx-health-session-meta,
+  .cx-health-add-workout > span, .cx-health-summary-progress,
+  .cx-health-trend-date, .cx-health-trend-metric > span,
+  .cx-health-rotation-name, .cx-health-rotation-index,
+  .cx-mental-metric-heading div > span,
+  .cx-mental-section-heading > span, .cx-mental-wind-row-copy div > span,
+  .cx-mental-closure-card > p, .cx-mental-finish-card > p,
+  .cx-mental-closure-choice-copy > span, .cx-mental-target-card p
+) {
+  color: var(--cx-light-muted) !important;
+}
+
+body.theme-light .cx-button,
+body.theme-light .cx-shell button.cx-health-stage,
+body.theme-light .cx-shell button.cx-health-choice,
+body.theme-light .cx-shell button.cx-mental-chip,
+body.theme-light .cx-shell button.cx-mental-closure-choice {
+  background: rgba(232, 245, 252, .78) !important;
+  border-color: rgba(47, 112, 151, .2) !important;
+  color: #24536f !important;
+}
+
+body.theme-light .cx-button:hover,
+body.theme-light .cx-shell button.cx-health-stage:hover,
+body.theme-light .cx-shell button.cx-health-choice:hover,
+body.theme-light .cx-shell button.cx-mental-chip:hover,
+body.theme-light .cx-shell button.cx-mental-closure-choice:hover {
+  background: rgba(207, 233, 247, .9) !important;
+  border-color: rgba(47, 112, 151, .32) !important;
+}
+
+body.theme-light .cx-button-primary,
+body.theme-light .cx-mental-shell .cx-button-primary {
+  background: linear-gradient(135deg, #73b9dc, #3f91bf) !important;
+  border-color: transparent !important;
+  color: #f8fcff !important;
+}
+
+body.theme-light .cx-mobile-home-button {
+  background: rgba(238, 248, 254, .94) !important;
+  border-color: rgba(45, 111, 151, .28) !important;
+  box-shadow: 0 8px 24px rgba(45, 94, 124, .2) !important;
+  color: #245b7b;
+}
+
+body.theme-light .cx-voyage-ritual,
+body.theme-light .cx-voyage-ritual.is-sailing,
+body.theme-light .cx-voyage-ritual.is-starting {
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.3), rgba(255,255,255,.07) 42%, rgba(111,181,216,.08)),
+    var(--cx-glass) !important;
+  color: #1e5575;
+}
+body.theme-light .cx-voyage-ritual.is-docked:hover { background: rgba(226, 243, 252, .92) !important; }
+body.theme-light .cx-voyage-boat { color: #2e7ea9; }
+body.theme-light .cx-voyage-water { background: rgba(49, 130, 172, .42); }
+
+body.theme-light .cx-shell button.cx-text-link,
+body.theme-light .cx-task-label { color: #17415d !important; }
+body.theme-light .cx-shell button.cx-text-link:hover,
+body.theme-light .cx-task:hover { background: rgba(78, 157, 199, .1) !important; border-color: rgba(57, 130, 171, .16) !important; }
+body.theme-light .cx-progress-track { background: rgba(43, 105, 143, .12); }
+body.theme-light .cx-progress-bar { background: linear-gradient(90deg, #56a7d2, #2b7eab); }
+body.theme-light .cx-shell button.cx-task-check { color: rgba(37, 92, 123, .7); }
+body.theme-light .cx-shell .cx-task-project-select {
+  border-color: rgba(45, 111, 151, .2);
+  color: #285c79;
+}
+
+body.theme-light .cx-route-track::before { background: rgba(45, 111, 151, .19); }
+body.theme-light .cx-route-node {
+  background: #8fb7cc;
+  border-color: rgba(49, 111, 145, .46);
+  box-shadow: 0 0 0 3px rgba(235, 247, 252, .72);
+}
+body.theme-light .cx-route-day.cx-level-1 .cx-route-node,
+body.theme-light .cx-route-day.cx-level-2 .cx-route-node,
+body.theme-light .cx-route-day.cx-level-3 .cx-route-node,
+body.theme-light .cx-route-day.cx-level-4 .cx-route-node,
+body.theme-light .cx-route-day.cx-level-5 .cx-route-node { background: #4f9bc2; }
+body.theme-light .cx-route-day.cx-level-6 .cx-route-node { background: #fff; border-color: #4d96bd; box-shadow: 0 0 10px rgba(58,136,180,.36); }
+
+body.theme-light .cx-mini-gauge,
+body.theme-light .cx-health-field,
+body.theme-light .cx-health-direction-item,
+body.theme-light .cx-health-preview-row,
+body.theme-light .cx-health-workout-empty,
+body.theme-light .cx-health-exercise,
+body.theme-light .cx-health-set,
+body.theme-light .cx-health-add-workout,
+body.theme-light .cx-health-rotation-node,
+body.theme-light .cx-health-summary-item,
+body.theme-light .cx-mental-summary-item,
+body.theme-light .cx-mental-summary-context > div {
+  background: rgba(239, 249, 254, .64);
+  border-color: rgba(47, 112, 151, .13);
+}
+
+body.theme-light .cx-heat-cell {
+  border-color: rgba(43, 105, 139, .14);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .2);
+}
+body.theme-light .cx-heat-cell.is-future {
+  background: rgba(71, 128, 158, .065);
+  border-color: rgba(43, 105, 139, .09);
+}
+body.theme-light .cx-heat-cell.is-missing {
+  background: rgba(71, 128, 158, .13);
+  border-color: rgba(43, 105, 139, .14);
+}
+body.theme-light .cx-heat-cell.cx-intensity-0 {
+  background: rgba(71, 128, 158, .2);
+  border-color: rgba(43, 105, 139, .16);
+}
+
+body.theme-light .cx-health-rotation-node.is-current {
+  background: linear-gradient(145deg, rgba(178, 223, 244, .9), rgba(219, 241, 251, .82));
+  border-color: rgba(39, 126, 169, .48);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .56), 0 5px 14px rgba(45, 119, 157, .14);
+}
+body.theme-light .cx-health-rotation-node.is-current .cx-health-rotation-name {
+  color: #123f5c;
+  font-weight: 700;
+}
+body.theme-light .cx-health-rotation-node.is-current .cx-health-rotation-index {
+  color: #2377a2;
+  font-weight: 700;
+}
+body.theme-light .cx-health-reasons ul {
+  color: #3f6880;
+}
+body.theme-light .cx-health-reasons li::marker {
+  color: #5a8ba7;
+}
+
+body.theme-light .cx-gauge-segment { stroke: rgba(45, 105, 139, .16); }
+body.theme-light .cx-gauge-segment:hover { stroke: rgba(52, 130, 171, .48); }
+body.theme-light .cx-gauge-segment.is-active { stroke: rgba(61, 147, 190, .62); }
+body.theme-light .cx-gauge-segment.is-selected { filter: drop-shadow(0 0 4px rgba(45,132,177,.28)); stroke: #247cab; }
+body.theme-light .cx-gauge-value { fill: #173a53; }
+body.theme-light .cx-radar-grid { stroke: rgba(45, 105, 139, .2); }
+body.theme-light .cx-radar-axis { stroke: rgba(45, 105, 139, .12); }
+body.theme-light .cx-radar-label { fill: #486d84; }
+body.theme-light .cx-radar-today { fill: rgba(64, 147, 190, .17); stroke: #287eae; }
+body.theme-light .cx-radar-average { fill: rgba(93, 170, 202, .09); stroke: #68a8c7; }
+
+body.theme-light .cx-calendar-nav button,
+body.theme-light .cx-mode-tab { color: #5d7c90 !important; }
+body.theme-light .cx-mode-tab.is-active { color: #1e5878 !important; }
+body.theme-light .cx-calendar-day {
+  background: rgba(236, 247, 252, .72);
+  border-color: rgba(47, 112, 151, .09);
+  color: #466d84;
+}
+body.theme-light .cx-calendar-day.has-note { background: rgba(215, 237, 248, .88); }
+body.theme-light .cx-calendar-day.is-partial { background: rgba(133, 192, 220, .42); }
+body.theme-light .cx-calendar-day.is-complete { background: #6fb3d5; color: #0d3852; }
+body.theme-light .cx-calendar-day.cx-rest-day { background: rgba(202, 229, 243, .76) !important; border-color: rgba(58, 130, 170, .22) !important; color: #315f79; }
+body.theme-light .cx-calendar-day.is-uncreated { background: rgba(239, 248, 252, .42); color: #86a0b0; }
+body.theme-light .cx-calendar-day.is-today { border-color: #2f83b2; box-shadow: 0 0 7px rgba(47,131,178,.24); }
+
+body.theme-light .cx-trend-grid { stroke: rgba(45, 105, 139, .15); }
+body.theme-light .cx-trend-axis,
+body.theme-light .cx-trend-date,
+body.theme-light .cx-trend-cutover-label { fill: #638195; }
+body.theme-light .cx-trend-line { stroke: #3e91bb; }
+body.theme-light .cx-trend-point { fill: #fff; stroke: #2d759d; }
+body.theme-light .cx-trend-point.is-retrospective { fill: #d3e9f4; stroke: #5b92af; }
+
+body.theme-light .cx-health-hero::after { background: radial-gradient(circle, rgba(81, 170, 185, .15), transparent 68%); }
+body.theme-light .cx-shell button.cx-health-stage.is-active,
+body.theme-light .cx-shell button.cx-health-choice.is-selected {
+  background: rgba(94, 181, 198, .2) !important;
+  border-color: rgba(48, 133, 151, .36) !important;
+  color: #174f63 !important;
+}
+body.theme-light .cx-health-stage-state { color: #6e8b99 !important; }
+body.theme-light .cx-health-stage.is-active .cx-health-stage-state { color: #326f80 !important; }
+body.theme-light .cx-shell button.cx-health-morning-ritual,
+body.theme-light .cx-shell button.cx-health-morning-ritual.is-recorded {
+  background: linear-gradient(135deg, rgba(255,249,218,.86), rgba(216,240,248,.9)) !important;
+  border-color: rgba(187, 149, 72, .24) !important;
+  color: #5e542d;
+}
+body.theme-light .cx-health-morning-title { color: #4d5738; }
+body.theme-light .cx-health-morning-note { color: #6f7d6d !important; }
+body.theme-light .cx-shell button.cx-health-night-ritual,
+body.theme-light .cx-shell button.cx-health-night-ritual.is-recorded {
+  background: linear-gradient(135deg, rgba(205,226,243,.9), rgba(232,244,250,.94)) !important;
+  border-color: rgba(56, 117, 155, .25) !important;
+  color: #244d68;
+}
+body.theme-light .cx-health-night-ritual-title { color: #254b65; }
+body.theme-light .cx-health-night-ritual-note { color: #607d90 !important; }
+body.theme-light .cx-health-night-moon { color: #5f93ad; }
+body.theme-light .cx-health-night-star { background: #82b1c7; }
+body.theme-light .cx-shell button.cx-health-signal-bar { background: rgba(72, 145, 172, .13) !important; border-color: rgba(47,112,151,.1) !important; }
+body.theme-light .cx-shell button.cx-health-signal-bar.is-active { background: linear-gradient(180deg, #84ced1, #3a98ad) !important; border-color: rgba(40,122,139,.4) !important; }
+body.theme-light .cx-health-textarea,
+body.theme-light .cx-lc-field select,
+body.theme-light .cx-lc-field textarea {
+  background: rgba(248, 252, 255, .9) !important;
+  border-color: rgba(45, 111, 151, .22) !important;
+  color: #173a53 !important;
+}
+body.theme-light .cx-health-mode-choices { background: rgba(219, 239, 248, .7); border-color: rgba(47,112,151,.18); }
+body.theme-light .cx-health-mode-choice { background: rgba(239, 249, 253, .8); border-color: rgba(47,112,151,.12); color: #4d7184; }
+body.theme-light .cx-health-mode-choice.is-selected { background: linear-gradient(135deg, #7cc6ca, #469bab); border-color: #2f8293; color: #fff; }
+
+body.theme-light .cx-mental-metric,
+body.theme-light .cx-mental-wind-row {
+  background: linear-gradient(155deg, rgba(247,250,251,.88), rgba(226,240,248,.82));
+  border-color: rgba(70, 119, 147, .18);
+}
+body.theme-light .cx-mental-metric.is-recorded { border-color: rgba(194, 136, 69, .42); }
+body.theme-light .cx-mental-star-petal { fill: rgba(139, 116, 91, .22); stroke: rgba(139, 116, 91, .3); }
+body.theme-light .cx-mental-star-petal.is-lit { fill: #e8aa4f; stroke: #d99738; }
+body.theme-light .cx-mental-wind-row-icon { color: #b77d3f !important; }
+body.theme-light .cx-shell button.cx-mental-chip.is-selected,
+body.theme-light .cx-shell button.cx-mental-closure-choice.is-selected { background: rgba(225, 181, 118, .25) !important; border-color: rgba(176, 118, 55, .36) !important; color: #694623 !important; }
+body.theme-light .cx-mental-closure-icon { background: rgba(229, 239, 245, .86); border-color: rgba(75, 124, 153, .16); color: #9a6838 !important; }
+body.theme-light .cx-shell button.cx-mental-finish-button { background: linear-gradient(135deg, #6aa9ca, #3f82a8) !important; border-color: transparent !important; color: #fff !important; }
+
+/* Embedded note components use the same light palette. */
+body.theme-light .cx-navigation-voyage-ticket,
+body.theme-light .cx-daily-status,
+body.theme-light .cx-time-allocation,
+body.theme-light .cx-health-daily-summary,
+body.theme-light .cx-mental-daily-summary {
+  background: linear-gradient(145deg, rgba(255,255,255,.76), rgba(220,240,250,.62));
+  border-color: rgba(45, 111, 151, .2);
+  box-shadow: 0 8px 24px rgba(45, 94, 124, .09);
+  color: #173a53;
+}
+body.theme-light .cx-navigation-voyage-time,
+body.theme-light .cx-daily-status-label,
+body.theme-light .cx-time-row-label,
+body.theme-light .cx-time-rings-total { color: #173a53; fill: #173a53; }
+body.theme-light .cx-navigation-voyage-label,
+body.theme-light .cx-navigation-voyage-mark,
+body.theme-light .cx-daily-status-meta,
+body.theme-light .cx-time-level,
+body.theme-light .cx-time-unit { color: #607f92; }
+body.theme-light .cx-daily-status-segment { stroke: rgba(45, 105, 139, .15); }
+body.theme-light .cx-daily-status-segment.is-active { stroke: rgba(61, 147, 190, .62); }
+body.theme-light .cx-daily-status-segment.is-selected { stroke: #287eae; }
+body.theme-light .cx-daily-status-value { fill: #173a53; }
+body.theme-light .cx-time-ring-track { stroke: rgba(45, 105, 139, .12); }
+body.theme-light .cx-time-row,
+body.theme-light .cx-time-review { background: rgba(239, 249, 254, .72); border-color: rgba(45,111,151,.15); color: #315d77; }
+body.theme-light .cx-time-input { background: #f9fcfe !important; border-color: rgba(45,111,151,.2) !important; color: #173a53 !important; }
+body.theme-light .cx-time-step,
+body.theme-light .cx-time-clear { color: #53788e; }
+
+body.theme-light .markdown-preview-view.castle-dashboard,
+body.theme-light .markdown-source-view.castle-dashboard {
+  background-color: #e7f3fa !important;
+  background-image:
+    linear-gradient(180deg, rgba(229,244,251,.7), rgba(245,250,253,.84)),
+    url("../../90_System/Assets/rain-glass-sunset-beach-v2.webp") !important;
+  color: #17384f;
+}
+body.theme-light .castle-dashboard h1 { color: #17384f; text-shadow: none; }
+body.theme-light .castle-dashboard .callout,
+body.theme-light .castle-dashboard table { background: rgba(248, 252, 255, .82); border-color: rgba(45,111,151,.18); }
+
+body.theme-light .cx-lc-shell {
+  --cx-lc-accent: #438fb9;
+  --cx-lc-accent-bright: #66acd0;
+  background:
+    radial-gradient(circle at 82% 2%, rgba(96, 179, 218, .19), transparent 34%),
+    linear-gradient(155deg, rgba(241,249,253,.97), rgba(218,237,247,.97));
+  border-color: rgba(45, 111, 151, .22);
+  box-shadow: 0 14px 36px rgba(45, 94, 124, .14), inset 0 1px 0 rgba(255,255,255,.72);
+  color: #173a53;
+}
+body.theme-light .cx-lc-shell :is(h2, h3, h4, strong),
+body.theme-light .cx-lc-shell :is(.cx-lc-heading h2, .cx-lc-time-value, .cx-lc-clock, .cx-lc-task-title, .cx-lc-phase-label) { color: #173a53; }
+body.theme-light .cx-lc-shell :is(.cx-lc-kicker, .cx-lc-subtitle, .cx-lc-progress-label, .cx-lc-progress-count, .cx-lc-progress-detail, .cx-lc-tab, .cx-lc-task-meta > span, .cx-lc-schedule span, .cx-lc-clock-meta, .cx-lc-phase-status, .cx-lc-phase-help, .cx-lc-phase-time, .cx-lc-phase-coverage, .cx-lc-running-note, .cx-lc-details summary, .cx-lc-field label, .cx-lc-section-heading span, .cx-lc-task-detail, .cx-lc-session-phases span, .cx-lc-session-note, .cx-lc-empty) { color: #58788d; }
+body.theme-light .cx-lc-progress-card,
+body.theme-light .cx-lc-session-card,
+body.theme-light .cx-lc-phase-panel,
+body.theme-light .cx-lc-phase-button { background: rgba(246, 251, 254, .72); border-color: rgba(45,111,151,.16); }
+body.theme-light .cx-lc-timer-ring { background: conic-gradient(var(--cx-lc-accent-bright) var(--cx-lc-timer-progress), rgba(45,105,139,.12) 0); }
+body.theme-light .cx-lc-timer-inner { background: radial-gradient(circle at 50% 40%, #f8fcfe, #dceef7 78%); border-color: rgba(45,111,151,.16); }
+body.theme-light .cx-lc-phase-button.is-active { background: linear-gradient(145deg, rgba(93,171,207,.24), rgba(61,139,181,.16)); border-color: rgba(45,125,167,.34); }
+body.theme-light .cx-lc-button,
+body.theme-light .cx-lc-row-button,
+body.theme-light .cx-lc-icon-button { background: rgba(230, 244, 251, .86); border-color: rgba(45,111,151,.2); color: #285c79; }
+body.theme-light .cx-lc-button.is-primary { background: linear-gradient(135deg, #72b7d8, #3e8fba); color: #fff; }
+
+/* Monthly Logbook semantic palette.
+   Dataview components consume these tokens without choosing an appearance. */
+body.theme-dark .monthly-voyage {
+  --ink-900: #0b1220;
+  --ink-800: #111a2b;
+  --ink-700: #17223a;
+  --hairline: rgba(230, 233, 239, .08);
+  --chart-100: #e6e9ef;
+  --chart-400: #97a3b6;
+  --chart-600: #5f6c82;
+  --tide: #4e9c93;
+  --depth: #5b7fb8;
+  --clay: #a8705a;
+  --dusk: #7e7099;
+  --brass: #b08d3f;
+  --signal: #c2603f;
+  --mode-direct: #4e9c93;
+  --mode-planning: #3e7a73;
+  --mode-system: #2f5a57;
+  --mode-unclassified: #3a4356;
+}
+
+body.theme-light .monthly-voyage {
+  --ink-900: #edf6fb;
+  --ink-800: #ffffff;
+  --ink-700: #e3f0f7;
+  --hairline: rgba(31, 83, 116, .16);
+  --chart-100: #17384f;
+  --chart-400: #4e6f84;
+  --chart-600: #718b9c;
+  --tide: #15877c;
+  --depth: #336fc0;
+  --clay: #b85e3e;
+  --dusk: #7654a8;
+  --brass: #956900;
+  --signal: #b84232;
+  --mode-direct: #15877c;
+  --mode-planning: #2a716b;
+  --mode-system: #385e5c;
+  --mode-unclassified: #617083;
+}
+
+body.theme-dark .markdown-preview-view.monthly-voyage,
+body.theme-dark .markdown-source-view.monthly-voyage {
+  background-color: var(--ink-900);
+  background-image:
+    radial-gradient(circle at 82% 3%, rgba(91, 127, 184, .08), transparent 32%),
+    linear-gradient(180deg, #0b1220, #0d1728);
+  color: var(--chart-100);
+}
+
+body.theme-light .markdown-preview-view.monthly-voyage,
+body.theme-light .markdown-source-view.monthly-voyage {
+  background-color: var(--ink-900) !important;
+  background-image:
+    radial-gradient(circle at 82% 3%, rgba(51, 111, 192, .08), transparent 34%),
+    linear-gradient(180deg, #e7f3fa, #f7fbfd) !important;
+  color: var(--chart-100);
+}
+
+.monthly-voyage :is(h1, h2, h3, h4, strong) { color: var(--chart-100); }
+.monthly-voyage blockquote { border-inline-start-color: var(--chart-600); }
+.monthly-voyage .callout[data-callout="important"] { border-inline-start-color: var(--brass); }
+.monthly-voyage a.internal-link { color: var(--brass); }
+.monthly-voyage table {
+  background: var(--ink-800);
+  border-color: var(--hairline);
+  color: var(--chart-100);
+}
+.monthly-voyage th { background: var(--ink-700); color: var(--chart-100); }
+.monthly-voyage td,
+.monthly-voyage th { border-color: var(--hairline); }
+
+/* PDF export is always a paper presentation, independent of screen appearance. */
+@media print {
+  @page { margin: 14mm; }
+
+  body {
+    --background-primary: #ffffff;
+    --background-primary-alt: #ffffff;
+    --background-secondary: #f5f7f9;
+    --background-secondary-alt: #eef2f5;
+    --background-modifier-border: #d8e0e6;
+    --text-normal: #172530;
+    --text-muted: #566773;
+    --text-faint: #7b8992;
+    --text-accent: #236f99;
+    --link-color: #236f99;
+    background: #fff !important;
+    color: #172530 !important;
+  }
+
+  body.theme-dark .monthly-voyage,
+  body.theme-light .monthly-voyage,
+  body .monthly-voyage {
+    --ink-900: #ffffff;
+    --ink-800: #ffffff;
+    --ink-700: #f1f5f8;
+    --hairline: #cbd6de;
+    --chart-100: #142b3b;
+    --chart-400: #3f5667;
+    --chart-600: #5d707e;
+    --tide: #176f67;
+    --depth: #315f9e;
+    --clay: #965039;
+    --dusk: #655286;
+    --brass: #7d5c0b;
+    --signal: #9f382c;
+    --mode-direct: #176f67;
+    --mode-planning: #315f5b;
+    --mode-system: #425a59;
+    --mode-unclassified: #596572;
+  }
+
+  body,
+  .markdown-preview-view,
+  .markdown-rendered,
+  .markdown-preview-view.castle-dashboard,
+  .markdown-source-view.castle-dashboard,
+  .daily-voyage,
+  .castle-dashboard {
+    background: #fff !important;
+    background-image: none !important;
+    color: #172530 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body.theme-dark .markdown-preview-view.monthly-voyage,
+  body.theme-dark .markdown-source-view.monthly-voyage,
+  body.theme-light .markdown-preview-view.monthly-voyage,
+  body.theme-light .markdown-source-view.monthly-voyage,
+  body .markdown-preview-view.monthly-voyage,
+  body .markdown-source-view.monthly-voyage,
+  body .monthly-voyage {
+    background: #fff !important;
+    background-image: none !important;
+    color: var(--chart-100) !important;
+  }
+
+  .monthly-voyage svg {
+    background: #fff !important;
+    color: var(--chart-100);
+    overflow: visible;
+    text-rendering: geometricPrecision;
+  }
+
+  .monthly-voyage svg text {
+    fill-opacity: 1 !important;
+    stroke: none !important;
+  }
+
+  .monthly-voyage :is(article, section, div) {
+    box-shadow: none !important;
+  }
+
+  .cx-background-layer,
+  .cx-mobile-home-button { display: none !important; }
+
+  .cx-shell,
+  .cx-lc-shell {
+    background: #fff !important;
+    background-image: none !important;
+    border-color: #d8e0e6 !important;
+    box-shadow: none !important;
+    color: #172530 !important;
+  }
+
+  .cx-glass,
+  .cx-card,
+  .cx-navigation-voyage-ticket,
+  .cx-daily-status,
+  .cx-time-allocation,
+  .cx-weekly-snapshot,
+  .cx-weekly-stat,
+  .cx-health-daily-summary,
+  .cx-health-summary-item,
+  .cx-mental-daily-summary,
+  .cx-mental-summary-item,
+  .cx-mental-summary-context > div,
+  .cx-lc-progress-card,
+  .cx-lc-session-card,
+  .cx-lc-phase-panel {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background: #fff !important;
+    background-image: none !important;
+    border-color: #d8e0e6 !important;
+    box-shadow: none !important;
+    color: #172530 !important;
+  }
+
+  .cx-navigation-voyage-time,
+  .cx-daily-status-label,
+  .cx-time-row-label,
+  .cx-weekly-header h3,
+  .cx-weekly-section-heading h4,
+  .cx-health-summary-value,
+  .cx-mental-summary-context strong,
+  .cx-lc-shell :is(h2, h3, h4, strong) { color: #172530 !important; }
+
+  .cx-navigation-voyage-label,
+  .cx-navigation-voyage-mark,
+  .cx-daily-status-meta,
+  .cx-weekly-period,
+  .cx-weekly-stat-label,
+  .cx-weekly-section-subtitle,
+  .cx-weekly-allocation-date,
+  .cx-weekly-allocation-total,
+  .cx-weekly-legend,
+  .cx-weekly-snapshot-footer,
+  .cx-health-summary-label,
+  .cx-health-summary-meta,
+  .cx-mental-summary-score,
+  .cx-mental-summary-context span,
+  .cx-mental-summary-closure { color: #566773 !important; }
+
+  .cx-daily-status-value,
+  .cx-time-rings-total,
+  .cx-weekly-axis-label,
+  .cx-weekly-date-label { fill: #172530 !important; }
+  .cx-daily-status-segment,
+  .cx-time-ring-track,
+  .cx-weekly-grid-line { stroke: #d8e0e6 !important; }
+  .cx-daily-status-segment.is-active { stroke: #6aa7c6 !important; }
+  .cx-daily-status-segment.is-selected { stroke: #236f99 !important; filter: none !important; }
+
+  .cx-time-row,
+  .cx-time-review,
+  .cx-time-input {
+    background: #f7f9fa !important;
+    border-color: #d8e0e6 !important;
+    color: #172530 !important;
+  }
+
+  .cx-button,
+  .cx-time-step,
+  .cx-time-clear,
+  .cx-time-confirm,
+  .cx-lc-button,
+  .cx-lc-row-button,
+  .cx-lc-icon-button { display: none !important; }
+
+  .cx-navigation-voyage-ticket,
+  .cx-daily-status,
+  .cx-time-allocation,
+  .cx-weekly-snapshot,
+  .cx-health-daily-summary,
+  .cx-mental-daily-summary,
+  .cx-lc-shell,
+  table,
+  blockquote,
+  pre {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }
