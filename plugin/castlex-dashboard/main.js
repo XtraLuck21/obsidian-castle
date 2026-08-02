@@ -2949,7 +2949,7 @@ class CastleXHomeView extends ItemView {
       const entryType = stateEntryType(frontmatter);
       if (voyage) voyageDays += 1;
       const level = entryType === "retrospective" ? 0 : count;
-      const day = track.createDiv({ cls: `cx-route-day cx-level-${level}${offset === 0 ? " is-today" : ""}` });
+      const day = track.createDiv({ cls: `cx-route-day cx-level-${level}${voyage ? " is-voyage" : " is-rest"}${offset === 0 ? " is-today" : ""}` });
       day.createSpan({ cls: "cx-route-node" });
       day.createSpan({ text: new Intl.DateTimeFormat("en-US", { weekday: "narrow" }).format(date), cls: "cx-route-weekday" });
       day.setAttr("aria-label", entryType === "retrospective" ? `${iso}: 休整日 · Retrospective` : `${iso}: ${count}/6 Navigation`);

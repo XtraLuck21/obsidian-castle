@@ -2418,6 +2418,16 @@ body.theme-light .cx-route-day.cx-level-3 .cx-route-node,
 body.theme-light .cx-route-day.cx-level-4 .cx-route-node,
 body.theme-light .cx-route-day.cx-level-5 .cx-route-node { background: #4f9bc2; }
 body.theme-light .cx-route-day.cx-level-6 .cx-route-node { background: #fff; border-color: #4d96bd; box-shadow: 0 0 10px rgba(58,136,180,.36); }
+body.theme-light .cx-route-day:not(.is-voyage) .cx-route-node {
+  background: #fff;
+  border-color: rgba(58, 136, 180, .72);
+  box-shadow: 0 0 0 3px rgba(235, 247, 252, .78);
+}
+body.theme-light .cx-route-day.is-voyage .cx-route-node {
+  background: #3f94c1;
+  border-color: #2679a6;
+  box-shadow: 0 0 0 3px rgba(222, 241, 250, .82), 0 0 8px rgba(47, 139, 186, .28);
+}
 
 body.theme-light .cx-mini-gauge,
 body.theme-light .cx-health-field,
@@ -2450,6 +2460,47 @@ body.theme-light .cx-heat-cell.is-missing {
 body.theme-light .cx-heat-cell.cx-intensity-0 {
   background: rgba(71, 128, 158, .2);
   border-color: rgba(43, 105, 139, .16);
+}
+body.theme-light .cx-heatmap-enrichment {
+  --cx-heat-rgb: 36, 117, 181;
+}
+body.theme-light .cx-heatmap-workout {
+  --cx-heat-rgb: 214, 105, 45;
+}
+body.theme-light .cx-heatmap-admin {
+  --cx-heat-rgb: 112, 83, 177;
+}
+body.theme-light .cx-heatmap-project {
+  --cx-heat-rgb: 65, 150, 99;
+}
+body.theme-light .cx-heatmap-enrichment .cx-heat-cell.cx-intensity-1,
+body.theme-light .cx-heatmap-workout .cx-heat-cell.cx-intensity-1,
+body.theme-light .cx-heatmap-admin .cx-heat-cell.cx-intensity-1,
+body.theme-light .cx-heatmap-project .cx-heat-cell.cx-intensity-1 {
+  background: rgba(var(--cx-heat-rgb), .34);
+  border-color: rgba(var(--cx-heat-rgb), .25);
+}
+body.theme-light .cx-heatmap-enrichment .cx-heat-cell.cx-intensity-2,
+body.theme-light .cx-heatmap-workout .cx-heat-cell.cx-intensity-2,
+body.theme-light .cx-heatmap-admin .cx-heat-cell.cx-intensity-2,
+body.theme-light .cx-heatmap-project .cx-heat-cell.cx-intensity-2 {
+  background: rgba(var(--cx-heat-rgb), .5);
+  border-color: rgba(var(--cx-heat-rgb), .34);
+}
+body.theme-light .cx-heatmap-enrichment .cx-heat-cell.cx-intensity-3,
+body.theme-light .cx-heatmap-workout .cx-heat-cell.cx-intensity-3,
+body.theme-light .cx-heatmap-admin .cx-heat-cell.cx-intensity-3,
+body.theme-light .cx-heatmap-project .cx-heat-cell.cx-intensity-3 {
+  background: rgba(var(--cx-heat-rgb), .68);
+  border-color: rgba(var(--cx-heat-rgb), .46);
+}
+body.theme-light .cx-heatmap-enrichment .cx-heat-cell.cx-intensity-4,
+body.theme-light .cx-heatmap-workout .cx-heat-cell.cx-intensity-4,
+body.theme-light .cx-heatmap-admin .cx-heat-cell.cx-intensity-4,
+body.theme-light .cx-heatmap-project .cx-heat-cell.cx-intensity-4 {
+  background: rgba(var(--cx-heat-rgb), .86);
+  border-color: rgba(var(--cx-heat-rgb), .62);
+  box-shadow: 0 0 6px rgba(var(--cx-heat-rgb), .2);
 }
 
 body.theme-light .cx-health-rotation-node.is-current {
@@ -2631,51 +2682,85 @@ body.theme-light .cx-lc-button.is-primary { background: linear-gradient(135deg, 
 /* Monthly Logbook semantic palette.
    Dataview components consume these tokens without choosing an appearance. */
 body.theme-dark .monthly-voyage {
-  --ink-900: #0b1220;
-  --ink-800: #111a2b;
-  --ink-700: #17223a;
-  --hairline: rgba(230, 233, 239, .08);
-  --chart-100: #e6e9ef;
-  --chart-400: #97a3b6;
-  --chart-600: #73859a;
-  --tide: #4e9c93;
-  --depth: #5b7fb8;
-  --clay: #a8705a;
-  --dusk: #7e7099;
-  --brass: #b08d3f;
-  --signal: #c2603f;
-  --mode-direct: #4e9c93;
-  --mode-planning: #3e7a73;
-  --mode-system: #2f5a57;
-  --mode-unclassified: #3a4356;
+  --ink-900: #081018;
+  --ink-800: #101922;
+  --ink-700: #16232d;
+  --hairline: rgba(145, 171, 191, .18);
+  --chart-100: #e5edf4;
+  --chart-400: #9dabb9;
+  --chart-600: #758798;
+  --tide: #51bd95;
+  --depth: #4e8ee5;
+  --clay: #f28b43;
+  --dusk: #9068d3;
+  --brass: #f0a15a;
+  --signal: #e85f78;
+  --mode-direct: #51bd95;
+  --mode-planning: #3f9778;
+  --mode-system: #31745f;
+  --mode-unclassified: #566576;
+  --event-start: #45bd86;
+  --event-restart: #9768d6;
+  --event-navigate: #4c91e8;
+  --event-turn: #f28b43;
+  --event-focus: #ed668f;
+  --event-assess: #45b98b;
+  --event-counsel: #976bd9;
+  --event-recovery: #4f91e3;
+  --phase-start: rgba(69, 189, 134, .2);
+  --phase-baseline: rgba(117, 135, 152, .17);
+  --phase-recovery: rgba(78, 142, 229, .18);
+  --phase-facing: rgba(242, 139, 67, .18);
+  --panel-bg: linear-gradient(145deg, rgba(18, 29, 39, .98), rgba(10, 18, 26, .98));
+  --panel-soft-bg: linear-gradient(145deg, rgba(26, 39, 50, .9), rgba(16, 27, 36, .9));
+  --panel-border: rgba(133, 162, 184, .21);
+  --panel-shadow: 0 15px 36px rgba(0, 0, 0, .24), inset 0 1px 0 rgba(229, 237, 244, .035);
+  --panel-shadow-soft: 0 8px 22px rgba(0, 0, 0, .15), inset 0 1px 0 rgba(229, 237, 244, .025);
 }
 
 body.theme-light .monthly-voyage {
-  --ink-900: #edf6fb;
+  --ink-900: #f4f9fd;
   --ink-800: #ffffff;
-  --ink-700: #e3f0f7;
-  --hairline: rgba(31, 83, 116, .16);
-  --chart-100: #17384f;
-  --chart-400: #4e6f84;
-  --chart-600: #5f7a8c;
-  --tide: #15877c;
-  --depth: #336fc0;
-  --clay: #b85e3e;
-  --dusk: #7654a8;
-  --brass: #956900;
-  --signal: #b84232;
-  --mode-direct: #15877c;
-  --mode-planning: #2a716b;
-  --mode-system: #385e5c;
-  --mode-unclassified: #617083;
+  --ink-700: #edf4f9;
+  --hairline: rgba(48, 88, 118, .13);
+  --chart-100: #142d4b;
+  --chart-400: #4b6279;
+  --chart-600: #60758a;
+  --tide: #2db98a;
+  --depth: #3f82df;
+  --clay: #ff862d;
+  --dusk: #8e5dd3;
+  --brass: #d97621;
+  --signal: #e34f78;
+  --mode-direct: #2db98a;
+  --mode-planning: #258e6d;
+  --mode-system: #246b57;
+  --mode-unclassified: #68798b;
+  --event-start: #22ad78;
+  --event-restart: #8856d0;
+  --event-navigate: #347fe1;
+  --event-turn: #ff7f22;
+  --event-focus: #f04f80;
+  --event-assess: #23aa7c;
+  --event-counsel: #8d5ad5;
+  --event-recovery: #397fd8;
+  --phase-start: rgba(45, 185, 138, .1);
+  --phase-baseline: rgba(104, 121, 139, .075);
+  --phase-recovery: rgba(63, 130, 223, .09);
+  --phase-facing: rgba(255, 134, 45, .1);
+  --panel-bg: linear-gradient(145deg, rgba(255, 255, 255, .98), rgba(248, 251, 254, .98));
+  --panel-soft-bg: linear-gradient(145deg, rgba(250, 253, 255, .98), rgba(239, 246, 251, .96));
+  --panel-border: rgba(48, 88, 118, .14);
+  --panel-shadow: 0 12px 28px rgba(51, 89, 119, .1), inset 0 1px 0 rgba(255, 255, 255, .92);
+  --panel-shadow-soft: 0 7px 18px rgba(51, 89, 119, .07), inset 0 1px 0 rgba(255, 255, 255, .9);
 }
 
 body.theme-dark .markdown-preview-view.monthly-voyage,
 body.theme-dark .markdown-source-view.monthly-voyage {
   background-color: var(--ink-900);
   background-image:
-    radial-gradient(circle at 82% 3%, rgba(91, 127, 184, .08), transparent 32%),
-    linear-gradient(180deg, #0b1220, #0d1728);
+    radial-gradient(circle at 82% 3%, rgba(78, 142, 229, .08), transparent 32%),
+    linear-gradient(180deg, #081018, #0c151e);
   color: var(--chart-100);
 }
 
@@ -2700,6 +2785,71 @@ body.theme-light .markdown-source-view.monthly-voyage {
 .monthly-voyage th { background: var(--ink-700); color: var(--chart-100); }
 .monthly-voyage td,
 .monthly-voyage th { border-color: var(--hairline); }
+
+/* Shared Monthly panel system, modeled after the July dashboard reference. */
+.monthly-voyage :is(
+  .cx-hero-main-panel,
+  .cx-hero-stat,
+  .cx-hero-event-detail,
+  .cx-insight-card,
+  .cx-memory-card,
+  .cx-scene-card,
+  .cx-belief-card,
+  .cx-decision-card,
+  .cx-cost-panel,
+  .cx-cost-ring-panel,
+  .cx-shape-row,
+  .cx-event-cell,
+  .cx-claim-row,
+  .cx-hypothesis-row
+) {
+  background: var(--panel-bg) !important;
+  border-color: var(--panel-border) !important;
+  box-shadow: var(--panel-shadow-soft) !important;
+}
+
+.monthly-voyage :is(
+  .cx-hero-svg,
+  .cx-mode-svg,
+  .cx-day-band-svg
+) {
+  background: var(--panel-bg) !important;
+  border-color: var(--panel-border) !important;
+  box-shadow: var(--panel-shadow) !important;
+}
+
+.monthly-voyage :is(
+  .cx-state-shapes,
+  .cx-work-modes,
+  .cx-day-bands,
+  .cx-coverage-grid
+) {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 22px;
+  box-shadow: var(--panel-shadow);
+  padding: 16px;
+}
+
+.monthly-voyage :is(.cx-claim-card, .cx-coverage-cell, .cx-cost-boundary) {
+  background: var(--panel-soft-bg) !important;
+  border-color: var(--panel-border) !important;
+}
+
+.monthly-voyage .cx-coverage-badge,
+.monthly-voyage :is(.cx-insight-trend, .cx-memory-date, .cx-scene-date, .cx-belief-chip, .cx-decision-badge) {
+  background: var(--panel-soft-bg);
+  border-color: var(--panel-border);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--chart-100) 5%, transparent);
+}
+
+body.theme-dark .monthly-voyage :is(.cx-hero-svg, .cx-mode-svg, .cx-day-band-svg) {
+  filter: drop-shadow(0 11px 22px rgba(0, 0, 0, .16));
+}
+
+body.theme-light .monthly-voyage :is(.cx-hero-svg, .cx-mode-svg, .cx-day-band-svg) {
+  filter: drop-shadow(0 9px 18px rgba(50, 89, 119, .07));
+}
 
 /* PDF export is always a paper presentation, independent of screen appearance. */
 @media print {
@@ -2740,6 +2890,23 @@ body.theme-light .markdown-source-view.monthly-voyage {
     --mode-planning: #315f5b;
     --mode-system: #425a59;
     --mode-unclassified: #596572;
+    --event-start: #176f67;
+    --event-restart: #655286;
+    --event-navigate: #315f9e;
+    --event-turn: #965039;
+    --event-focus: #9f385a;
+    --event-assess: #26745f;
+    --event-counsel: #655286;
+    --event-recovery: #315f9e;
+    --phase-start: rgba(23, 111, 103, .08);
+    --phase-baseline: rgba(63, 86, 103, .06);
+    --phase-recovery: rgba(49, 95, 158, .07);
+    --phase-facing: rgba(150, 80, 57, .07);
+    --panel-bg: #ffffff;
+    --panel-soft-bg: #f4f7f9;
+    --panel-border: #cbd6de;
+    --panel-shadow: none;
+    --panel-shadow-soft: none;
   }
 
   body,
