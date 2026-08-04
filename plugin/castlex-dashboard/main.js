@@ -386,7 +386,7 @@ function timeLevel(value, metric) {
   const minutes = minutesValue(value);
   if (minutes === null) return null;
   if (minutes === 0) return 0;
-  return Math.min(4, Math.ceil(minutes / metric.unit));
+  return Math.min(4, Math.floor(minutes / metric.unit) + 1);
 }
 
 function formatDuration(value) {
@@ -400,8 +400,8 @@ function formatDuration(value) {
 }
 
 function timeThresholdLabel(metric) {
-  if (metric.unit === 60) return "≤1h · ≤2h · ≤3h · >3h";
-  return "≤30m · ≤60m · ≤90m · >90m";
+  if (metric.unit === 60) return "<1h · <2h · <3h · ≥3h";
+  return "<30m · <60m · <90m · ≥90m";
 }
 
 function healthWorkout(id) {
@@ -2089,6 +2089,67 @@ class DailyTimeRingsChild extends MarkdownRenderChild {
   }
 }
 
+const DAY_METRICS_MODEL = "project-execution-v1";
+
+function ledgerDurationMinutes(value) {
+  const text = String(value || "").trim();
+  const hours = text.match(/(\d+(?:\.\d+)?)\s*h/i);
+  const minutes = text.match(/(\d+)\s*m/i);
+  if (!hours && !minutes) return 0;
+  return Math.round((hours ? Number(hours[1]) * 60 : 0) + (minutes ? Number(minutes[1]) : 0));
+}
+
+function ledgerProjectKeys(value) {
+  const text = String(value || "").trim().replace(/^['"]|['"]$/g, "");
+  if (!text) return [];
+  const link = text.match(/^\[\[([^|\]]+)(?:\|([^\]]+))?\]\]$/);
+  if (!link) return [text.toLowerCase()];
+  const target = link[1].replace(/\.md$/i, "");
+  const basename = target.split("/").pop();
+  return [...new Set([target, basename, link[2]].filter(Boolean).map((item) => item.trim().toLowerCase()))];
+}
+
+function parseDailyDayMetrics(markdown, frontmatter = {}) {
+  const start = /^## Time & Task Log\s*$/m.exec(markdown || "");
+  if (!start) return { projectMinutes: 0, executionMinutes: 0 };
+  let section = markdown.slice(start.index + start[0].length);
+  const nextHeading = section.search(/^##\s+/m);
+  if (nextHeading >= 0) section = section.slice(0, nextHeading);
+  section = section.replace(/<!--[\s\S]*?-->/g, "");
+
+  const blocks = [];
+  let current = null;
+  section.split(/\r?\n/).forEach((line) => {
+    const header = line.match(/^-\s+.+?\s+·\s+Engaged:\s*(.+?)\s*$/);
+    if (header) {
+      current = { minutes: ledgerDurationMinutes(header[1]), mode: "", project: "", category: "" };
+      blocks.push(current);
+      return;
+    }
+    if (!current) return;
+    const mode = line.match(/^\s{2,}-\s+Activity Mode:\s*(.+?)\s*$/i);
+    const project = line.match(/^\s{2,}-\s+Project:\s*(.+?)\s*$/i);
+    const category = line.match(/^\s{2,}-\s+(Admin|Workout|Enrichment)\s*$/i);
+    if (mode) current.mode = mode[1].trim();
+    if (project) current.project = project[1].trim();
+    if (category) current.category = category[1].toLowerCase();
+  });
+
+  const coreKeys = new Set();
+  const snapshot = Array.isArray(frontmatter.core_snapshot) ? frontmatter.core_snapshot : [];
+  snapshot.filter((entry) => entry?.core === true).forEach((entry) => {
+    ledgerProjectKeys(entry.project).forEach((key) => coreKeys.add(key));
+  });
+
+  return blocks.reduce((totals, block) => {
+    const isCoreProject = block.project && ledgerProjectKeys(block.project).some((key) => coreKeys.has(key));
+    if (isCoreProject) totals.projectMinutes += block.minutes;
+    if (block.project && block.mode.toLowerCase() === "execution") totals.executionMinutes += block.minutes;
+    if (block.category === "admin" || block.category === "workout") totals.executionMinutes += block.minutes;
+    return totals;
+  }, { projectMinutes: 0, executionMinutes: 0 });
+}
+
 class WeeklySnapshotChild extends MarkdownRenderChild {
   constructor(container, app, file) {
     super(container);
@@ -2225,6 +2286,7 @@ class WeeklySnapshotChild extends MarkdownRenderChild {
 
   async render() {
     const weeklyFrontmatter = await freshFrontmatter(this.app, this.file);
+    const dayMetricsEnabled = weeklyFrontmatter.day_metrics_model === DAY_METRICS_MODEL;
     const dates = dateRange(weeklyFrontmatter.period_start, weeklyFrontmatter.period_end);
     this.periodPaths = new Set(dates.map((date) => dailyPathFromISO(localISO(date))).filter(Boolean));
     const days = await Promise.all(dates.map(async (date) => {
@@ -2232,6 +2294,7 @@ class WeeklySnapshotChild extends MarkdownRenderChild {
       const path = dailyPathFromISO(iso);
       const file = path ? this.app.vault.getAbstractFileByPath(path) : null;
       const frontmatter = file instanceof TFile ? await freshFrontmatter(this.app, file) : {};
+      const markdown = dayMetricsEnabled && file instanceof TFile ? await this.app.vault.cachedRead(file) : "";
       const values = TIME_METRICS.map((metric) => minutesValue(frontmatter?.[metric.key]));
       return {
         iso,
@@ -2239,6 +2302,7 @@ class WeeklySnapshotChild extends MarkdownRenderChild {
         frontmatter,
         totalMinutes: values.filter((value) => value !== null).reduce((sum, value) => sum + value, 0),
         hasTimeData: values.some((value) => value !== null),
+        dayMetrics: dayMetricsEnabled ? parseDailyDayMetrics(markdown, frontmatter) : null,
       };
     }));
     if (!this.containerEl.isConnected) return;
@@ -2259,12 +2323,21 @@ class WeeklySnapshotChild extends MarkdownRenderChild {
       cls: "cx-weekly-period",
     });
 
-    const stats = wrap.createDiv({ cls: "cx-weekly-stats" });
-    [
+    const stats = wrap.createDiv({ cls: `cx-weekly-stats${dayMetricsEnabled ? " has-day-metrics" : ""}` });
+    const statItems = [
       [formatDuration(totalMinutes), "Engaged time"],
       [formatDuration(Math.round(totalMinutes / days.length)), "Daily average"],
       [`${recordedDays}/${days.length}`, "Days with time data"],
-    ].forEach(([value, label]) => {
+    ];
+    if (dayMetricsEnabled) {
+      const projectDays = days.filter((day) => (day.dayMetrics?.projectMinutes || 0) >= 120).length;
+      const executionDays = days.filter((day) => (day.dayMetrics?.executionMinutes || 0) >= 120).length;
+      statItems.push(
+        [`${projectDays}/${days.length}`, "Project Days"],
+        [`${executionDays}/${days.length}`, "Execution Days"],
+      );
+    }
+    statItems.forEach(([value, label]) => {
       const stat = stats.createDiv({ cls: "cx-weekly-stat" });
       stat.createDiv({ text: value, cls: "cx-weekly-stat-value" });
       stat.createDiv({ text: label, cls: "cx-weekly-stat-label" });
@@ -4381,7 +4454,7 @@ class CastleXHealthView extends ItemView {
           const row = setRows.createEl("label", { cls: `cx-health-set${completed.has(key) ? " is-complete" : ""}` });
           const checkbox = row.createEl("input", { attr: { type: "checkbox" } });
           checkbox.checked = completed.has(key);
-          row.createSpan({ text: label });
+          row.createSpan({ text: label, cls: "cx-health-set-label" });
           checkbox.addEventListener("change", () => this.toggleWorkoutSet(file, key, checkbox.checked));
         });
       });

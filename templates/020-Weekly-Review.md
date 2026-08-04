@@ -3,6 +3,7 @@ type: weekly-review
 week: {{date:gggg-[W]ww}}
 period_start:
 period_end:
+day_metrics_model: project-execution-v1
 origin: mixed
 cssclasses:
   - castle-dashboard

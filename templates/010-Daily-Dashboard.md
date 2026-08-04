@@ -119,32 +119,7 @@ cssclasses:
 ```castlex-time-rings
 ```
 
-<!-- Codex 新增或整理的 Daily 内容默认使用普通文本；不得为 bullet title、前缀、标签、callout 元数据或说明主动添加 Markdown 粗体。仅当用户明确要求，或需要原样保留用户本人书写中已有的粗体时例外。 -->
-
 ## Time & Task Log
-
-<!--
-从 2026-08-01 起，Codex 根据 Raw Notes 提取有明确证据的投入，按自然日顺序写入 nested bullet ledger。
-每个顶层 bullet 是一个时间块，格式为「HH:MM–HH:MM · Engaged: 时长」；Window 是时段，Engaged 是可归属的实际投入。跨午夜的记录在 00:00 处分成两条对应自然日记录。
-每个时间块下面固定写 Activity 与 Source；Project 行再写 Activity Mode 与 Project。Activity Mode 只使用 Execution、Planning、System、Not Classified；没有对应 `30_Projects/` Project 文件的标题直接写普通文本，不使用 Wikilink，默认为 non-core。
-凡涉及脑力工作、写文件、规划、系统维护或 review 的投入都归 Project / Domain（即使该 Domain 是 non-core）；Admin 只用于买菜、通勤、回邮件、打客服电话等日常事务。非 Project 时间块只写 category 与 activity，并使用 Enrichment、Admin、Workout 等裸 category bullet；不要给 Workout 或 Counseling 强行套用 Execution。
-Source 只使用 human、dashboard、ai、legacy-derived、unknown 等受控值。无法可靠分类的旧资料只标记为 legacy-derived 或 unknown。
-core_snapshot 是按本 Daily 生成时 Project 的 status 冻结出的内部派生数据，不要求每天手填，也不要追溯改写。
-旧格式的 2026-07-26–2026-07-31 仅供 Weekly/Monthly 只读 derived mapping 使用，不回写旧 Daily。
--->
-
-<!-- 新格式示例：
-- 14:00–16:00 · Engaged: 2h
-  - Activity: Drafted a section
-  - Activity Mode: Execution
-  - Project: [[30_Projects/Example-Project|Example Project]]
-  - Source: human
-
-- 14:00–17:00 · Engaged: 1h
-  - Activity: Commute to campus
-  - Admin
-  - Source: human
--->
 
 ## Health Snapshot
 
@@ -158,20 +133,10 @@ core_snapshot 是按本 Daily 生成时 Project 的 status 冻结出的内部派
 
 ## Today’s Wins
 
-<!-- 鼓励有效习惯、选择与应对方式；不要复述 Completed Today 的成果。仅保留最重要的 3–5 条，并只使用 Raw Notes 中有证据的内容。 -->
-
 ## Completed Today
-
-<!-- 已完成的可验证任务或结果；只用最短措辞写“完成了什么”。不得包含时间戳、日期、时段或投入时长，不得把 Time & Task Log 改写成另一份流水账；不写鼓励性评价，不分子 section。 -->
 
 ## Open Loops
 
-<!-- 已经启动、承诺、等待反馈或需要明确跟进，但尚未闭环的事项。 -->
-
 ## Backlog
 
-<!-- 尚未启动且明确延后的事项；不得从模糊想法中发明任务。 -->
-
 ## Raw Notes
-
-<!-- 你的原始记录放在最后；Codex 整理时不得静默改写。按写入时间从早到晚保留，后续补充或更正一律追加在已有内容之后。Codex 追加标签时使用普通文本，例如「时间补充：」；不得主动增加粗体。若用户原文已经包含粗体，则原样保留。 -->

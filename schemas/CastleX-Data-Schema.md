@@ -164,6 +164,11 @@ explanatory text. This applies to AI Time Allocation notes, `Time & Task Log`,
 `Raw Notes`. The only exceptions are an explicit user request for bold or
 verbatim preservation of bold already present in the user's own writing.
 
+Starting with Daily Notes dated 2026-08-03, Daily files contain no HTML comment
+blocks. Formatting, synthesis, ledger, provenance, and Raw Notes preservation
+rules live in this Schema rather than being copied into every Daily Note. Daily
+Notes dated 2026-08-02 or earlier remain unchanged.
+
 ```text
 时间补充：7 月 26 日凌晨约 01:30–03:00，我也在策划 Mental Dashboard，投入约 1.5 小时。
 ```
@@ -215,7 +220,9 @@ visualization, or end-of-day reflection.
   `status_at_generation: non-project-domain` in the snapshot.
 - A non-Project block records only a bare category bullet (`Enrichment`, `Admin`,
   or `Workout`) and `Activity`; it omits `Activity Mode` and `Project`. Workout
-  and Counseling are never forced into `Execution`.
+  and Counseling are never assigned an Activity Mode. Admin and Workout are
+  nevertheless treated as inherently executed time in the derived Execution
+  Day metric; this does not add `Activity Mode: Execution` to their ledger rows.
 - `Source` is a single provenance bullet. Controlled values include `human`,
   `dashboard`, `ai`, `legacy-derived`, and `unknown`; derived legacy mappings
   must use `legacy-derived` or `unknown`.
@@ -295,21 +302,27 @@ Assign a time block to one primary category unless the source explicitly splits
 it. Project-directed learning belongs to `Project`, not both Project and
 Enrichment.
 
-### Action and Execution days
+### Project and Execution days
 
-- An **Action Day** is a natural date whose frozen Core Project rows total at
+- A **Project Day** is a natural date whose frozen Core Project rows total at
   least 120 engaged minutes, regardless of whether those rows are Execution,
-  Planning, System, or Not Classified.
-- An **Execution Day** is a natural date whose Project rows with
-  `Activity Mode: Execution` total at least 120 engaged minutes. Non-Project
-  rows and `Not Classified` time do not count.
+  Planning, System, or Not Classified. Non-core Project rows do not count
+  toward Project Day.
+- An **Execution Day** is a natural date with at least 120 engaged minutes from
+  the sum of all Project rows marked `Activity Mode: Execution`, all `Admin`
+  rows, and all `Workout` rows. The Project may be Core or non-core. Enrichment,
+  Planning, System, and Not Classified time do not count.
 - `23:00–24:00` is assigned to the previous natural date; `00:00–01:00` is
   assigned to the next natural date. A cross-midnight window is split before
   aggregation.
-- Weekly Reviews may display the current period's Action Day and Execution Day
-  counts. Monthly Reviews may display total Action Days and Longest Execution
-  Streak. These metrics remain separate from Voyage Day and are not rendered on
-  the Main Dashboard for now.
+- A new Weekly Review declares `day_metrics_model: project-execution-v1` and
+  displays `Project Days n/7` and `Execution Days n/7`. Existing Weekly Reviews
+  without that model remain unchanged.
+- Future Monthly Reviews display `Project Days n/N` and `Execution Days n/N`,
+  where `N` is the number of natural dates in that month. They do not display a
+  longest streak. Existing Monthly Reviews remain frozen.
+- These metrics remain separate from Voyage Day and are not rendered on the
+  Main Dashboard.
 
 ### Four Heatmap levels
 

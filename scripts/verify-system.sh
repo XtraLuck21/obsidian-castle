@@ -84,6 +84,9 @@ rg -Fq 'body.theme-light .cx-heatmap-workout {' "$plugin/styles.css" || fail "Li
 rg -Fq 'body.theme-light .cx-heatmap-admin {' "$plugin/styles.css" || fail "Light-mode Admin heatmap lacks a distinct purple scale"
 rg -Fq 'body.theme-light .cx-heatmap-project .cx-heat-cell.cx-intensity-4 {' "$plugin/styles.css" || fail "Light-mode Project heatmap lacks the shared darkest level"
 rg -Fq 'body.theme-light .cx-heatmap-admin .cx-heat-cell.cx-intensity-4,' "$plugin/styles.css" || fail "Light-mode Admin heatmap lacks the shared darkest level"
+rg -Fq 'Math.floor(minutes / metric.unit) + 1' "$plugin/main.js" || fail "Heatmap thresholds do not promote exact boundaries"
+rg -Fq '<1h · <2h · <3h · ≥3h' "$plugin/main.js" || fail "Hourly heatmap legend does not describe the new boundaries"
+rg -Fq '<30m · <60m · <90m · ≥90m' "$plugin/main.js" || fail "Half-hour heatmap legend does not describe the new boundaries"
 rg -Fq 'body.theme-light .cx-health-rotation-node.is-current {' "$plugin/styles.css" || fail "Light-mode Health rotation missing current-workout highlight"
 rg -Fq 'body.theme-light .cx-health-reasons ul {' "$plugin/styles.css" || fail "Light-mode Health recommendation reasons are not readable"
 rg -Fq 'body.theme-light .weekly-voyage .cx-weekly-snapshot {' "$plugin/styles.css" || fail "Weekly Snapshot missing explicit light-mode surface"
@@ -178,6 +181,7 @@ rg -q '山羊挺身' "$plugin/main.js" || fail "Workout plan missing 山羊挺�
 rg -Fq 'healthModeLabel(session.mode)' "$plugin/main.js" || fail "Completed sessions do not display Standard or Light mode"
 rg -q 'planned_working_sets' "$plugin/main.js" || fail "Completed sessions do not preserve working-set totals"
 rg -q 'cx-health-set-breakdown' "$plugin/styles.css" || fail "Workout Mode does not separate working and warm-up set progress"
+rg -Fq 'body.theme-light .cx-health-set-label' "$plugin/styles.css" || fail "Light-mode workout set labels lack an explicit readable color"
 rg -Fq 'content: "✓"' "$plugin/styles.css" || fail "Completed Health Check-ins do not use a check mark"
 rg -q 'cx-health-summary-tag' "$plugin/main.js" "$plugin/styles.css" || fail "Daily Health Snapshot missing compact workout status tag"
 rg -q 'trendPages.push' "$plugin/main.js" || fail "Mobile Health trends do not force-include freshly read Today data"
@@ -328,12 +332,15 @@ rg -Fq -- '- Project: [[' "$template" "$schema" || fail "Daily task log missing 
 rg -Fq -- '- Admin' "$template" "$schema" || fail "Daily task log missing non-Project category bullet"
 rg -Fq '23:00–24:00' "$template" "$schema" || fail "Daily task log missing natural-date boundary rule"
 rg -Fq 'core_snapshot' "$template" "$schema" || fail "Daily task log missing frozen Core snapshot rule"
-rg -Fq 'Action Day' "$schema" || fail "Schema missing Action Day rule"
+rg -Fq 'Project Day' "$schema" || fail "Schema missing Project Day rule"
 rg -Fq 'Execution Day' "$schema" || fail "Schema missing Execution Day rule"
 rg -Fq 'Do not create an `End-of-day Evidence` section.' "$schema" || fail "Schema does not prohibit End-of-day Evidence"
-rg -Fq '不得包含时间戳、日期、时段或投入时长' "$template" || fail "Completed Today does not prohibit task-log timing details"
-rg -Fq '不得为 bullet title、前缀、标签、callout 元数据或说明主动添加 Markdown 粗体' "$template" || fail "Daily template does not prohibit Codex-added bold styling"
+if rg -q -U '<!--[\s\S]*?-->' "$template"; then
+  fail "Daily template still embeds HTML instruction comments"
+fi
+rg -Fq 'timestamp, date, clock range, or duration' "$schema" || fail "Completed Today does not prohibit task-log timing details"
 rg -Fq 'not add bold styling to bullet titles' "$schema" || fail "Daily Schema does not prohibit Codex-added bold styling"
+rg -Fq 'Daily files contain no HTML comment' "$schema" || fail "Daily Schema does not define the comment-free cutover"
 if rg -Fq '**时间补充：**' "$template" "$schema"; then
   fail "Daily template or Schema still prescribes a bold Raw Notes label"
 fi
@@ -351,6 +358,11 @@ rg -q '^```castlex-weekly-snapshot$' "$weekly_template" || fail "Weekly template
 for field in period_start period_end; do
   rg -q "^${field}:" "$weekly_template" || fail "Weekly template missing $field"
 done
+rg -q '^day_metrics_model: project-execution-v1$' "$weekly_template" || fail "Weekly template missing Project/Execution day metrics model"
+rg -Fq '"Project Days"' "$plugin/main.js" || fail "Weekly snapshot missing Project Day count"
+rg -Fq '"Execution Days"' "$plugin/main.js" || fail "Weekly snapshot missing Execution Day count"
+rg -Fq 'block.category === "admin" || block.category === "workout"' "$plugin/main.js" || fail "Execution Day does not include Admin and Workout"
+rg -Fq 'section = section.replace(/<!--[\s\S]*?-->/g, "");' "$plugin/main.js" || fail "Weekly day metrics may count commented Daily examples"
 rg -q 'castlex-weekly-snapshot' "$plugin/main.js" || fail "Dashboard missing Weekly Snapshot processor"
 rg -Fq 'navigation ? "navigation_activation" : "agency"' "$plugin/main.js" || fail "Weekly Snapshot does not switch Activation sources"
 rg -Fq 'stateTrendValue(day.frontmatter, "sleep")' "$plugin/main.js" || fail "Weekly Snapshot does not use the dual-model Sleep source"

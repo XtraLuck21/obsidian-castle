@@ -249,7 +249,7 @@ including when that Domain is non-core. `Admin` is reserved for routine
 activities such as groceries, commuting, routine email, and customer-service
 calls. Non-Project rows use a category such as `Enrichment`, `Admin`, or
 `Workout` as a bare nested bullet and omit Activity Mode. Workout and
-Counseling are never forced into Execution. A window crossing
+Counseling are never assigned an Activity Mode. A window crossing
 midnight is split at the natural-date boundary. The ledger remains textual
 source for later Weekly and Monthly Reviews; it does not add a dashboard
 component or `End-of-day Evidence` section. Daily Notes from 2026-07-26 through
@@ -258,12 +258,14 @@ mapping.
 
 Each new Daily may carry an internal `core_snapshot`: `status: active` is Core
 and every other Project status is non-core, frozen at generation time. This is
-not a user-facing Project property and does not use `project_role`. Action Day
-means at least 120 minutes of frozen Core Project time, including Not Classified;
-Execution Day means at least 120 minutes of Project Execution time, excluding
-Not Classified and all non-Project categories. Weekly shows both counts,
-Monthly shows total Action Days and Longest Execution Streak, and Main Dashboard
-does not show these metrics yet.
+not a user-facing Project property and does not use `project_role`. A Project
+Day means at least 120 minutes of frozen Core Project time across Execution,
+Planning, System, and Not Classified. An Execution Day means at least 120
+minutes of actual doing: every Project row marked Execution plus all Admin and
+Workout time; Enrichment, Planning, System, and Not Classified do not count.
+New Weekly Reviews show both counts out of the seven-day period. Future Monthly
+Reviews show both counts out of the month's 28, 29, 30, or 31 natural dates and
+do not report a longest streak. Main Dashboard does not show these metrics.
 
 AI may also populate four non-overlapping flat bullet lists: `Today’s Wins`
 recognizes effective habits and choices, `Completed Today` records factual
@@ -273,6 +275,10 @@ synthesis belongs in the Weekly Review. `Today’s Wins` is limited to the three
 to five most important observations. `Completed Today` uses the shortest useful
 task or outcome wording and never repeats timestamps, clock ranges, dates, or
 durations from `Time & Task Log`.
+
+Daily Notes dated 2026-08-03 or later do not embed HTML instruction comments or
+example ledgers. Canonical instructions live in the Schema, keeping each Daily
+limited to its actual data and content. Earlier Daily Notes are not rewritten.
 
 Codex-generated Daily content uses plain Markdown text by default, including
 bullet titles, prefixes, labels, callout metadata, explanatory text, and

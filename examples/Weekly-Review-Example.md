@@ -3,6 +3,7 @@ type: weekly-review
 week: 2099-W01
 period_start: 2099-01-01
 period_end: 2099-01-07
+day_metrics_model: project-execution-v1
 origin: mixed
 cssclasses:
   - castle-dashboard
