@@ -24,11 +24,7 @@ admin_minutes_origin:
 workout_minutes_origin:
 enrichment_minutes_origin:
 time_data_reviewed: false
-health_night_bedtime_at:
-health_night_sleepiness:
-health_night_calmness:
-health_night_awake_reasons: []
-health_night_completed_at:
+health_early_morning_bedtime_at:
 health_morning_started_at:
 health_morning_sleep:
 health_morning_recovery:
@@ -57,6 +53,11 @@ health_evening_appetite_stability:
 health_evening_post_workout:
 health_evening_body_note:
 health_evening_completed_at:
+health_night_bedtime_at:
+health_night_sleepiness:
+health_night_calmness:
+health_night_awake_reasons: []
+health_night_completed_at:
 health_planned_workout:
 health_planned_rotation_slot:
 health_recommended_workout:

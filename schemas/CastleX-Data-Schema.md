@@ -241,10 +241,13 @@ visualization, or end-of-day reflection.
       generated_for: 2099-01-01
   ```
 
-  `status: active` means Core; every other status means non-core. The snapshot
-  is frozen per Daily/Weekly generation so later Project status changes cannot
-  rewrite historical rollups. It is not a user-facing Project property and
-  does not use `project_role`.
+  Core is read from the linked Project's explicit boolean `core` property.
+  `status` does not imply Core: an Active Project may be Core or non-core. A
+  missing or non-boolean `core` value is conservatively treated as `false` and
+  must not be inferred from lifecycle. The snapshot is frozen per Daily/Weekly
+  generation so later Project lifecycle or Core changes cannot rewrite
+  historical rollups. The snapshot remains internal derived metadata and does
+  not use `project_role`.
 - Daily is the time ledger source of truth. Human corrections take precedence,
   while Raw Notes remain unchanged and append-only.
 - Do not copy timestamps, ranges, or durations into `Completed Today`.
@@ -328,17 +331,17 @@ Enrichment.
 
 For Project and Enrichment:
 
-- Level 1: `1–60` minutes
-- Level 2: `61–120` minutes
-- Level 3: `121–180` minutes
-- Level 4: more than `180` minutes
+- Level 1: `1–59` minutes
+- Level 2: `60–119` minutes
+- Level 3: `120–179` minutes
+- Level 4: `180` minutes or more
 
 For Admin and Workout:
 
-- Level 1: `1–30` minutes
-- Level 2: `31–60` minutes
-- Level 3: `61–90` minutes
-- Level 4: more than `90` minutes
+- Level 1: `1–29` minutes
+- Level 2: `30–59` minutes
+- Level 3: `60–89` minutes
+- Level 4: `90` minutes or more
 
 Codex may only sum durations that are explicit in the source. It must not invent
 minutes from vague phrases. A mentioned activity without a usable duration stays
@@ -366,19 +369,32 @@ Navigation v1 dates.
 
 ### Time-aware check-ins
 
-- From 00:00 through 08:59, the recommended form is 夜间.
-- From 09:00 through 13:59, the recommended form is 早晨.
-- From 14:00 through 20:59, the recommended form is 傍晚.
-- From 21:00 through 23:59, the recommended form is 晚间.
-- Stage controls are displayed in the same 夜间 → 早晨 → 傍晚 → 晚间
-  order, so the first stage describes the preceding night's close.
+- Through 2026-08-06, the legacy recommendation remains 00:00–08:59 夜间,
+  09:00–13:59 早晨, 14:00–20:59 傍晚, and 21:00–23:59 晚间.
+- Starting on the 2026-08-07 schedule cutover, 00:00–11:59 recommends 早晨,
+  12:00–17:59 recommends 白天, 18:00–21:59 recommends 晚间, and
+  22:00–23:59 recommends 夜间. The intended ordinary Morning recording window
+  is 08:00–11:59; the earlier hours remain routed to Morning so a new natural
+  date never continues the previous date's Night form.
+- From the cutover onward, stage controls are displayed in
+  早晨 → 白天 → 晚间 → 夜间 order. The internal `health_afternoon_*` field names
+  remain unchanged for compatibility, while their UI label becomes 白天.
 - Time only recommends a default. The four stage controls remain directly
   selectable at all times.
-- Entering Health from Mental's completed voyage opens 夜间 directly. Manual
-  stage choice outranks the time recommendation until the natural date changes.
-- Health always belongs to the current natural date. A 02:00 lights-out action
-  writes the Daily whose date contains that 02:00 timestamp. No previous-date
-  lock or voyage-style cross-midnight ownership is applied.
+- Through 2026-08-06, entering Health from a completed Mental voyage opens 夜间.
+  Starting on the cutover, a post-midnight transition opens the new date's
+  早晨; a same-evening transition opens 夜间. Manual stage choice outranks the
+  time recommendation until the natural date changes.
+- Health always belongs to the current natural date. At 00:00, Health clears any
+  manual stage override, switches to the new date's Daily, and opens 早晨. An
+  unfinished prior-date Night stays incomplete and cannot be completed from the
+  new date's Dashboard.
+- Starting on the cutover, the ordinary 夜间 lights-out ritual records only in
+  its live 22:00–23:59 window. From 00:00 through 07:59, when the previous date
+  has no lights-out timestamp, Morning instead offers a separate live-only
+  `跨夜入睡` action. It writes the exact current timestamp to the new natural
+  date and disappears when the live window ends; it cannot be backfilled later
+  in the morning.
 - Every discrete selection writes immediately. A period completion timestamp is
   optional. The stage tracker shows `已记录` when every core field for that
   stage has an answer, or when the user explicitly presses its completion
@@ -395,12 +411,7 @@ signal-bar scale and is stored in `health_afternoon_energy_signal`.
 The principal input fields are:
 
 ```yaml
-health_night_bedtime_at:
-health_night_sleepiness:
-health_night_calmness:
-health_night_awake_reasons: []
-health_night_completed_at:
-
+health_early_morning_bedtime_at:
 health_morning_started_at:
 health_morning_sleep:
 health_morning_recovery:
@@ -431,6 +442,12 @@ health_evening_appetite_stability:
 health_evening_post_workout:
 health_evening_body_note:
 health_evening_completed_at:
+
+health_night_bedtime_at:
+health_night_sleepiness:
+health_night_calmness:
+health_night_awake_reasons: []
+health_night_completed_at:
 ```
 
 `health_morning_regions` and `health_afternoon_regions` accept `chest` in
@@ -438,11 +455,14 @@ addition to the existing shoulder, back, arm, leg, whole-body, and none values.
 When paired with soreness, `chest` is treated as relevant to Upper-body
 training recommendations.
 
-Sleep State belongs to the natural calendar date on which the entry begins. For
-example, an entry opened at 23:50 on July 24 remains in the July 24 Daily if the
-user presses `关灯` after midnight. An entry first opened at 00:08 on July 25
-belongs to July 25. The full-width
-lights-out control records the exact preparation time and completes the period.
+Through 2026-08-06, Sleep State retains its legacy behavior. Starting on
+2026-08-07, the full-width Night lights-out control records the exact preparation
+time only before midnight and completes that date's Night period. Crossing
+00:00 without using it leaves the prior date empty. The new date may instead
+record an exact `health_early_morning_bedtime_at` from 00:00 through 07:59; that
+timestamp is a separate natural-date event and does not complete or backfill the
+prior Night. A single Daily may therefore contain an early-morning cross-night
+bedtime and another ordinary Night bedtime later on the same natural date.
 Sleepiness and Calmness use positive `1–5` signal scales. Awake reasons are a
 multi-select set including not sleepy, screen or entertainment, work or study,
 social activity, late workout, physical discomfort, hunger or thirst, ordinary
@@ -499,9 +519,10 @@ voyage_ended_at:
 ```
 
 Stress source is single-select. Emotions and relief factors accept at most two
-values each. `今日风向` presents the three fields as full-width rows with a
-stable title, short explanation, and visible choices. Context questions are
-optional and never block voyage closure.
+values each. The controlled emotion choices include `wronged` (`委屈`) and
+`angry` (`愤怒`) alongside the existing choices. `今日风向` presents the three
+fields as full-width rows with a stable title, short explanation, and visible
+choices. Context questions are optional and never block voyage closure.
 `mental_evening_closure` is one of `active`, `shelved`, or `released`, presented
 as 还在心上, 暂时搁置, or 可以放下. Their static icons respectively show two
 sheets, a sheet placed into an envelope, or a conventional airplane indicating
@@ -711,6 +732,7 @@ Workstream lifecycle is stored in the existing `status` field:
 type: project
 status: incubating
 focus: false
+core: false
 area:
 priority:
 progress_sections:
@@ -728,29 +750,39 @@ start and remains blank while that decision has not been made. `priority` and
 `target` likewise remain blank until Manager or the user commits them. File
 creation never fills those Commitment properties by inference.
 
+`core` is a required explicit boolean portfolio classification. `core: true`
+means all of the Project's frozen Daily time may contribute to Project Day;
+`core: false` means none of it contributes to Project Day. This classification
+is independent from lifecycle and Dashboard focus. An Active Project may be
+non-core when it is a current supporting, operational, or bounded decision
+Project. Missing or invalid `core` is treated as false rather than inferred from
+`status`.
+
 The five canonical values and capacity semantics are:
 
 | `status` | Manager label | Capacity semantics |
 | --- | --- | --- |
-| `active` | Active | Receives deliberate growth capacity and may produce current tasks. |
+| `active` | Active | Is currently being advanced and may produce current tasks; Core classification is separate. |
 | `maintenance` | Maintenance | Receives only the minimum recurring capacity needed to preserve continuity; it is not growth work. |
 | `incubating` | Incubating | Remains exploratory or proposed and receives no default scheduled capacity. |
 | `paused` | Paused | Retains context and history but receives no current capacity until explicitly resumed. |
 | `closed` | Closed | Is ended and retained for history; it receives no current capacity. |
 
-New Project notes default to `incubating` and `focus: false`, so creating a note
-does not silently create an Active Commitment or place proposed tasks in
-Upcoming Tasks. A user-authorized Domain Expert may establish this one canonical
-note directly under `30_Projects/`; no Proposal folder, duplicate intake note,
-copy, move, or later conversion is required. Note creation authorizes durable
-Proposal drafting, not portfolio capacity.
+New Project notes default to `incubating`, `focus: false`, and `core: false`, so
+creating a note does not silently create an Active Commitment, classify it as
+Core, or place proposed tasks in Upcoming Tasks. A user-authorized Domain
+Expert may establish this one canonical note directly under `30_Projects/`;
+no Proposal folder, duplicate intake note, copy, move, or later conversion is
+required.
+Note creation authorizes durable Proposal drafting, not portfolio capacity.
 
 While the Project remains Incubating, its Outcome, evidence, milestones, tasks,
 timeline, effort, risks, assumptions, and expectations are advisory. They stay
 in the canonical Project body so Manager can review and edit the same file.
-Manager or the user owns lifecycle, `focus`, committed `priority`, `started`,
-`target`, capacity, scope, effort, and expectations. A Manager or the user
-changes `status` only when the lifecycle decision changes. There is no recurring
+Manager or the user owns lifecycle, `focus`, `core`, committed `priority`,
+`started`, `target`, capacity, scope, effort, and expectations. A Manager or the
+user changes `status` only when the lifecycle decision changes and changes
+`core` only when Project Day classification changes. There is no recurring
 lifecycle check-in, Proposal database, or closure form.
 
 ### Project creation provenance
@@ -779,8 +811,8 @@ concise empty state.
 
 Maintenance, Incubating, Paused, Closed, missing, and legacy compatibility
 states remain fully readable in the data model for Manager decisions and other
-contexts, but they never render in the Home `Active Projects` card. Active
-remains the only state that receives growth capacity by default.
+contexts, but they never render in the Home `Active Projects` card. Core is not
+a Dashboard filter and does not change this Active-only rendering rule.
 
 Upcoming Tasks reads only Projects with `status: active` and `focus: true`,
 groups tasks by Project, lets the user select the source Project, and displays

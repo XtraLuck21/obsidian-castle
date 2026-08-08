@@ -2,6 +2,7 @@
 type: project
 status: incubating
 focus: false
+core: false
 area:
 priority:
 progress_sections:
@@ -23,6 +24,7 @@ origin:
 
 <!-- Proposed while Incubating. What observable result would mean this project is complete? -->
 <!-- Lifecycle status: active, maintenance, incubating, paused, or closed. -->
+<!-- Core is an explicit portfolio classification. Set core: true only when this Project should contribute to Project Day; active alone never implies Core. -->
 
 ## Evidence & Sources
 

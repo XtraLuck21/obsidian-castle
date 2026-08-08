@@ -23,6 +23,7 @@ const MENTAL_DESKTOP_ASSET_PATH = "90_System/Assets/rain-glass-mental-lighthouse
 const MENTAL_MOBILE_ASSET_PATH = "90_System/Assets/rain-glass-mental-lighthouse-mobile-v2.webp";
 const NAVIGATION_CUTOVER = "2026-07-25";
 const OVERALL_ENERGY_CUTOVER = "2026-07-26";
+const HEALTH_SCHEDULE_CUTOVER = "2026-08-07";
 const OPEN_VOYAGE_HOURS = 24;
 const WORKSTREAM_STATES = [
   { id: "active", label: "Active", capacity: "Growth capacity" },
@@ -123,6 +124,8 @@ const MENTAL_EMOTIONS = [
   ["tired", "疲惫"],
   ["anxious", "焦虑"],
   ["sad", "低落"],
+  ["wronged", "委屈"],
+  ["angry", "愤怒"],
   ["frustrated", "挫败"],
   ["lonely", "孤独"],
   ["numb", "麻木"],
@@ -408,12 +411,34 @@ function healthWorkout(id) {
   return HEALTH_WORKOUTS[id] ?? HEALTH_WORKOUTS.pool;
 }
 
+function usesHealthScheduleV2(value = new Date()) {
+  const iso = value instanceof Date ? localISO(value) : isoDateValue(value?.date ?? value);
+  return Boolean(iso && iso >= HEALTH_SCHEDULE_CUTOVER);
+}
+
 function healthStageForTime(date = new Date()) {
   const hour = date.getHours();
+  if (usesHealthScheduleV2(date)) {
+    if (hour < 12) return "morning";
+    if (hour < 18) return "afternoon";
+    if (hour < 22) return "evening";
+    return "sleep";
+  }
   if (hour < 9) return "sleep";
   if (hour < 14) return "morning";
   if (hour < 21) return "afternoon";
   return "evening";
+}
+
+function healthStageOrder(value) {
+  return usesHealthScheduleV2(value)
+    ? ["morning", "afternoon", "evening", "sleep"]
+    : ["sleep", "morning", "afternoon", "evening"];
+}
+
+function healthPostVoyageStage(date = new Date()) {
+  if (!usesHealthScheduleV2(date)) return "sleep";
+  return date.getHours() < 12 ? "morning" : "sleep";
 }
 
 function healthSignal(value) {
@@ -667,6 +692,7 @@ function healthStateLabel(value) {
 function healthRecommendation(frontmatter, plannedWorkout, now = new Date()) {
   const morning = healthMorningCapacity(frontmatter);
   const afternoon = healthAfternoonState(frontmatter);
+  const daytimeLabel = usesHealthScheduleV2(frontmatter) ? "白天" : "傍晚";
   const hasAfternoon = afternoon.answered > 0;
   const capacity = morning.value !== null && afternoon.value !== null
     ? Math.round(morning.value * .4 + afternoon.value * .6)
@@ -696,7 +722,7 @@ function healthRecommendation(frontmatter, plannedWorkout, now = new Date()) {
   let intensity = "standard";
 
   if (morning.value !== null) reasons.push(`今日恢复容量 ${morning.value}%`);
-  if (afternoon.value !== null) reasons.push(`傍晚身体状态 ${afternoon.value}% · ${healthStateLabel(afternoon.value)}`);
+  if (afternoon.value !== null) reasons.push(`${daytimeLabel}身体状态 ${afternoon.value}% · ${healthStateLabel(afternoon.value)}`);
 
   if (hasAfternoon) {
     if (energy === 1 || (capacity !== null && capacity < 35)) {
@@ -719,11 +745,11 @@ function healthRecommendation(frontmatter, plannedWorkout, now = new Date()) {
   if (intensity === "rest") {
     workout = "rest";
     mode = "recovery";
-    reasons.push(energy === 1 ? "傍晚精力处于最低档" : "综合训练准备度低于 35%");
+    reasons.push(energy === 1 ? `${daytimeLabel}精力处于最低档` : "综合训练准备度低于 35%");
   } else if (intensity === "stretch") {
     workout = "stretch";
     mode = "recovery";
-    reasons.push(hasAfternoon ? "今天更适合低负荷活动" : "早晨信息暂定为低负荷，傍晚后会再判断");
+    reasons.push(hasAfternoon ? "今天更适合低负荷活动" : `早晨信息暂定为低负荷，${daytimeLabel}后会再判断`);
   } else {
     mode = intensity;
     reasons.push(intensity === "standard"
@@ -2400,9 +2426,12 @@ class DailyHealthSummaryChild extends MarkdownRenderChild {
     }
     const morning = healthMorningCapacity(frontmatter);
     const afternoon = healthAfternoonState(frontmatter);
+    const scheduleV2 = usesHealthScheduleV2(frontmatter);
+    const earlyMorningBedtime = String(frontmatter.health_early_morning_bedtime_at || "");
     const header = wrap.createDiv({ cls: "cx-health-summary-header" });
     header.createEl("h3", { text: "Health Snapshot" });
     const grid = wrap.createDiv({ cls: "cx-health-summary-grid" });
+    if (scheduleV2) grid.addClass("is-schedule-v2");
     const recommendationChanged = recommendation !== planned || recommendationMode !== "standard";
     const manuallyChanged = String(frontmatter.health_primary_source || "") === "manual"
       || (!primaryCompleted && frontmatter.health_manual_override === true);
@@ -2418,9 +2447,9 @@ class DailyHealthSummaryChild extends MarkdownRenderChild {
         : selected || recommendationChanged
           ? "建议"
           : "原计划";
-    [
+    const summaryItems = [
       { label: "今日恢复容量", value: morning.value === null ? "—" : `${morning.value}%` },
-      { label: "傍晚身体状态", value: afternoon.value === null ? "—" : `${afternoon.value}% · ${healthStateLabel(afternoon.value)}` },
+      { label: scheduleV2 ? "白天身体状态" : "傍晚身体状态", value: afternoon.value === null ? "—" : `${afternoon.value}% · ${healthStateLabel(afternoon.value)}` },
       {
         label: "训练状态",
         value: workoutValue,
@@ -2433,7 +2462,14 @@ class DailyHealthSummaryChild extends MarkdownRenderChild {
               ? `今日共 ${minutesValue(frontmatter.workout_minutes)} 分钟`
               : "",
       },
-    ].forEach(({ label, value, tag, meta }) => {
+    ];
+    if (scheduleV2) {
+      summaryItems.unshift({
+        label: "跨夜入睡",
+        value: earlyMorningBedtime ? `${earlyMorningBedtime.slice(11, 16)} · 准备入睡` : "—",
+      });
+    }
+    summaryItems.forEach(({ label, value, tag, meta }) => {
       const item = grid.createDiv({ cls: "cx-health-summary-item" });
       item.createSpan({ text: label, cls: "cx-health-summary-label" });
       item.createSpan({ text: value, cls: "cx-health-summary-value" });
@@ -3895,8 +3931,59 @@ class CastleXHealthView extends ItemView {
     input.addEventListener("input", () => this.queueTextUpdate(file, key, input.value));
   }
 
-  renderMorning(parent, file, frontmatter) {
+  renderEarlyMorningBedtime(parent, file, frontmatter, previousNightRecorded) {
+    const now = new Date();
+    const targetISO = isoDateValue(frontmatter.date);
+    const recordedAt = String(frontmatter.health_early_morning_bedtime_at || "");
+    const inLiveWindow = usesHealthScheduleV2(now)
+      && now.getHours() < 8
+      && targetISO === localISO(now);
+    if (!inLiveWindow || (previousNightRecorded && !recordedAt)) return;
+
+    const recordedLabel = recordedAt ? recordedAt.slice(11, 16) : "";
+    const ritual = parent.createEl("button", {
+      cls: `cx-health-early-sleep-ritual${recordedAt ? " is-recorded" : ""}`,
+      attr: {
+        type: "button",
+        "aria-pressed": String(Boolean(recordedAt)),
+        "aria-label": recordedAt
+          ? `跨夜入睡已记录 ${recordedLabel}，点击可更新时间`
+          : "记录此刻准备跨夜入睡",
+      },
+    });
+    const icon = ritual.createSpan({ cls: "cx-health-early-sleep-icon", attr: { "aria-hidden": "true" } });
+    setIcon(icon, "moon-star");
+    const copy = ritual.createSpan({ cls: "cx-health-early-sleep-copy" });
+    copy.createSpan({
+      text: recordedAt ? `跨夜入睡 · ${recordedLabel}` : "跨夜入睡",
+      cls: "cx-health-early-sleep-title",
+    });
+    copy.createSpan({
+      text: recordedAt ? "准备入睡时间已保存" : "昨夜尚未记录关灯；如果现在准备休息，可以留下此刻时间",
+      cls: "cx-health-early-sleep-note",
+    });
+    ritual.addEventListener("click", () => {
+      const clickTime = new Date();
+      if (
+        !usesHealthScheduleV2(clickTime)
+        || clickTime.getHours() >= 8
+        || targetISO !== localISO(clickTime)
+      ) {
+        new Notice("跨夜入睡只允许在 00:00–07:59 实时记录");
+        this.stageOverride = null;
+        this.renderDashboard();
+        return;
+      }
+      const timestamp = localTimestamp(clickTime);
+      this.updateHealth(file, (next) => {
+        next.health_early_morning_bedtime_at = timestamp;
+      }, `跨夜入睡 · 已记录 ${timestamp.slice(11, 16)} 准备入睡`);
+    });
+  }
+
+  renderMorning(parent, file, frontmatter, context = {}) {
     const fields = parent.createDiv({ cls: "cx-health-form-grid" });
+    this.renderEarlyMorningBedtime(fields, file, frontmatter, context.previousNightRecorded === true);
     const startedAt = String(frontmatter.health_morning_started_at || "");
     const startedLabel = startedAt ? startedAt.slice(11, 16) : "";
     const ritual = fields.createEl("button", {
@@ -4003,7 +4090,18 @@ class CastleXHealthView extends ItemView {
       cls: "cx-health-night-ritual-note",
     });
     ritual.addEventListener("click", () => {
-      const recordedAt = localTimestamp();
+      const now = new Date();
+      const targetISO = isoDateValue(frontmatter.date);
+      if (
+        usesHealthScheduleV2(frontmatter)
+        && (targetISO !== localISO(now) || now.getHours() < 22)
+      ) {
+        new Notice("夜间关灯只允许在 22:00–23:59 实时记录；凌晨请使用早晨的“跨夜入睡”");
+        this.stageOverride = null;
+        this.renderDashboard();
+        return;
+      }
+      const recordedAt = localTimestamp(now);
       this.nightRitualAnimationUntil = Date.now() + 1400;
       ritual.addClass("is-activating");
       window.setTimeout(() => {
@@ -4027,13 +4125,14 @@ class CastleXHealthView extends ItemView {
     reasons.addClass("cx-health-night-reasons");
   }
 
-  renderCheckin(parent, file, frontmatter, stage, timedStage) {
+  renderCheckin(parent, file, frontmatter, stage, timedStage, context = {}) {
     const card = parent.createDiv({ cls: "cx-card cx-health-checkin-card" });
     this.renderedStage = timedStage;
+    const scheduleV2 = usesHealthScheduleV2(frontmatter);
     const stageNames = {
       sleep: "夜间状态",
       morning: "早晨 Check-in",
-      afternoon: "傍晚 Check-in",
+      afternoon: scheduleV2 ? "白天 Check-in" : "傍晚 Check-in",
       evening: "晚间身体回顾",
     };
     const timestampKeys = {
@@ -4060,13 +4159,13 @@ class CastleXHealthView extends ItemView {
     }
 
     const tracker = card.createDiv({ cls: "cx-health-stage-tracker" });
-    ["sleep", "morning", "afternoon", "evening"].forEach((item) => {
+    healthStageOrder(frontmatter).forEach((item) => {
       const complete = healthStageComplete(frontmatter, item);
       const button = tracker.createEl("button", {
         cls: `cx-health-stage${item === stage ? " is-active" : ""}${complete ? " is-complete" : ""}`,
         attr: { type: "button", "aria-pressed": String(item === stage) },
       });
-      const labels = { sleep: "夜间", morning: "早晨", afternoon: "傍晚", evening: "晚间" };
+      const labels = { sleep: "夜间", morning: "早晨", afternoon: scheduleV2 ? "白天" : "傍晚", evening: "晚间" };
       button.createSpan({ text: labels[item] });
       button.createSpan({ text: complete ? "已记录" : item === timedStage ? "推荐" : "待记录", cls: "cx-health-stage-state" });
       button.addEventListener("click", () => {
@@ -4077,7 +4176,7 @@ class CastleXHealthView extends ItemView {
 
     const form = card.createDiv({ cls: "cx-health-form" });
     if (stage === "sleep") this.renderNight(form, file, frontmatter);
-    else if (stage === "morning") this.renderMorning(form, file, frontmatter);
+    else if (stage === "morning") this.renderMorning(form, file, frontmatter, context);
     else if (stage === "afternoon") this.renderAfternoon(form, file, frontmatter);
     else this.renderEvening(form, file, frontmatter);
     const footer = card.createDiv({ cls: "cx-health-form-footer" });
@@ -4150,7 +4249,11 @@ class CastleXHealthView extends ItemView {
     const header = card.createDiv({ cls: "cx-health-card-header" });
     const title = header.createDiv();
     title.createEl("h2", { text: "今日身体方向" });
-    const statusLabels = { planned: "轮换计划", provisional: "实时暂定", final: "傍晚确认" };
+    const statusLabels = {
+      planned: "轮换计划",
+      provisional: "实时暂定",
+      final: usesHealthScheduleV2(frontmatter) ? "白天确认" : "傍晚确认",
+    };
     title.createSpan({ text: `${statusLabels[recommendation.status]} · 信息 ${recommendation.completeness}` });
     const primarySession = healthPrimarySession(frontmatter);
     const primaryWorkout = String(primarySession?.workout || frontmatter.health_primary_workout || frontmatter.health_selected_workout || "");
@@ -4646,10 +4749,15 @@ class CastleXHealthView extends ItemView {
     frontmatter = await this.initializePlannedWorkout(todayFile, frontmatter, pages);
     frontmatter = await this.normalizePrimaryWorkout(todayFile, frontmatter);
     const recommendation = healthRecommendation(frontmatter, this.plannedWorkout, now);
+    const previousISO = localISO(addDays(now, -1));
+    const previousNightRecorded = pages.some((page) => (
+      isoDateValue(page.frontmatter.date) === previousISO
+      && Boolean(page.frontmatter.health_night_bedtime_at)
+    ));
     const dashboard = this.createCanvas();
     this.renderHeader(dashboard);
     const main = dashboard.createDiv({ cls: "cx-health-main-grid" });
-    this.renderCheckin(main, todayFile, frontmatter, stage, timedStage);
+    this.renderCheckin(main, todayFile, frontmatter, stage, timedStage, { previousNightRecorded });
     this.renderDirection(main, todayFile, frontmatter, recommendation);
     this.renderWorkout(dashboard, todayFile, frontmatter, recommendation);
     const insights = dashboard.createDiv({ cls: "cx-health-insights-grid" });
@@ -5127,8 +5235,12 @@ class CastleXMentalView extends ItemView {
       setIcon(icon, "book-check");
       card.createEl("h2", { text: "今日航程已结束" });
       card.createEl("p", { text: "日志已经合上。接下来只需要照顾自己，然后准备休息。" });
-      const sleep = card.createEl("button", { text: "前往夜间状态", cls: "cx-button cx-button-primary" });
-      sleep.addEventListener("click", () => this.plugin.activateHealthView("sleep"));
+      const healthStage = healthPostVoyageStage(new Date());
+      const health = card.createEl("button", {
+        text: healthStage === "morning" ? "前往早晨状态" : "前往夜间状态",
+        cls: "cx-button cx-button-primary",
+      });
+      health.addEventListener("click", () => this.plugin.activateHealthView(healthStage));
       return;
     }
     card.createEl("h2", { text: "结束今日航程" });

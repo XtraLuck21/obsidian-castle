@@ -32,8 +32,8 @@ committed to this repository.
 - Separate warm, cabin-inspired Mental Dashboard for one evening reflection and voyage closure
 - Home, Health, and Mental share one Hero structure: left-aligned date/time/signature content and three vertically stacked navigation buttons; Health and Mental use matching compact typography
 - The Home 14-day route anchors its line and voyage nodes to the card's vertical center while weekday labels sit independently below
-- Health stages remain directly accessible in 夜间, 早晨, 傍晚, 晚间 order; 00:00–08:59, 09:00–13:59, 14:00–20:59, and 21:00–23:59 recommend those stages without locking them
-- Health records always belong to the current natural-date Daily; stage tabs reset at midnight instead of holding a prior-date Night entry
+- Starting 2026-08-07, Health stages appear in 早晨, 白天, 晚间, 夜间 order; 00:00–11:59, 12:00–17:59, 18:00–21:59, and 22:00–23:59 recommend those stages while pre-cutover Daily records retain the legacy schedule
+- Health records always belong to the current natural-date Daily; stage tabs reset to Morning at midnight, an unfinished prior Night stays empty, and 00:00–07:59 offers a live-only cross-night bedtime timestamp on the new date
 - Health stages become recorded when all core answers are present or the explicit completion action is used; optional notes never block completion
 - Health Evening records whole-day appetite stability and Overall Energy; Morning and Sleep retain their own start/end rituals
 - Morning and Afternoon body-region choices include the chest; chest soreness participates in Upper-body recommendation safeguards
@@ -256,13 +256,17 @@ component or `End-of-day Evidence` section. Daily Notes from 2026-07-26 through
 2026-07-31 remain frozen legacy input and are only read through marked derived
 mapping.
 
-Each new Daily may carry an internal `core_snapshot`: `status: active` is Core
-and every other Project status is non-core, frozen at generation time. This is
-not a user-facing Project property and does not use `project_role`. A Project
-Day means at least 120 minutes of frozen Core Project time across Execution,
-Planning, System, and Not Classified. An Execution Day means at least 120
-minutes of actual doing: every Project row marked Execution plus all Admin and
-Workout time; Enrichment, Planning, System, and Not Classified do not count.
+Each Project declares an explicit boolean `core`. Lifecycle and Core
+classification are independent: `status: active` means the Project is currently
+being advanced, while `core: true` means its time contributes to Project Day.
+Each new Daily may carry an internal `core_snapshot` that freezes the linked
+Project's explicit `core` value at generation time. A missing `core` value is
+conservatively non-core; it is never inferred from `status`. This does not use
+`project_role`. A Project Day means at least 120 minutes of frozen Core Project
+time across Execution, Planning, System, and Not Classified. An Execution Day
+means at least 120 minutes of actual doing: every Project row marked Execution
+plus all Admin and Workout time; Enrichment, Planning, System, and Not
+Classified do not count.
 New Weekly Reviews show both counts out of the seven-day period. Future Monthly
 Reviews show both counts out of the month's 28, 29, 30, or 31 natural dates and
 do not report a longest streak. Main Dashboard does not show these metrics.
@@ -296,6 +300,7 @@ Project notes live under `30_Projects/` and use frontmatter to control state:
 type: project
 status: incubating
 focus: false
+core: false
 area:
 priority:
 progress_sections:
@@ -309,23 +314,26 @@ origin:
 
 Project records retain five canonical lifecycle states:
 
-- `active`: current growth capacity and current execution;
+- `active`: currently being advanced; Core classification remains separate;
 - `maintenance`: minimum continuity capacity, visibly separate from growth;
 - `incubating`: proposal or exploration with no default capacity;
 - `paused`: intentionally suspended with history retained;
 - `closed`: ended and retained for history.
 
-New Project notes default to `incubating` and `focus: false`. `created` records
-only when the canonical note was established; blank `started`, `target`, and
-`priority` mean that no start, target, or portfolio priority has been committed.
+New Project notes default to `incubating`, `focus: false`, and `core: false`.
+`status` records lifecycle, `focus` controls Upcoming Tasks, and `core` controls
+Project Day inclusion. An Active Project may be either Core or non-core; Active
+never implies Core. `created` records only when the canonical note was
+established; blank `started`, `target`, and `priority` mean that no start,
+target, or portfolio priority has been committed.
 A user-authorized Domain Expert may create the one canonical note directly under
 `30_Projects/` and draft evidence, outcome, milestones, tasks, timeline, effort,
 risks, and assumptions there. No Proposal folder or later copy is required.
 
 Creation is Proposal authorization, not capacity authorization. Expert planning
 remains advisory while the Project is Incubating. Manager or the user reviews
-and edits that same file, then owns lifecycle, `focus`, priority, committed
-dates, capacity, scope, effort, and expectations.
+and edits that same file, then owns lifecycle, `focus`, `core`, priority,
+committed dates, capacity, scope, effort, and expectations.
 
 The Template leaves `origin` blank for explicit attribution: a human creator
 sets `origin: human`; an AI Expert sets `origin: ai` and records generation time

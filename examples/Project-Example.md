@@ -2,6 +2,7 @@
 type: project
 status: active
 focus: true
+core: true
 area: Example Area
 priority: 1
 progress_sections:
@@ -14,7 +15,7 @@ origin: human
 ---
 # Example Project
 
-> Lifecycle: **Active** — this fictional example currently receives growth capacity.
+> Lifecycle: **Active · Core** — this fictional example is currently advanced and contributes to Project Day.
 
 ## Outcome
 
