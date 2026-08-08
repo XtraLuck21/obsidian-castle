@@ -331,6 +331,12 @@ rg -Fq 'round_target_problem_count' "$plugin/main.js" "$schema" || fail "LeetCod
 rg -Fq 'technicalCompleted + problems.length - executionCompleted' "$plugin/main.js" || fail "LeetCode Tracker may double-count completed plan tasks in Technical Coverage"
 rg -Fq 'open problems · ${problems.length} total' "$plugin/main.js" || fail "LeetCode Plan header does not distinguish open and total problems"
 rg -q 'never writes Daily Note time fields' "$schema" || fail "Schema does not preserve LeetCode/Daily time boundary"
+rg -Fq 'body.theme-light .cx-lc-task-date span' "$plugin/styles.css" || fail "Light-mode LeetCode task dates lack readable contrast"
+rg -Fq 'body.theme-light .cx-lc-status {' "$plugin/styles.css" || fail "Light-mode LeetCode Planned status lacks readable contrast"
+for state in completed partial stopped; do
+  rg -Fq "body.theme-light .cx-lc-status.is-${state}" "$plugin/styles.css" || fail "Light-mode LeetCode ${state} status lacks semantic contrast"
+done
+rg -Fq 'body.theme-light .cx-lc-pattern-heading' "$plugin/styles.css" || fail "Light-mode LeetCode pattern headings lack readable contrast"
 pass "embedded desktop Project tracker, optional phase timing, and Bridge session boundary"
 
 rg -q '^```castlex-time-rings$' "$template" || fail "Daily template missing time-ring block"

@@ -2791,16 +2791,43 @@ body.theme-light .cx-lc-shell {
 body.theme-light .cx-lc-shell :is(h2, h3, h4, strong),
 body.theme-light .cx-lc-shell :is(.cx-lc-heading h2, .cx-lc-time-value, .cx-lc-clock, .cx-lc-task-title, .cx-lc-phase-label) { color: #173a53; }
 body.theme-light .cx-lc-shell :is(.cx-lc-kicker, .cx-lc-subtitle, .cx-lc-progress-label, .cx-lc-progress-count, .cx-lc-progress-detail, .cx-lc-tab, .cx-lc-task-meta > span, .cx-lc-schedule span, .cx-lc-clock-meta, .cx-lc-phase-status, .cx-lc-phase-help, .cx-lc-phase-time, .cx-lc-phase-coverage, .cx-lc-running-note, .cx-lc-details summary, .cx-lc-field label, .cx-lc-section-heading span, .cx-lc-task-detail, .cx-lc-session-phases span, .cx-lc-session-note, .cx-lc-empty) { color: #58788d; }
+body.theme-light .cx-lc-loading,
+body.theme-light .cx-lc-error { color: #456b82; }
+body.theme-light .cx-lc-tabs { border-color: rgba(45, 111, 151, .18); }
+body.theme-light .cx-lc-tab:hover { color: #285c79; }
+body.theme-light .cx-lc-tab.is-active { border-bottom-color: #438fb9; color: #173a53; }
 body.theme-light .cx-lc-progress-card,
 body.theme-light .cx-lc-session-card,
 body.theme-light .cx-lc-phase-panel,
 body.theme-light .cx-lc-phase-button { background: rgba(246, 251, 254, .72); border-color: rgba(45,111,151,.16); }
+body.theme-light .cx-lc-progress-track { background: rgba(45, 105, 139, .14); }
+body.theme-light .cx-lc-progress-bar { background: linear-gradient(90deg, #4f9fc7, #2579a5); }
+body.theme-light .cx-lc-task-meta > span:not(:last-child)::after,
+body.theme-light .cx-lc-schedule span:not(:last-child)::after { color: rgba(45, 92, 124, .38); }
+body.theme-light .cx-lc-status {
+  background: rgba(71, 143, 181, .14);
+  border-color: rgba(45, 111, 151, .34);
+  color: #285e7d;
+}
+body.theme-light .cx-lc-status.is-completed { background: rgba(50, 143, 108, .14); border-color: rgba(37, 124, 91, .34); color: #236b55; }
+body.theme-light .cx-lc-status.is-partial { background: rgba(211, 143, 49, .15); border-color: rgba(173, 104, 22, .34); color: #845018; }
+body.theme-light .cx-lc-status.is-stopped { background: rgba(191, 88, 88, .13); border-color: rgba(157, 70, 70, .32); color: #874545; }
 body.theme-light .cx-lc-timer-ring { background: conic-gradient(var(--cx-lc-accent-bright) var(--cx-lc-timer-progress), rgba(45,105,139,.12) 0); }
 body.theme-light .cx-lc-timer-inner { background: radial-gradient(circle at 50% 40%, #f8fcfe, #dceef7 78%); border-color: rgba(45,111,151,.16); }
 body.theme-light .cx-lc-phase-button.is-active { background: linear-gradient(145deg, rgba(93,171,207,.24), rgba(61,139,181,.16)); border-color: rgba(45,125,167,.34); }
+body.theme-light .cx-lc-phase-heading > span:first-child { color: #173a53; }
+body.theme-light .cx-lc-phase-coverage,
+body.theme-light .cx-lc-details { border-color: rgba(45, 111, 151, .17); }
+body.theme-light .cx-lc-pattern-heading { color: #2d607d; }
+body.theme-light .cx-lc-task-row,
+body.theme-light .cx-lc-session-row { border-bottom-color: rgba(45, 111, 151, .14); }
+body.theme-light .cx-lc-task-date span { color: #3a6b86; font-weight: 620; }
 body.theme-light .cx-lc-button,
 body.theme-light .cx-lc-row-button,
 body.theme-light .cx-lc-icon-button { background: rgba(230, 244, 251, .86); border-color: rgba(45,111,151,.2); color: #285c79; }
+body.theme-light .cx-lc-button:hover,
+body.theme-light .cx-lc-row-button:hover,
+body.theme-light .cx-lc-icon-button:hover { background: rgba(207, 233, 246, .94); color: #173a53; }
 body.theme-light .cx-lc-button.is-primary { background: linear-gradient(135deg, #72b7d8, #3e8fba); color: #fff; }
 
 /* Monthly Logbook semantic palette.
