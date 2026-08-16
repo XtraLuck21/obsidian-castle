@@ -954,6 +954,24 @@ missing. It must not infer wake time or sleep duration from
 `health_morning_started_at`; that field is Morning Check-in only. Bedtime may
 come from `health_night_bedtime_at` or `health_early_morning_bedtime_at`.
 
+The Four-Week Trend may show Project Days and Execution Days for any visible
+period, including historical periods, only when all of the following are true:
+
+- the canonical Weekly filename is exactly
+  `YYYY-MM-DD--YYYY-MM-DD.md` for that visible Sunday–Saturday period;
+- the Weekly frontmatter declares `type: weekly-review`, matching
+  `period_start` and `period_end`, and
+  `day_metrics_model: project-execution-v1`;
+- all seven canonical Daily files exist.
+
+An eligible period calculates both counts from those Daily files' recorded
+`Time & Task Log` and frozen `core_snapshot`. It never consults current Project
+metadata for historical Core membership. A present Daily with an empty ledger
+is a valid zero-contribution day. A missing Daily, missing Weekly, unsupported
+model, or mismatched period renders `—` for both metrics instead of `0/7`.
+`time_data_reviewed` is not an eligibility gate. Visible Weekly model files and
+Daily sources are render dependencies and refresh the view when changed.
+
 Detailed Weekly Analytics may also reconstruct Project progress at the day
 before `period_start` and at `period_end`. It uses the same weighted
 `progress_sections` calculation as Home, restricted to checked Project tasks

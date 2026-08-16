@@ -14,6 +14,7 @@ const VIEW_TYPE = "castlex-home";
 const HEALTH_VIEW_TYPE = "castlex-health";
 const MENTAL_VIEW_TYPE = "castlex-mental";
 const DAILY_ROOT = "10_Journal/Daily";
+const WEEKLY_ROOT = "10_Journal/Weekly";
 const PROJECT_ROOT = "30_Projects";
 const DESKTOP_ASSET_PATH = "90_System/Assets/rain-glass-sunset-beach-v2.webp";
 const MOBILE_ASSET_PATH = "90_System/Assets/rain-glass-sunset-mobile-v1.webp";
@@ -331,6 +332,12 @@ function dateFromISO(value) {
 function dailyPathFromISO(value) {
   const iso = isoDateValue(value);
   return iso ? `${DAILY_ROOT}/${iso.slice(0, 4)}/${iso.slice(5, 7)}/${iso}.md` : null;
+}
+
+function weeklyPathFromPeriod(startValue, endValue) {
+  const start = isoDateValue(startValue);
+  const end = isoDateValue(endValue);
+  return start && end ? `${WEEKLY_ROOT}/${start}--${end}.md` : null;
 }
 
 function dateRange(startValue, endValue, maximumDays = 31) {
@@ -2106,6 +2113,23 @@ class DailyTimeRingsChild extends MarkdownRenderChild {
 
 const DAY_METRICS_MODEL = "project-execution-v1";
 
+function weeklyDayMetricsEligible(frontmatter, startValue, endValue) {
+  const start = isoDateValue(startValue);
+  const end = isoDateValue(endValue);
+  const startDate = dateFromISO(start);
+  const expectedEnd = startDate ? localISO(addDays(startDate, 6)) : null;
+  return Boolean(
+    start
+    && end
+    && startDate?.getDay() === 0
+    && end === expectedEnd
+    && String(frontmatter?.type || "").trim() === "weekly-review"
+    && isoDateValue(frontmatter?.period_start) === start
+    && isoDateValue(frontmatter?.period_end) === end
+    && String(frontmatter?.day_metrics_model || "").trim() === DAY_METRICS_MODEL
+  );
+}
+
 function ledgerDurationMinutes(value) {
   const text = String(value || "").trim();
   const hours = text.match(/(\d+(?:\.\d+)?)\s*h/i);
@@ -2523,13 +2547,20 @@ class WeeklyAnalyticsChild extends MarkdownRenderChild {
 
   onload() {
     this.render();
-    const schedule = (changedFile) => {
-      if (changedFile.path !== this.file.path && !this.periodPaths.has(changedFile.path)) return;
+    const schedule = (changedFile, oldPath = null) => {
+      if (
+        changedFile.path !== this.file.path
+        && !this.periodPaths.has(changedFile.path)
+        && !this.periodPaths.has(oldPath)
+      ) return;
       if (this.renderTimer) window.clearTimeout(this.renderTimer);
       this.renderTimer = window.setTimeout(() => this.render(), 180);
     };
     this.registerEvent(this.app.metadataCache.on("changed", schedule));
     this.registerEvent(this.app.vault.on("modify", schedule));
+    this.registerEvent(this.app.vault.on("create", schedule));
+    this.registerEvent(this.app.vault.on("delete", schedule));
+    this.registerEvent(this.app.vault.on("rename", schedule));
   }
 
   onunload() {
@@ -2747,7 +2778,7 @@ class WeeklyAnalyticsChild extends MarkdownRenderChild {
         if (accessor) {
           const mean = average(week.days.map(accessor));
           value = mean === null ? "—" : mean.toFixed(1);
-        } else if (week.current) {
+        } else if (week.dayMetricsEnabled) {
           const key = rowIndex === 3 ? "projectMinutes" : "executionMinutes";
           value = `${week.days.filter((day) => day.dayMetrics[key] >= 120).length}/7`;
         }
@@ -3202,17 +3233,30 @@ class WeeklyAnalyticsChild extends MarkdownRenderChild {
     const uniqueDates = [...new Map(allDates.map((date) => [localISO(date), date])).values()];
     const loaded = await Promise.all(uniqueDates.map((date) => this.loadDay(date)));
     const byISO = new Map(loaded.map((day) => [day.iso, day]));
-    this.periodPaths = new Set(loaded.map((day) => day.file?.path).filter(Boolean));
+    const periodPaths = new Set(uniqueDates.map((date) => dailyPathFromISO(localISO(date))).filter(Boolean));
     const days = dates.map((date) => byISO.get(localISO(date))).filter(Boolean);
     const weeks = [];
     for (let offset = (historyWeeks - 1) * 7; offset >= 0; offset -= 7) {
       const start = localISO(addDays(currentStart, -offset));
+      const end = localISO(addDays(dateFromISO(start), 6));
+      const weeklyPath = weeklyPathFromPeriod(start, end);
+      if (weeklyPath) periodPaths.add(weeklyPath);
+      const weeklyFile = weeklyPath ? this.app.vault.getAbstractFileByPath(weeklyPath) : null;
+      const historicalFrontmatter = weeklyFile instanceof TFile ? await freshFrontmatter(this.app, weeklyFile) : {};
+      const weekDays = dateRange(start, end).map((date) => byISO.get(localISO(date))).filter(Boolean);
       weeks.push({
         start,
+        end,
         current: offset === 0,
-        days: dateRange(start, localISO(addDays(dateFromISO(start), 6))).map((date) => byISO.get(localISO(date))).filter(Boolean),
+        days: weekDays,
+        weeklyFile,
+        dayMetricsEnabled: weeklyFile instanceof TFile
+          && weeklyDayMetricsEligible(historicalFrontmatter, start, end)
+          && weekDays.length === 7
+          && weekDays.every((day) => day.file instanceof TFile),
       });
     }
+    this.periodPaths = periodPaths;
     const precedingStart = localISO(addDays(currentStart, -historyWeeks * 7));
     const precedingWeek = {
       start: precedingStart,

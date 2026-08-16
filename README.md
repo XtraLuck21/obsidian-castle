@@ -418,9 +418,17 @@ Planned → Recommended → Selected → Actual funnel. `history_weeks` defaults
 `1` through `8`. Bedtime uses either the same-date night field or the v2
 early-morning bedtime field; `health_morning_started_at` is labeled Morning
 Check-in and is never interpreted as wake time or sleep duration. Project and
-Execution Day history is shown only where the Weekly period explicitly enables
-the frozen `project-execution-v1` model; unavailable historical counts remain
-blank rather than being reconstructed from current Project metadata.
+Execution Day history is shown only when that exact Sunday–Saturday period has
+its canonical `YYYY-MM-DD--YYYY-MM-DD` Weekly Note, `type: weekly-review`, an
+exact `period_start` / `period_end` match, and
+`day_metrics_model: project-execution-v1`. All seven canonical Daily files must
+also exist. A present Daily with an empty ledger contributes zero; a missing
+Daily makes both counts unavailable. Eligible historical periods reuse each
+Daily's frozen `core_snapshot` and recorded ledger, while unavailable periods
+remain `—` rather than being reconstructed from current Project metadata or
+silently treated as `0/7`. Visible Weekly model files and Daily sources are
+render dependencies, so their creation, deletion, rename, or edit refreshes the
+analytics view.
 Project progress uses the same `progress_sections` weights as Home and only
 reconstructs historical completion from checked tasks carrying an explicit
 `✅ YYYY-MM-DD` date. Undated checked tasks make the historical delta
