@@ -4361,10 +4361,7 @@ class CastleXHomeView extends ItemView {
 
   renderTrend(parent, pages) {
     const label = this.trendMode === "energy" ? "Overall Energy" : "Sleep Quality";
-    const subtitle = this.trendMode === "energy"
-      ? "7/26 起读取 Health Evening；7/25 使用 Work Energy fallback"
-      : "7/25 起读取 Health Morning Sleep";
-    const card = this.createCard(parent, `14-day ${label}`, subtitle);
+    const card = this.createCard(parent, `14-day ${label}`);
     card.addClass("cx-trend-card");
     const header = card.querySelector(".cx-card-header");
     this.renderModeTabs(header, [["energy", "Energy"], ["sleep_quality", "Sleep"]], this.trendMode, (mode) => {
@@ -4387,17 +4384,6 @@ class CastleXHomeView extends ItemView {
       this.createSvg(svg, "line", { x1: left, y1: y, x2: right, y2: y, class: "cx-trend-grid" });
       const text = this.createSvg(svg, "text", { x: 28, y: y + 4, class: "cx-trend-axis", "text-anchor": "middle" });
       text.textContent = String(value);
-    }
-    const cutoverIndex = series.findIndex((item) => item.iso === NAVIGATION_CUTOVER);
-    if (cutoverIndex >= 0) {
-      const x = xAt(cutoverIndex);
-      this.createSvg(svg, "line", { x1: x, y1: top, x2: x, y2: bottom, class: "cx-trend-cutover" });
-      const marker = this.createSvg(svg, "text", {
-        x: x + 5,
-        y: top + 10,
-        class: "cx-trend-cutover-label",
-      });
-      marker.textContent = "Navigation v1";
     }
     let segment = [];
     const flush = () => {

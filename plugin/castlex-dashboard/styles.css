@@ -458,8 +458,6 @@ body.theme-light {
 .cx-trend-line { fill: none; filter: drop-shadow(0 0 5px rgba(158,193,205,.2)); stroke: #a9c4ce; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2.6; }
 .cx-trend-point { fill: #e1e5e1; stroke: rgba(12,27,36,.9); stroke-width: 2; }
 .cx-trend-point.is-retrospective { fill: rgba(8,25,43,.95); stroke: rgba(151,183,204,.86); stroke-width: 2.2; }
-.cx-trend-cutover { stroke: rgba(151,183,204,.28); stroke-dasharray: 3 4; stroke-width: 1; }
-.cx-trend-cutover-label { fill: rgba(196,216,225,.48); font-size: 8px; }
 .cx-trend-summary { color: rgba(238,244,245,.48); display: flex; font-size: .54rem; justify-content: space-between; padding: 0 7px; }
 
 .daily-voyage .metadata-container,
@@ -2909,8 +2907,7 @@ body.theme-light .cx-calendar-day.is-today { border-color: #2f83b2; box-shadow: 
 
 body.theme-light .cx-trend-grid { stroke: rgba(45, 105, 139, .15); }
 body.theme-light .cx-trend-axis,
-body.theme-light .cx-trend-date,
-body.theme-light .cx-trend-cutover-label { fill: #638195; }
+body.theme-light .cx-trend-date { fill: #638195; }
 body.theme-light .cx-trend-line { stroke: #3e91bb; }
 body.theme-light .cx-trend-point { fill: #fff; stroke: #2d759d; }
 body.theme-light .cx-trend-point.is-retrospective { fill: #d3e9f4; stroke: #5b92af; }

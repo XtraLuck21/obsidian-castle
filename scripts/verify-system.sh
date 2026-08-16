@@ -111,6 +111,9 @@ rg -q 'cx-voyage-launch' "$plugin/styles.css" || fail "Voyage ritual missing lau
 rg -q 'overallEnergyValue' "$plugin/main.js" || fail "Trend does not use Overall Energy source rules"
 rg -Fq 'const OVERALL_ENERGY_CUTOVER = "2026-07-26"' "$plugin/main.js" || fail "Trend missing Overall Energy cutover"
 rg -Fq 'navigation ? "health_morning_sleep" : "sleep_quality"' "$plugin/main.js" || fail "Trend does not switch Sleep sources"
+if rg -q '7/26 起读取 Health Evening|7/25 起读取 Health Morning Sleep|cx-trend-cutover' "$plugin/main.js" "$plugin/styles.css"; then
+  fail "Rolling 14-day trend still exposes an expired migration caption or cutover marker"
+fi
 rg -Fq 'OPEN_VOYAGE_HOURS = 24' "$plugin/main.js" || fail "Voyage lifecycle missing 24-hour stale guard"
 rg -Fq 'cx-navigation-voyage-ticket' "$plugin/main.js" "$plugin/styles.css" || fail "Daily Navigation missing voyage ticket"
 rg -Fq 'calendarDayDifference(frontmatter.date, endedAt)' "$plugin/main.js" || fail "Voyage ticket does not derive cross-date arrival offset"
