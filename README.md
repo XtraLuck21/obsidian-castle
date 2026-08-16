@@ -57,6 +57,7 @@ committed to this repository.
 - Four editable Apple Fitness-inspired time rings in each Daily Note
 - Calendar navigation that opens or creates Daily Notes
 - Active Project progress and Project Task overview
+- Desktop-only LeetCode Round 1 Study Blocks with one low-friction timer, multi-problem outcomes, manual-duration fallback, and append-only legacy/v4 Bridge compatibility
 - Voyage-day streak calculation based on complete Daily check-ins
 - Explicit separation between human writing and AI-generated summaries
 
@@ -394,15 +395,74 @@ returns the values to the pending-review state.
 Weekly Reviews live under `10_Journal/Weekly/`. Standard periods run Sunday
 through Saturday and use explicit `period_start` and `period_end` fields. The
 `castlex-weekly-snapshot` block reads those Daily Notes and renders a compact
-period-specific view: Sleep, Energy, and Activation on one aligned state chart,
-and the four Time Allocation categories as one stacked chart per day. The state
-chart reads the legacy Daily State fields through 2026-07-24, then switches to
-Health morning sleep plus Navigation work energy and activation from 2026-07-25.
+period-specific view led by the four Time Allocation categories as one stacked
+chart per day. Sleep, Energy, and Activation remain in the Snapshot footer as
+compact averages; their full aligned state chart appears later in Detailed
+Weekly Analytics beside the Capacity views. The state series read the legacy
+Daily State fields through 2026-07-24, then switch to Health morning sleep plus
+Navigation work energy and activation from 2026-07-25.
 
 The snapshot is read-only derived data and has no review button. It always reads
 the current Daily YAML, so a later human correction takes precedence over an
 earlier AI-filled value. Human reflection and decisions remain normal prose,
 while AI summary, comparison, and advice remain visibly marked callouts.
+
+The optional `castlex-weekly-analytics` block is also read-only. It renders
+project and Activity Mode allocation from the nested ledger, category totals,
+Project/Execution Day matrices, four-week time and state trends, Health and
+Mental signal matrices, controlled-term frequencies, readiness percentages,
+clock-time regularity, weighted Project progress reconstructed from dated task
+completion, a daily Health/Mental/engaged-time alignment chart, and the Workout
+Planned → Recommended → Selected → Actual funnel. `history_weeks` defaults to
+`4` and may be set from
+`1` through `8`. Bedtime uses either the same-date night field or the v2
+early-morning bedtime field; `health_morning_started_at` is labeled Morning
+Check-in and is never interpreted as wake time or sleep duration. Project and
+Execution Day history is shown only where the Weekly period explicitly enables
+the frozen `project-execution-v1` model; unavailable historical counts remain
+blank rather than being reconstructed from current Project metadata.
+Project progress uses the same `progress_sections` weights as Home and only
+reconstructs historical completion from checked tasks carrying an explicit
+`✅ YYYY-MM-DD` date. Undated checked tasks make the historical delta
+unreliable rather than being assigned an invented completion date. The
+cross-domain chart aligns Daily values and never states causal inference.
+The rolling investment view separates each week's recorded duration from its
+own previous-week percentage for Total, Project, Enrichment, Workout, and
+Admin. It reads one additional period before the visible four-week window so
+the first visible column can still show a comparison when that earlier data is
+complete across all seven dates; missing or partial prior data renders as a
+neutral dash. Project Velocity combines
+weighted progress delta, dated completed-task count, Project Execution time,
+and total invested time without claiming that percentage points are comparable
+across Projects.
+
+Three additional derived views remain explicitly formula-bound. Capacity–Load
+Gap subtracts the mean of Health recommendation capacity and positive-direction
+Mental availability from engaged time normalized to an eight-hour day. Core
+Execution Ratio divides frozen-Core Project Execution minutes by all engaged
+minutes. Time Fragmentation Index is `1 - Σ(block share²)`, displayed from `0`
+for one block toward `100` as recorded engaged time is distributed across more
+blocks; its Weekly headline is the mean of the recorded Daily indices. These are
+descriptive visualizations, not narrative interpretation or causal claims.
+Capacity–Load Gap uses its own berry/teal semantic pair rather than reusing the
+Workout and Project category colors; positive berry extends right from zero and
+negative teal extends left.
+In Light mode, Weekly charts use the lively Odd Garden palette, with lime
+Project, teal Enrichment, coral Workout, and violet Admin kept in sync with the
+Home Heatmap. The Weekly page uses `#EDF6F8` and its cards use `#F8FCFD`.
+Surfaces remain opaque and clean, without blur or inset-highlight effects.
+Health and Mental use garden green and violet, while generic duration bars and
+controlled-term dots use a clear aqua. Health Signals, Mental Dimensions, and
+the Workout decision flow retain their established semantic level colors.
+Cross-domain time bars and Health Capacity points reserve an inner plot margin
+so bars and points do not collide with the axis; the cross-domain Time matrix
+row uses pale aqua `#D8F0EE` to distinguish duration from Health and Mental
+percentages.
+
+The visual reading order is outcome-led: Snapshot KPIs and Engaged Time,
+Week-over-Week and four-week trends, Project allocation and velocity, execution
+quality, Capacity and state relationships, Workout and rhythm, then detailed
+Health and Mental matrices and term frequencies.
 For weeks beginning 2026-07-26, the cross-domain review also reads each Daily
 `Time & Task Log` alongside Completed Today, Open Loops, Raw Notes, and YAML.
 The 2026-07-26–2026-07-31 portion is legacy-derived and read-only; from the

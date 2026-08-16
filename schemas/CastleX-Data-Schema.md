@@ -875,44 +875,45 @@ because the external Bridge lives outside the Vault. Mobile renders a clear
 unavailable state while the rest of CastleX remains mobile-compatible.
 
 The LeetCode repository owns plan order, test evidence, mastery, and review
-scheduling through the Bridge `to_obsidian/` files. The Project tracker owns
-only execution sessions. Start is clicked when the problem is first read.
-Pause and Resume persist local timer state in plugin data. Finish appends
-exactly one schema-v3 `session_completed` event to
-`from_obsidian/session_events.jsonl`; it never writes Daily Note time fields.
+scheduling through the Bridge `to_obsidian/` files. During Round 1 the Project
+tracker owns only low-friction Study Block activity. One persisted timer is
+global to the Project rather than attached to a problem. Start, Pause, Resume,
+and Finish manage the Block; a Block may include one or several stable task IDs.
 
-Total active time always accumulates while the session is running. After Start,
-the user may optionally classify time as `thinking`, `implementation`, or
-`debugging`. Before the first phase selection, all three values render as
-`N/A`, meaning that no phase breakdown was recorded. The first phase selection
-enables the breakdown and initializes all three values to zero. From then on,
-an unused phase remains an intentional `0`, while the selected phase
-accumulates classified seconds. Selecting a different phase changes
-classification without interrupting Total; tapping the active phase again
-records subsequent time as Unclassified. Once enabled, a breakdown does not
-return to the `N/A` state during that Session.
+For every touched problem, the user records only `attempted`, `partial`,
+`completed`, or `reviewed`. A completed declaration remains sticky for plan
+execution. A later review never downgrades it. The repository must still combine
+the declaration with test evidence before changing technical progress or
+mastery. Attempted, partial, and reviewed activity never establishes mastery.
 
-Schema-v3 events omit both `phase_seconds` and `unclassified_seconds` when no
-phase was ever selected. When phase tracking was enabled, `phase_seconds`
-contains all three integer keys, including zero values, and
-`unclassified_seconds` stores the Total time not assigned to a phase. Existing
-schema-v2 events remain readable with their legacy partial-key semantics.
+Finish appends exactly one schema-v4 `study_block_completed` event to
+`from_obsidian/session_events.jsonl`. Its `active_seconds` is the authoritative
+total for the entire Block and must never be divided, copied, or inferred as a
+per-problem duration. Timer events include `started_at` and `ended_at`; a manual
+fallback records a positive total duration with `duration_source: manual` and
+omits those timestamps. Both paths record a local `date`, one or more problem
+outcomes, and an optional note. Multiple Blocks on one date are valid and are
+aggregated by the repository for daily totals. The tracker never writes Daily Note time fields.
 
-`completion_status: completed` is clicked only after all tests pass and records
-the user's completion declaration. The coding repository remains the source of
-test evidence and mastery evaluation. `partial` and `stopped` preserve time and
-attempt history without advancing the execution progress bar. Hint level and a
-short note are optional. Planned dates remain anchors, while actual
-`started_at`, `ended_at`, `active_seconds`, and optional `phase_seconds`
-preserve what happened.
+Round 1 does not display or request expected minutes, actual per-problem
+minutes, live elapsed targets, hint levels, speed targets, or phase controls.
+The plan's `expected_active_minutes` values remain legacy repository metadata
+and are ignored by the UI.
+
+The append-only event reader supports a mixed log. Existing schema-v2/v3
+`session_completed` events retain their historical single-task and optional
+phase semantics byte-for-byte. New schema-v4 events are not synthesized from
+old Sessions, and missing legacy phases are never backfilled. Consumers branch
+by event type and schema version, then deduplicate by `event_id`.
 
 The Today recommendation follows the task-array order in `plan_export.json` and
-selects the first task without a completed Session. A later task scheduled for
-today never jumps ahead of an earlier unfinished task; completing work early
-simply advances to the next open task in the same canonical order. The optional
-`round_target_problem_count` in `current_state.json` supplies the Technical
-Coverage denominator. When it is absent, the tracker infers the target without
-double-counting plan tasks that already have completed Sessions.
+selects the first task without any historical completed Session or schema-v4
+completed outcome. A later task scheduled for today never jumps ahead of an
+earlier unfinished task; completing work early simply advances to the next open
+task in canonical order. The optional `round_target_problem_count` in
+`current_state.json` supplies the Technical Coverage denominator. When it is
+absent, the tracker infers the target without double-counting plan tasks already
+declared complete.
 
 ## Weekly Review
 
@@ -928,10 +929,11 @@ origin: mixed
 ```
 
 The `castlex-weekly-snapshot` block reads the canonical Daily Notes inside that
-inclusive period. It renders one aligned state chart for Sleep, Energy, and
-Activation plus one stacked daily chart for the four Time Allocation
-categories. Through 2026-07-24 those series use `sleep_quality`, `energy`, and
-`agency`. Starting 2026-07-25 they use `health_morning_sleep`,
+inclusive period. It renders the four Time Allocation categories as one stacked
+daily chart and keeps Sleep, Energy, and Activation as compact footer averages.
+The full aligned state chart belongs to the later Capacity group in Detailed
+Weekly Analytics. Through 2026-07-24 those state series use `sleep_quality`,
+`energy`, and `agency`. Starting 2026-07-25 they use `health_morning_sleep`,
 `navigation_work_energy`, and `navigation_activation`, so a Weekly Review that
 crosses the cutover remains continuous without rewriting legacy Daily Notes.
 The snapshot is computed from Daily YAML and never writes derived totals back
@@ -940,6 +942,67 @@ separate review status. When a human changes a Daily value after AI assistance,
 the current Daily YAML value and its human origin take precedence in every
 subsequent Weekly Snapshot. Human additions belong in `My Reflection` or
 `Next Week · My Decision`; they do not silently become AI text.
+
+An optional `castlex-weekly-analytics` block provides a data-only detailed
+review. It reads the same current Daily YAML plus the canonical nested `Time &
+Task Log` ledger and renders charts for Project time, Activity Mode time, the
+four time categories, Project/Execution Days, up to eight Sunday–Saturday
+periods, Health signals and capacities, Mental dimensions and controlled-term
+frequencies, and recorded clock-time regularity. It never writes narrative
+summary, interpretation, observation, or advice. Missing values render as
+missing. It must not infer wake time or sleep duration from
+`health_morning_started_at`; that field is Morning Check-in only. Bedtime may
+come from `health_night_bedtime_at` or `health_early_morning_bedtime_at`.
+
+Detailed Weekly Analytics may also reconstruct Project progress at the day
+before `period_start` and at `period_end`. It uses the same weighted
+`progress_sections` calculation as Home, restricted to checked Project tasks
+with explicit `✅ YYYY-MM-DD` completion dates. It displays percentage-point
+change, not a claim about effort or impact. The Health × Mental × Time chart
+aligns `health_recommendation_capacity`, the positive-direction mean of the five
+Mental dimensions, and total engaged minutes by date; visual alignment is not
+causal inference. Workout flow reads Planned, Recommended, Selected, and Actual
+fields independently so missing execution remains visibly missing.
+
+The rolling Week-over-Week Investment view uses the current period and up to
+three immediately preceding Sunday–Saturday periods as its visible window. It
+also reads one hidden preceding period strictly as comparison context. Total,
+Project, Enrichment, Workout, and Admin each receive a four-bar duration chart.
+Every visible bar displays its own change against its immediately preceding
+week, spatially aligned above that bar and separated from duration. The first
+visible bar therefore still receives a percentage when the hidden preceding
+period has time data on all seven dates. Missing or partial preceding data
+renders as `—`, never as `0%` or `Baseline`; this prevents a partially recorded
+week from producing a misleading large change. When the prior value is recorded
+zero and the current value is positive, the comparison is `New` rather than an
+invented infinite percentage.
+
+Each visible Week-over-Week percentage uses a compact rounded-rectangle border
+and remains centered over its own duration and bar. The Health × Mental × Time
+and Health Capacity charts keep their first and last marks inside an explicit
+plot inset; the axis grid remains fixed, and the inset changes only geometry,
+not values or scaling.
+
+Detailed Weekly Analytics follows this visual order: investment trends;
+Project allocation, velocity, day thresholds, Core Execution, and fragmentation;
+Capacity–Load Gap, cross-domain alignment, Health Capacity, and the aligned
+Sleep/Energy/Activation state chart; Workout flow and Daily Rhythm; then Health
+Signals, Health Categories, Mental Dimensions, and Mental Terms. This is a
+presentation order only and does not change any source or formula.
+
+In Light mode, Weekly pages use the Odd Garden presentation palette on an
+opaque `#EDF6F8` page with opaque `#F8FCFD` cards. Category colors remain
+consistent between Weekly time visualizations and the Home Heatmap; semantic
+score matrices retain their independent level colors. Weekly surfaces do not
+use backdrop blur or inset-highlight effects.
+
+Derived Weekly metrics use these canonical formulas:
+
+- `Capacity–Load Gap = min(total engaged minutes / 480 × 100, 100) - mean(health_recommendation_capacity, Mental availability)`. Mental availability is the positive-direction mean of the five Mental dimensions scaled to `0–100`; both Health and Mental values are required for a Daily gap.
+- `Core Execution Ratio = frozen-Core Project blocks with Activity Mode: Execution / all engaged minutes × 100`. Admin, Workout, non-Core Projects, Planning, System, and Not Classified are excluded from the numerator.
+- `Project Velocity` displays weighted Project progress percentage-point change, newly dated completed-task count, Project Execution minutes, and total Project minutes. Percentage-point velocity is interpreted only within the same Project because section weights and task granularity differ across Projects.
+- `Time Fragmentation Index = (1 - Σ((block engaged minutes / total ledger engaged minutes)²)) × 100`. One block yields `0`; time distributed across more similarly sized blocks approaches `100`. The view also exposes block count, average block duration, and longest block duration.
+- The Weekly Time Fragmentation headline is the arithmetic mean of available Daily indices; days without ledger blocks are missing rather than zero. Weekly block count and average duration remain direct ledger aggregates.
 
 Weekly AI output is intentionally brief:
 

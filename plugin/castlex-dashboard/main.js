@@ -1168,62 +1168,15 @@ function trackerTimerSeconds(timer, now = Date.now()) {
   return accumulated + (Number.isFinite(runningSince) ? Math.max(0, (now - runningSince) / 1000) : 0);
 }
 
-const TRACKER_PHASES = [
-  { id: "thinking", label: "Thinking" },
-  { id: "implementation", label: "Implementing" },
-  { id: "debugging", label: "Debugging" },
+const TRACKER_OUTCOMES = [
+  { id: "attempted", label: "Attempted" },
+  { id: "partial", label: "Partial" },
+  { id: "completed", label: "Completed" },
+  { id: "reviewed", label: "Reviewed" },
 ];
 
-function trackerPhaseLabel(phase) {
-  return TRACKER_PHASES.find(({ id }) => id === phase)?.label ?? trackerPatternLabel(phase);
-}
-
-function trackerPhaseTrackingEnabled(timer) {
-  if (!timer) return false;
-  if (timer.phase_tracking === true) return true;
-  if (TRACKER_PHASES.some(({ id }) => id === timer.phase)) return true;
-  const stored = timer.phase_seconds;
-  return Boolean(stored && typeof stored === "object" && !Array.isArray(stored)
-    && TRACKER_PHASES.some(({ id }) => Object.prototype.hasOwnProperty.call(stored, id)));
-}
-
-function trackerPhaseSeconds(timer, now = Date.now()) {
-  const phases = {};
-  const stored = timer?.phase_seconds;
-  if (stored && typeof stored === "object" && !Array.isArray(stored)) {
-    TRACKER_PHASES.forEach(({ id }) => {
-      if (Object.prototype.hasOwnProperty.call(stored, id)) {
-        phases[id] = Math.max(0, Number(stored[id]) || 0);
-      }
-    });
-  }
-  if (timer?.status === "running" && timer.running_since && TRACKER_PHASES.some(({ id }) => id === timer.phase)) {
-    const runningSince = new Date(timer.running_since).getTime();
-    const elapsed = Number.isFinite(runningSince) ? Math.max(0, (now - runningSince) / 1000) : 0;
-    phases[timer.phase] = Math.max(0, Number(phases[timer.phase]) || 0) + elapsed;
-  }
-  return phases;
-}
-
-function trackerTimerSnapshot(timer, now = Date.now()) {
-  const phaseTracking = trackerPhaseTrackingEnabled(timer);
-  const recordedPhases = trackerPhaseSeconds(timer, now);
-  const phases = phaseTracking
-    ? Object.fromEntries(TRACKER_PHASES.map(({ id }) => [id, Math.max(0, Number(recordedPhases[id]) || 0)]))
-    : {};
-  return {
-    active_seconds: Math.max(0, trackerTimerSeconds(timer, now)),
-    phase_tracking: phaseTracking,
-    phase_seconds: phases,
-  };
-}
-
-function trackerUnclassifiedSeconds(timer, now = Date.now()) {
-  if (!trackerPhaseTrackingEnabled(timer)) return null;
-  const total = Math.max(0, trackerTimerSeconds(timer, now));
-  const classified = Object.values(trackerPhaseSeconds(timer, now))
-    .reduce((sum, seconds) => sum + Math.max(0, Number(seconds) || 0), 0);
-  return Math.max(0, total - classified);
+function trackerOutcomeLabel(outcome) {
+  return TRACKER_OUTCOMES.find(({ id }) => id === outcome)?.label ?? trackerPatternLabel(outcome);
 }
 
 function trackerEventId() {
@@ -1231,16 +1184,36 @@ function trackerEventId() {
   return `lc-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function trackerTaskSessions(events, taskId) {
+function trackerEventDate(event) {
+  return String(event?.ended_at || event?.date || "");
+}
+
+function trackerEventProblems(event) {
+  if (event?.event_type === "study_block_completed" && Array.isArray(event.problems)) {
+    return event.problems.filter((problem) => problem?.task_id && problem?.outcome);
+  }
+  if (event?.event_type === "session_completed" && event.task_id) {
+    const legacyOutcome = event.completion_status === "completed"
+      ? "completed"
+      : event.completion_status === "partial" ? "partial" : "attempted";
+    return [{ task_id: event.task_id, outcome: legacyOutcome }];
+  }
+  return [];
+}
+
+function trackerTaskEvents(events, taskId) {
   return events
-    .filter((event) => event.task_id === taskId)
-    .sort((a, b) => String(a.ended_at).localeCompare(String(b.ended_at)));
+    .filter((event) => trackerEventProblems(event).some((problem) => problem.task_id === taskId))
+    .sort((a, b) => trackerEventDate(a).localeCompare(trackerEventDate(b)));
 }
 
 function trackerTaskExecutionStatus(events, taskId) {
-  const sessions = trackerTaskSessions(events, taskId);
-  if (sessions.some((event) => event.completion_status === "completed")) return "completed";
-  return sessions[sessions.length - 1]?.completion_status ?? "planned";
+  const taskEvents = trackerTaskEvents(events, taskId);
+  const outcomes = taskEvents.flatMap((event) => trackerEventProblems(event)
+    .filter((problem) => problem.task_id === taskId)
+    .map((problem) => problem.outcome));
+  if (outcomes.includes("completed")) return "completed";
+  return outcomes[outcomes.length - 1] ?? "planned";
 }
 
 function trackerWeekRange(date = new Date()) {
@@ -1262,15 +1235,12 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
     this.loading = false;
     this.activeTab = "today";
     this.selectedTaskId = "";
-    this.timerDisplay = null;
-    this.timerRing = null;
-    this.timerMeta = null;
-    this.phaseDisplays = new Map();
-    this.phaseStatus = null;
-    this.phaseUnclassifiedDisplay = null;
-    this.hintLevel = "";
+    this.blockStatus = null;
+    this.manualEntryOpen = false;
+    this.manualDurationMinutes = "";
+    this.manualProblems = {};
     this.userNote = "";
-    this.savingSession = false;
+    this.savingBlock = false;
   }
 
   onload() {
@@ -1315,7 +1285,8 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
           return null;
         }
       })
-      .filter((event) => event?.event_type === "session_completed" && event.task_id);
+      .filter((event) => (event?.event_type === "session_completed" && event.task_id)
+        || (event?.event_type === "study_block_completed" && Array.isArray(event.problems)));
   }
 
   async loadBridgeData() {
@@ -1329,13 +1300,14 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
       this.readJson("to_obsidian/review_queue.json"),
       this.readEvents(),
     ]);
-    if (!Array.isArray(plan.tasks) || Number(plan.schema_version) !== 1) {
+    if (!Array.isArray(plan.tasks) || ![1, 2].includes(Number(plan.schema_version))) {
       throw new Error("The Bridge plan export is not a supported schema.");
     }
+    if (Number(plan.schema_version) === 2 && plan.round_1_tracking_policy?.mode !== "daily_study_block") {
+      throw new Error("The Bridge plan does not declare the Round 1 Daily Study Block policy.");
+    }
     this.data = { plan, current, review, events };
-    const timerTaskId = this.timer()?.task_id;
     const taskIds = new Set(plan.tasks.map((task) => task.task_id));
-    if (timerTaskId && taskIds.has(timerTaskId)) this.selectedTaskId = timerTaskId;
     if (!this.selectedTaskId || !taskIds.has(this.selectedTaskId)) {
       this.selectedTaskId = this.recommendedTask()?.task_id ?? plan.tasks[0]?.task_id ?? "";
     }
@@ -1353,9 +1325,9 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
     return this.tasks().find((task) => task.task_id === taskId) ?? null;
   }
 
-  sessions(taskId = "") {
+  activity(taskId = "") {
     const events = this.data?.events ?? [];
-    return taskId ? trackerTaskSessions(events, taskId) : [...events];
+    return taskId ? trackerTaskEvents(events, taskId) : [...events];
   }
 
   taskStatus(taskId) {
@@ -1370,8 +1342,6 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
 
   recommendedTask() {
     if (!this.data) return null;
-    const active = this.timer();
-    if (active?.task_id) return this.task(active.task_id);
     const completed = this.completedTaskIds();
     const open = this.tasks().filter((task) => !completed.has(task.task_id));
     return open[0]
@@ -1381,6 +1351,15 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
 
   selectedTask() {
     return this.task(this.selectedTaskId) ?? this.recommendedTask();
+  }
+
+  blockProblems() {
+    const timer = this.timer();
+    if (timer?.problems && typeof timer.problems === "object" && !Array.isArray(timer.problems)) {
+      return { ...timer.problems };
+    }
+    if (timer?.task_id) return { [timer.task_id]: "attempted" };
+    return { ...this.manualProblems };
   }
 
   async render() {
@@ -1415,7 +1394,7 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
     if (this.activeTab === "week") this.renderWeek(content);
     else if (this.activeTab === "plan") this.renderPlan(content);
     else if (this.activeTab === "review") this.renderReview(content);
-    else if (this.activeTab === "sessions") this.renderSessions(content);
+    else if (this.activeTab === "activity") this.renderActivity(content);
     else this.renderToday(content);
     this.updateTimerDisplay();
   }
@@ -1430,8 +1409,6 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
     const technicalTotal = Number.isFinite(configuredTechnicalTotal) && configuredTechnicalTotal > 0
       ? Math.max(technicalCompleted, configuredTechnicalTotal)
       : Math.max(technicalCompleted, inferredTechnicalTotal);
-    const events = this.sessions();
-    const totalSeconds = events.reduce((sum, event) => sum + Math.max(0, Number(event.active_seconds) || 0), 0);
     const milestone = this.data.current.next_milestone;
     const milestoneIds = Array.isArray(milestone?.task_ids) ? milestone.task_ids : [];
     const milestoneCompleted = milestoneIds.filter((taskId) => completed.has(taskId)).length;
@@ -1453,12 +1430,8 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
 
     const progressGrid = shell.createDiv({ cls: "cx-lc-progress-grid" });
     this.renderProgress(progressGrid, "Technical coverage", technicalCompleted, technicalTotal, "Repository evidence");
-    this.renderProgress(progressGrid, "Plan execution", executionCompleted, problems.length, "Completed sessions");
+    this.renderProgress(progressGrid, "Plan execution", executionCompleted, problems.length, "Completed outcomes");
     this.renderProgress(progressGrid, milestone?.title || "Current milestone", milestoneCompleted, milestoneIds.length, "Current focus");
-    const time = progressGrid.createDiv({ cls: "cx-lc-progress-card cx-lc-time-card" });
-    time.createDiv({ cls: "cx-lc-progress-label", text: "Recorded active time" });
-    time.createDiv({ cls: "cx-lc-time-value", text: trackerDuration(totalSeconds) });
-    time.createDiv({ cls: "cx-lc-progress-detail", text: `${events.length} completed session${events.length === 1 ? "" : "s"}` });
   }
 
   renderProgress(parent, label, value, total, detail) {
@@ -1482,7 +1455,7 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
       ["week", "This Week"],
       ["plan", "Plan"],
       ["review", "Review"],
-      ["sessions", "Sessions"],
+      ["activity", "Activity"],
     ].forEach(([id, label]) => {
       const button = nav.createEl("button", {
         cls: `cx-lc-tab${this.activeTab === id ? " is-active" : ""}`,
@@ -1501,50 +1474,58 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
       parent.createDiv({ cls: "cx-lc-empty", text: "No task is available in the current plan." });
       return;
     }
-    const taskSessions = this.sessions(task.task_id);
-    const totalSeconds = taskSessions.reduce((sum, event) => sum + Number(event.active_seconds || 0), 0);
     const status = this.taskStatus(task.task_id);
     const card = parent.createDiv({ cls: "cx-lc-session-card" });
     const meta = card.createDiv({ cls: "cx-lc-task-meta" });
-    meta.createSpan({ cls: `cx-lc-status is-${status}`, text: status === "planned" ? "Up next" : status });
+    meta.createSpan({ cls: `cx-lc-status is-${status}`, text: status === "planned" ? "Up next" : trackerOutcomeLabel(status) });
     meta.createSpan({ text: task.task_type === "checkpoint" ? "Round checkpoint" : `LC ${task.leetcode_id}` });
     meta.createSpan({ text: trackerPatternLabel(task.pattern) });
     meta.createSpan({ text: task.stage });
-    card.createEl("h3", { text: task.title });
+    card.createEl("h3", { text: "LeetCode Study Block" });
+    card.createDiv({ cls: "cx-lc-block-prompt", text: `Recommended next · ${task.title}` });
     const schedule = card.createDiv({ cls: "cx-lc-schedule" });
     schedule.createSpan({ text: `Planned · ${trackerDateLabel(task.scheduled_date)}` });
-    schedule.createSpan({ text: `Expected · ${task.expected_active_minutes}m` });
-    if (taskSessions.length) {
-      schedule.createSpan({ text: `${taskSessions.length} session${taskSessions.length === 1 ? "" : "s"} · ${trackerDuration(totalSeconds)}` });
-    }
+    schedule.createSpan({ text: "Follow canonical plan order" });
 
-    const timerArea = card.createDiv({ cls: "cx-lc-timer-area" });
-    const ring = timerArea.createDiv({ cls: "cx-lc-timer-ring" });
-    this.timerRing = ring;
-    this.phaseDisplays = new Map();
-    this.phaseStatus = null;
-    this.phaseUnclassifiedDisplay = null;
-    const inner = ring.createDiv({ cls: "cx-lc-timer-inner" });
-    this.timerDisplay = inner.createDiv({ cls: "cx-lc-clock", text: "00:00:00" });
-    this.timerMeta = inner.createDiv({ cls: "cx-lc-clock-meta", text: "Ready to begin" });
-    this.renderTimerActions(timerArea, task);
-    this.renderOptionalDetails(card);
+    const blockArea = card.createDiv({ cls: "cx-lc-block-area" });
+    this.blockStatus = blockArea.createDiv({ cls: "cx-lc-block-status", text: "Ready to begin" });
+    this.renderBlockActions(blockArea, task);
+    if (this.timer() || this.manualEntryOpen) {
+      this.renderProblemOutcomes(card);
+      this.renderBlockNote(card);
+    }
+    if (!this.timer() && this.manualEntryOpen) this.renderManualDuration(card);
     this.renderTaskChooser(parent, task);
   }
 
-  renderTimerActions(parent, task) {
+  renderBlockActions(parent, task) {
     const timer = this.timer();
-    const actions = parent.createDiv({ cls: "cx-lc-timer-actions" });
-    if (!timer) {
-      const start = actions.createEl("button", { cls: "cx-lc-button is-primary", text: "Start Session" });
-      start.addEventListener("click", () => this.startSession(task));
+    const actions = parent.createDiv({ cls: "cx-lc-block-actions" });
+    if (timer?.status === "saving_manual") {
+      const retry = actions.createEl("button", { cls: "cx-lc-button is-primary", text: "Retry Manual Save" });
+      retry.addEventListener("click", () => this.retryPendingManualBlock());
       return;
     }
-    if (timer.task_id !== task.task_id) {
-      actions.createDiv({ cls: "cx-lc-running-note", text: `A session is already active for ${this.task(timer.task_id)?.title || timer.task_id}.` });
-      const open = actions.createEl("button", { cls: "cx-lc-button", text: "Open Active Session" });
-      open.addEventListener("click", () => {
-        this.selectedTaskId = timer.task_id;
+    if (!timer) {
+      if (this.manualEntryOpen) {
+        const save = actions.createEl("button", { cls: "cx-lc-button is-primary", text: "Save Manual Block" });
+        save.addEventListener("click", () => this.finishManualBlock());
+        const cancel = actions.createEl("button", { cls: "cx-lc-button is-quiet", text: "Cancel" });
+        cancel.addEventListener("click", () => {
+          this.manualEntryOpen = false;
+          this.manualDurationMinutes = "";
+          this.manualProblems = {};
+          this.userNote = "";
+          this.renderTracker();
+        });
+        return;
+      }
+      const start = actions.createEl("button", { cls: "cx-lc-button is-primary", text: "Start Study Block" });
+      start.addEventListener("click", () => this.startBlock(task));
+      const manual = actions.createEl("button", { cls: "cx-lc-button is-quiet", text: "Log Manually" });
+      manual.addEventListener("click", () => {
+        this.manualEntryOpen = true;
+        this.manualProblems = { [task.task_id]: "attempted" };
         this.renderTracker();
       });
       return;
@@ -1553,78 +1534,42 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
       cls: "cx-lc-button",
       text: timer.status === "running" ? "Pause" : "Resume",
     });
-    pause.addEventListener("click", () => timer.status === "running" ? this.pauseSession() : this.resumeSession());
-    this.renderPhaseSelector(actions, timer);
-    const finish = actions.createEl("button", { cls: "cx-lc-button is-primary", text: "Finish · Completed" });
-    finish.addEventListener("click", () => this.finishSession("completed"));
-    const partial = actions.createEl("button", { cls: "cx-lc-button is-quiet", text: "Save Partial" });
-    partial.addEventListener("click", () => this.finishSession("partial"));
-    const stopped = actions.createEl("button", { cls: "cx-lc-button is-quiet", text: "Stop" });
-    stopped.addEventListener("click", () => this.finishSession("stopped"));
+    pause.addEventListener("click", () => timer.status === "running" ? this.pauseBlock() : this.resumeBlock());
+    const finish = actions.createEl("button", { cls: "cx-lc-button is-primary", text: "Finish Study Block" });
+    finish.addEventListener("click", () => this.finishTimedBlock());
   }
 
-  renderPhaseSelector(parent, timer) {
-    const phaseTracking = trackerPhaseTrackingEnabled(timer);
-    const panel = parent.createDiv({ cls: "cx-lc-phase-panel" });
-    const heading = panel.createDiv({ cls: "cx-lc-phase-heading" });
-    heading.createSpan({ text: "Optional phase" });
-    this.phaseStatus = heading.createSpan({
-      cls: "cx-lc-phase-status",
-      text: timer.phase
-        ? `Tracking ${trackerPhaseLabel(timer.phase)}`
-        : phaseTracking ? "Breakdown on · no active phase" : "Total only",
+  renderProblemOutcomes(parent) {
+    const problems = this.blockProblems();
+    const panel = parent.createDiv({ cls: "cx-lc-outcome-panel" });
+    const heading = panel.createDiv({ cls: "cx-lc-section-heading" });
+    heading.createEl("h4", { text: "Problems in this block" });
+    heading.createSpan({ text: "Choose one outcome for each touched problem" });
+    Object.entries(problems).forEach(([taskId, outcome]) => {
+      const task = this.task(taskId);
+      if (!task) return;
+      const row = panel.createDiv({ cls: "cx-lc-outcome-row" });
+      const copy = row.createDiv({ cls: "cx-lc-task-row-main" });
+      copy.createDiv({ cls: "cx-lc-task-title", text: `${task.leetcode_id ? `LC ${task.leetcode_id} · ` : ""}${task.title}` });
+      copy.createDiv({ cls: "cx-lc-task-detail", text: `${trackerPatternLabel(task.pattern)} · ${task.stage}` });
+      const select = row.createEl("select", { cls: "cx-lc-outcome-select", attr: { "aria-label": `Outcome for ${task.title}` } });
+      TRACKER_OUTCOMES.forEach(({ id, label }) => select.createEl("option", { attr: { value: id }, text: label }));
+      select.value = outcome;
+      select.addEventListener("change", () => this.setProblemOutcome(taskId, select.value));
+      const remove = row.createEl("button", { cls: "cx-lc-row-button", text: "Remove" });
+      remove.addEventListener("click", () => this.removeProblem(taskId));
     });
-    panel.createDiv({
-      cls: "cx-lc-phase-help",
-      text: phaseTracking
-        ? "Switch phases as you work. Tap the active phase again to leave time unclassified."
-        : "Choose a phase to start the breakdown. Until then, only Total is recorded.",
-    });
-    const choices = panel.createDiv({ cls: "cx-lc-phase-choices" });
-    const phaseSeconds = trackerPhaseSeconds(timer);
-    TRACKER_PHASES.forEach(({ id, label }) => {
-      const button = choices.createEl("button", {
-        cls: `cx-lc-phase-button${timer.phase === id ? " is-active" : ""}`,
-        attr: {
-          type: "button",
-          "aria-pressed": timer.phase === id ? "true" : "false",
-        },
-      });
-      button.createSpan({ cls: "cx-lc-phase-label", text: label });
-      const display = button.createSpan({
-        cls: "cx-lc-phase-time",
-        text: phaseTracking ? trackerClock(phaseSeconds[id] || 0) : "/",
-      });
-      this.phaseDisplays.set(id, display);
-      button.addEventListener("click", () => this.selectPhase(timer.phase === id ? null : id));
-    });
-    const coverage = panel.createDiv({ cls: `cx-lc-phase-coverage${phaseTracking ? "" : " is-hidden"}` });
-    coverage.createSpan({ text: "Unclassified" });
-    this.phaseUnclassifiedDisplay = coverage.createSpan({
-      cls: "cx-lc-phase-unclassified-time",
-      text: phaseTracking ? trackerClock(trackerUnclassifiedSeconds(timer) || 0) : "/",
-    });
+    if (!Object.keys(problems).length) {
+      panel.createDiv({ cls: "cx-lc-empty", text: "Add at least one problem before finishing the block." });
+    }
   }
 
-  renderOptionalDetails(parent) {
+  renderBlockNote(parent) {
     const details = parent.createEl("details", { cls: "cx-lc-details" });
-    details.createEl("summary", { text: "Optional details · hint level and note" });
+    details.createEl("summary", { text: "Optional note" });
     const fields = details.createDiv({ cls: "cx-lc-detail-fields" });
-    const hint = fields.createDiv({ cls: "cx-lc-field" });
-    hint.createEl("label", { text: "Hint level" });
-    const select = hint.createEl("select");
-    [
-      ["", "Not recorded"],
-      ["H0", "H0 · No hint"],
-      ["H1", "H1 · Direction"],
-      ["H2", "H2 · Concept / structure"],
-      ["H3", "H3 · Strong guidance"],
-      ["answer", "Answer viewed"],
-    ].forEach(([value, label]) => select.createEl("option", { attr: { value }, text: label }));
-    select.value = this.hintLevel;
-    select.addEventListener("change", () => { this.hintLevel = select.value; });
     const note = fields.createDiv({ cls: "cx-lc-field is-note" });
-    note.createEl("label", { text: "Session note" });
+    note.createEl("label", { text: "Study Block note" });
     const textarea = note.createEl("textarea", {
       attr: { maxlength: "500", placeholder: "Optional friction, feeling, or next step…" },
     });
@@ -1632,16 +1577,29 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
     textarea.addEventListener("input", () => { this.userNote = textarea.value; });
   }
 
+  renderManualDuration(parent) {
+    const field = parent.createDiv({ cls: "cx-lc-manual-duration" });
+    field.createEl("label", { text: "Total active minutes" });
+    const input = field.createEl("input", {
+      attr: { type: "number", min: "1", step: "1", inputmode: "numeric", placeholder: "e.g. 45" },
+    });
+    input.value = this.manualDurationMinutes;
+    input.addEventListener("input", () => { this.manualDurationMinutes = input.value; });
+    field.createDiv({ cls: "cx-lc-task-detail", text: "One total for the whole block; it is never divided across problems." });
+  }
+
   renderTaskChooser(parent, selectedTask) {
     const queue = parent.createDiv({ cls: "cx-lc-queue" });
     const header = queue.createDiv({ cls: "cx-lc-section-heading" });
-    header.createEl("h4", { text: "Choose another task" });
-    header.createSpan({ text: "Planned dates remain anchors" });
+    header.createEl("h4", { text: this.timer() || this.manualEntryOpen ? "Add another problem" : "Continue in plan order" });
+    header.createSpan({ text: "Planned dates remain anchors; unfinished order comes first" });
+    const selectedIds = new Set(Object.keys(this.blockProblems()));
     const open = this.tasks()
-      .filter((task) => task.task_id !== selectedTask.task_id && this.taskStatus(task.task_id) !== "completed")
-      .slice(0, 4);
+      .filter((task) => !selectedIds.has(task.task_id))
+      .sort((a, b) => Number(this.taskStatus(a.task_id) === "completed") - Number(this.taskStatus(b.task_id) === "completed"))
+      .slice(0, 6);
     if (!open.length) {
-      queue.createDiv({ cls: "cx-lc-empty", text: "All current plan tasks have a completed session." });
+      queue.createDiv({ cls: "cx-lc-empty", text: "Every plan task is already included in this block." });
       return;
     }
     open.forEach((task) => this.renderTaskRow(queue, task));
@@ -1688,44 +1646,42 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
     });
   }
 
-  renderSessions(parent) {
+  renderActivity(parent) {
     const tasks = new Map(this.tasks().map((task) => [task.task_id, task]));
-    const events = this.sessions().sort((a, b) => String(b.ended_at).localeCompare(String(a.ended_at)));
-    this.renderListHeader(parent, "Recent Sessions", `${events.length} recorded in the Bridge`);
+    const events = this.activity().sort((a, b) => trackerEventDate(b).localeCompare(trackerEventDate(a)));
+    this.renderListHeader(parent, "Recent Activity", `${events.length} append-only records in the Bridge`);
     if (!events.length) {
-      parent.createDiv({ cls: "cx-lc-empty", text: "Finish a session to create the first timing record." });
+      parent.createDiv({ cls: "cx-lc-empty", text: "Finish a Study Block to create the first activity record." });
       return;
     }
     events.slice(0, 20).forEach((event) => {
-      const task = tasks.get(event.task_id);
       const row = parent.createDiv({ cls: "cx-lc-session-row" });
       const main = row.createDiv({ cls: "cx-lc-task-row-main" });
-      main.createDiv({ cls: "cx-lc-task-title", text: task?.title || event.task_id });
-      const detail = [
-        trackerDateLabel(event.ended_at, { time: true }),
-        trackerDuration(event.active_seconds),
-        event.completion_status,
-        event.hint_level || "",
-      ].filter(Boolean).join(" · ");
-      main.createDiv({ cls: "cx-lc-task-detail", text: detail });
-      const phases = event.phase_seconds && typeof event.phase_seconds === "object"
-        ? event.phase_seconds
-        : {};
-      const hasBreakdown = Object.keys(phases).length > 0;
-      const phaseLine = main.createDiv({ cls: "cx-lc-session-phases" });
-      TRACKER_PHASES.forEach(({ id, label }) => {
-        const hasValue = Object.prototype.hasOwnProperty.call(phases, id);
-        phaseLine.createSpan({ text: `${label} ${hasValue ? trackerDuration(phases[id]) : "/"}` });
+      const problems = trackerEventProblems(event);
+      const legacy = event.event_type === "session_completed";
+      main.createDiv({
+        cls: "cx-lc-task-title",
+        text: legacy
+          ? `Legacy Session · ${tasks.get(event.task_id)?.title || event.task_id}`
+          : `Study Block · ${problems.length} problem${problems.length === 1 ? "" : "s"}`,
       });
-      if (hasBreakdown) {
-        const classified = Object.values(phases)
-          .reduce((sum, seconds) => sum + Math.max(0, Number(seconds) || 0), 0);
-        const unclassified = event.schema_version >= 3 && Number.isFinite(Number(event.unclassified_seconds))
-          ? Math.max(0, Number(event.unclassified_seconds))
-          : Math.max(0, Number(event.active_seconds || 0) - classified);
-        phaseLine.createSpan({ cls: "is-unclassified", text: `Unclassified ${trackerDuration(unclassified)}` });
-      }
-      if (event.user_note) main.createDiv({ cls: "cx-lc-session-note", text: event.user_note });
+      main.createDiv({
+        cls: "cx-lc-task-detail",
+        text: [
+          trackerDateLabel(event.ended_at || event.date, { time: Boolean(event.ended_at) }),
+          legacy ? "Historical v2/v3 record" : trackerPatternLabel(event.duration_source),
+        ].filter(Boolean).join(" · "),
+      });
+      const outcomes = main.createDiv({ cls: "cx-lc-activity-outcomes" });
+      problems.forEach((problem) => {
+        const task = tasks.get(problem.task_id);
+        outcomes.createSpan({
+          cls: `cx-lc-status is-${problem.outcome}`,
+          text: `${task?.title || problem.task_id} · ${trackerOutcomeLabel(problem.outcome)}`,
+        });
+      });
+      const note = event.note || event.user_note;
+      if (note) main.createDiv({ cls: "cx-lc-session-note", text: note });
     });
   }
 
@@ -1737,8 +1693,6 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
 
   renderTaskRow(parent, task) {
     const status = this.taskStatus(task.task_id);
-    const sessions = this.sessions(task.task_id);
-    const totalSeconds = sessions.reduce((sum, event) => sum + Number(event.active_seconds || 0), 0);
     const row = parent.createDiv({ cls: "cx-lc-task-row" });
     const date = row.createDiv({ cls: "cx-lc-task-date" });
     date.createSpan({ text: trackerDateLabel(task.scheduled_date) });
@@ -1746,55 +1700,56 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
     main.createDiv({ cls: "cx-lc-task-title", text: `${task.leetcode_id ? `LC ${task.leetcode_id} · ` : ""}${task.title}` });
     main.createDiv({
       cls: "cx-lc-task-detail",
-      text: `${trackerPatternLabel(task.pattern)} · ${task.stage} · ${task.expected_active_minutes}m${sessions.length ? ` · ${trackerDuration(totalSeconds)} recorded` : ""}`,
+      text: `${trackerPatternLabel(task.pattern)} · ${task.stage}`,
     });
-    row.createSpan({ cls: `cx-lc-status is-${status}`, text: status });
+    row.createSpan({ cls: `cx-lc-status is-${status}`, text: status === "planned" ? "planned" : trackerOutcomeLabel(status) });
+    const collecting = Boolean(this.timer() || this.manualEntryOpen);
     const select = row.createEl("button", {
       cls: "cx-lc-row-button",
-      text: this.timer()?.task_id === task.task_id ? "Active" : "Open",
+      text: collecting ? "Add" : "Open",
     });
-    select.disabled = this.timer()?.task_id === task.task_id;
     select.addEventListener("click", () => {
+      if (collecting) {
+        this.setProblemOutcome(task.task_id, status === "completed" ? "reviewed" : "attempted");
+        return;
+      }
       this.selectedTaskId = task.task_id;
       this.activeTab = "today";
       this.renderTracker();
     });
   }
 
-  async startSession(task) {
+  async startBlock(task) {
     if (this.timer()) {
-      new Notice("Finish or stop the active LeetCode session first.");
+      new Notice("Finish the active LeetCode Study Block first.");
       return;
     }
     const now = new Date().toISOString();
     await this.plugin.setLeetcodeTimer(this.timerKey(), {
-      task_id: task.task_id,
       started_at: now,
       running_since: now,
       active_seconds: 0,
-      phase: null,
-      phase_tracking: false,
-      phase_seconds: {},
+      problems: { [task.task_id]: "attempted" },
       status: "running",
     });
-    this.selectedTaskId = task.task_id;
+    this.manualEntryOpen = false;
+    this.manualProblems = {};
     this.renderTracker();
   }
 
-  async pauseSession() {
+  async pauseBlock() {
     const timer = this.timer();
     if (!timer || timer.status !== "running") return;
-    const snapshot = trackerTimerSnapshot(timer);
     await this.plugin.setLeetcodeTimer(this.timerKey(), {
       ...timer,
-      ...snapshot,
+      active_seconds: Math.max(0, trackerTimerSeconds(timer)),
       running_since: null,
       status: "paused",
     });
     this.renderTracker();
   }
 
-  async resumeSession() {
+  async resumeBlock() {
     const timer = this.timer();
     if (!timer || timer.status !== "paused") return;
     await this.plugin.setLeetcodeTimer(this.timerKey(), {
@@ -1805,121 +1760,155 @@ class LeetCodeTrackerChild extends MarkdownRenderChild {
     this.renderTracker();
   }
 
-  async selectPhase(phase) {
+  async setProblemOutcome(taskId, outcome) {
+    if (!this.task(taskId) || !TRACKER_OUTCOMES.some(({ id }) => id === outcome)) return;
     const timer = this.timer();
-    if (!timer || (phase !== null && !TRACKER_PHASES.some(({ id }) => id === phase))) return;
-    const snapshot = trackerTimerSnapshot(timer);
-    const phaseTracking = snapshot.phase_tracking || Boolean(phase);
-    if (phaseTracking) {
-      TRACKER_PHASES.forEach(({ id }) => {
-        if (!Object.prototype.hasOwnProperty.call(snapshot.phase_seconds, id)) snapshot.phase_seconds[id] = 0;
-      });
+    if (timer) {
+      const problems = this.blockProblems();
+      problems[taskId] = outcome;
+      await this.plugin.setLeetcodeTimer(this.timerKey(), { ...timer, problems });
+    } else {
+      this.manualProblems = { ...this.manualProblems, [taskId]: outcome };
     }
-    await this.plugin.setLeetcodeTimer(this.timerKey(), {
-      ...timer,
-      ...snapshot,
-      phase,
-      phase_tracking: phaseTracking,
-      running_since: timer.status === "running" ? new Date().toISOString() : null,
-    });
     this.renderTracker();
   }
 
-  async finishSession(completionStatus) {
-    if (this.savingSession) return;
-    let timer = this.timer();
-    if (!timer || !["completed", "partial", "stopped"].includes(completionStatus)) return;
+  async removeProblem(taskId) {
+    const timer = this.timer();
+    const problems = this.blockProblems();
+    delete problems[taskId];
+    if (timer) await this.plugin.setLeetcodeTimer(this.timerKey(), { ...timer, problems });
+    else this.manualProblems = problems;
+    this.renderTracker();
+  }
+
+  async appendStudyBlock(event, pendingState = null) {
     const io = trackerDesktopIO();
     const target = this.bridgePath("from_obsidian/session_events.jsonl");
-    if (!io || !target) {
-      new Notice("Bridge output is unavailable.");
+    if (!io || !target) throw new Error("Bridge output is unavailable.");
+    if (pendingState) await this.plugin.setLeetcodeTimer(this.timerKey(), pendingState);
+    const existing = await this.readEvents();
+    if (!existing.some((item) => item.event_id === event.event_id)) {
+      await io.fs.promises.appendFile(target, `${JSON.stringify(event)}\n`, "utf8");
+    }
+  }
+
+  async finishTimedBlock() {
+    if (this.savingBlock) return;
+    let timer = this.timer();
+    if (!timer || !["running", "paused"].includes(timer.status)) return;
+    const problems = Object.entries(this.blockProblems())
+      .filter(([taskId, outcome]) => this.task(taskId) && TRACKER_OUTCOMES.some(({ id }) => id === outcome))
+      .map(([task_id, outcome]) => ({ task_id, outcome }));
+    if (!problems.length) {
+      new Notice("Add at least one problem before finishing the Study Block.");
       return;
     }
-    this.savingSession = true;
+    this.savingBlock = true;
     try {
       const eventId = timer.pending_event_id || trackerEventId();
-      if (!timer.pending_event_id) {
-        timer = { ...timer, pending_event_id: eventId };
-        await this.plugin.setLeetcodeTimer(this.timerKey(), timer);
-      }
-      const snapshot = trackerTimerSnapshot(timer);
+      timer = { ...timer, pending_event_id: eventId };
+      const endedAt = new Date();
       const event = {
-        schema_version: 3,
+        schema_version: 4,
         event_id: eventId,
-        event_type: "session_completed",
-        task_id: timer.task_id,
+        event_type: "study_block_completed",
+        date: localISO(endedAt),
         started_at: timer.started_at,
-        ended_at: new Date().toISOString(),
-        active_seconds: Math.max(0, Math.floor(snapshot.active_seconds)),
-        completion_status: completionStatus,
-        obsidian_note_path: this.file.path,
+        ended_at: endedAt.toISOString(),
+        active_seconds: Math.max(0, Math.floor(trackerTimerSeconds(timer))),
+        duration_source: "timer",
+        problems,
       };
-      if (snapshot.phase_tracking) {
-        event.phase_seconds = Object.fromEntries(TRACKER_PHASES.map(({ id }) => [
-          id,
-          Math.max(0, Math.floor(snapshot.phase_seconds[id] || 0)),
-        ]));
-        const classifiedSeconds = Object.values(event.phase_seconds)
-          .reduce((sum, seconds) => sum + seconds, 0);
-        event.unclassified_seconds = Math.max(0, event.active_seconds - classifiedSeconds);
-      }
-      if (this.hintLevel) event.hint_level = this.hintLevel;
       const note = this.userNote.trim().slice(0, 500);
-      if (note) event.user_note = note;
-      const existing = await this.readEvents();
-      if (!existing.some((item) => item.event_id === event.event_id)) {
-        await io.fs.promises.appendFile(target, `${JSON.stringify(event)}\n`, "utf8");
-      }
+      if (note) event.note = note;
+      await this.appendStudyBlock(event, timer);
       await this.plugin.setLeetcodeTimer(this.timerKey(), null);
-      this.hintLevel = "";
       this.userNote = "";
-      this.selectedTaskId = timer.task_id;
-      new Notice(`${this.task(timer.task_id)?.title || "LeetCode"} session saved.`);
+      new Notice("LeetCode Study Block saved.");
       await this.render();
     } catch (error) {
-      new Notice(`Could not save the LeetCode session: ${error.message || error}`);
+      new Notice(`Could not save the LeetCode Study Block: ${error.message || error}`);
     } finally {
-      this.savingSession = false;
+      this.savingBlock = false;
+    }
+  }
+
+  async finishManualBlock() {
+    if (this.savingBlock) return;
+    const minutes = Number(this.manualDurationMinutes);
+    const problems = Object.entries(this.manualProblems)
+      .filter(([taskId, outcome]) => this.task(taskId) && TRACKER_OUTCOMES.some(({ id }) => id === outcome))
+      .map(([task_id, outcome]) => ({ task_id, outcome }));
+    if (!Number.isFinite(minutes) || minutes <= 0) {
+      new Notice("Enter a positive total duration in minutes.");
+      return;
+    }
+    if (!problems.length) {
+      new Notice("Add at least one problem before saving the Study Block.");
+      return;
+    }
+    this.savingBlock = true;
+    const eventId = trackerEventId();
+    try {
+      const event = {
+        schema_version: 4,
+        event_id: eventId,
+        event_type: "study_block_completed",
+        date: localISO(new Date()),
+        active_seconds: Math.round(minutes * 60),
+        duration_source: "manual",
+        problems,
+      };
+      const note = this.userNote.trim().slice(0, 500);
+      if (note) event.note = note;
+      const pending = {
+        status: "saving_manual",
+        pending_event_id: eventId,
+        active_seconds: event.active_seconds,
+        problems: Object.fromEntries(problems.map(({ task_id, outcome }) => [task_id, outcome])),
+        pending_event: event,
+      };
+      await this.appendStudyBlock(event, pending);
+      await this.plugin.setLeetcodeTimer(this.timerKey(), null);
+      this.manualEntryOpen = false;
+      this.manualDurationMinutes = "";
+      this.manualProblems = {};
+      this.userNote = "";
+      new Notice("Manual LeetCode Study Block saved.");
+      await this.render();
+    } catch (error) {
+      new Notice(`Could not save the manual Study Block: ${error.message || error}`);
+    } finally {
+      this.savingBlock = false;
+    }
+  }
+
+  async retryPendingManualBlock() {
+    if (this.savingBlock) return;
+    const timer = this.timer();
+    const event = timer?.pending_event;
+    if (timer?.status !== "saving_manual" || !event?.event_id) return;
+    this.savingBlock = true;
+    try {
+      await this.appendStudyBlock(event, timer);
+      await this.plugin.setLeetcodeTimer(this.timerKey(), null);
+      new Notice("Manual LeetCode Study Block saved.");
+      await this.render();
+    } catch (error) {
+      new Notice(`Could not save the manual Study Block: ${error.message || error}`);
+    } finally {
+      this.savingBlock = false;
     }
   }
 
   updateTimerDisplay() {
-    if (!this.timerDisplay || !this.timerRing || !this.timerMeta) return;
+    if (!this.blockStatus) return;
     const timer = this.timer();
-    const task = this.selectedTask();
-    const seconds = timer?.task_id === task?.task_id ? trackerTimerSeconds(timer) : 0;
-    this.timerDisplay.setText(trackerClock(seconds));
-    const expectedSeconds = Math.max(60, Number(task?.expected_active_minutes || 0) * 60);
-    const percentage = Math.min(100, seconds / expectedSeconds * 100);
-    this.timerRing.style.setProperty("--cx-lc-timer-progress", `${percentage * 3.6}deg`);
-    if (!timer || timer.task_id !== task?.task_id) {
-      this.timerMeta.setText("Ready to begin");
-    } else if (timer.status === "paused") {
-      this.timerMeta.setText(`Paused · ${timer.phase
-        ? trackerPhaseLabel(timer.phase)
-        : trackerPhaseTrackingEnabled(timer) ? "Unclassified" : "Total only"}`);
-    } else if (seconds >= expectedSeconds) {
-      this.timerMeta.setText(`Reached the ${task.expected_active_minutes}m check-in point`);
-    } else {
-      this.timerMeta.setText(`Active · ${timer.phase
-        ? trackerPhaseLabel(timer.phase)
-        : trackerPhaseTrackingEnabled(timer) ? "Unclassified" : "Total only"}`);
-    }
-    if (timer?.task_id === task?.task_id) {
-      const phaseSeconds = trackerPhaseSeconds(timer);
-      const phaseTracking = trackerPhaseTrackingEnabled(timer);
-      TRACKER_PHASES.forEach(({ id }) => {
-        const display = this.phaseDisplays.get(id);
-        if (!display) return;
-        display.setText(phaseTracking ? trackerClock(phaseSeconds[id] || 0) : "/");
-      });
-      this.phaseStatus?.setText(timer.phase
-        ? `Tracking ${trackerPhaseLabel(timer.phase)}`
-        : phaseTracking ? "Breakdown on · no active phase" : "Total only");
-      if (this.phaseUnclassifiedDisplay && phaseTracking) {
-        this.phaseUnclassifiedDisplay.setText(trackerClock(trackerUnclassifiedSeconds(timer) || 0));
-      }
-    }
+    if (!timer) this.blockStatus.setText(this.manualEntryOpen ? "Manual entry" : "Ready to begin");
+    else if (timer.status === "paused") this.blockStatus.setText("Study Block paused");
+    else if (timer.status === "saving_manual") this.blockStatus.setText("Saving manual Study Block…");
+    else this.blockStatus.setText("Study Block active");
   }
 }
 
@@ -2135,9 +2124,16 @@ function ledgerProjectKeys(value) {
   return [...new Set([target, basename, link[2]].filter(Boolean).map((item) => item.trim().toLowerCase()))];
 }
 
-function parseDailyDayMetrics(markdown, frontmatter = {}) {
+function ledgerProjectLabel(value) {
+  const text = String(value || "").trim().replace(/^['"]|['"]$/g, "");
+  const link = text.match(/^\[\[([^|\]]+)(?:\|([^\]]+))?\]\]$/);
+  if (!link) return text || "Unassigned Project";
+  return String(link[2] || link[1].split("/").pop() || "Unassigned Project").replace(/\.md$/i, "");
+}
+
+function parseDailyLedger(markdown) {
   const start = /^## Time & Task Log\s*$/m.exec(markdown || "");
-  if (!start) return { projectMinutes: 0, executionMinutes: 0 };
+  if (!start) return [];
   let section = markdown.slice(start.index + start[0].length);
   const nextHeading = section.search(/^##\s+/m);
   if (nextHeading >= 0) section = section.slice(0, nextHeading);
@@ -2146,9 +2142,15 @@ function parseDailyDayMetrics(markdown, frontmatter = {}) {
   const blocks = [];
   let current = null;
   section.split(/\r?\n/).forEach((line) => {
-    const header = line.match(/^-\s+.+?\s+·\s+Engaged:\s*(.+?)\s*$/);
+    const header = line.match(/^-\s+(.+?)\s+·\s+Engaged:\s*(.+?)\s*$/);
     if (header) {
-      current = { minutes: ledgerDurationMinutes(header[1]), mode: "", project: "", category: "" };
+      current = {
+        activity: header[1].trim(),
+        minutes: ledgerDurationMinutes(header[2]),
+        mode: "",
+        project: "",
+        category: "",
+      };
       blocks.push(current);
       return;
     }
@@ -2160,6 +2162,11 @@ function parseDailyDayMetrics(markdown, frontmatter = {}) {
     if (project) current.project = project[1].trim();
     if (category) current.category = category[1].toLowerCase();
   });
+  return blocks.filter((block) => block.minutes > 0);
+}
+
+function parseDailyDayMetrics(markdown, frontmatter = {}) {
+  const blocks = parseDailyLedger(markdown);
 
   const coreKeys = new Set();
   const snapshot = Array.isArray(frontmatter.core_snapshot) ? frontmatter.core_snapshot : [];
@@ -2170,10 +2177,11 @@ function parseDailyDayMetrics(markdown, frontmatter = {}) {
   return blocks.reduce((totals, block) => {
     const isCoreProject = block.project && ledgerProjectKeys(block.project).some((key) => coreKeys.has(key));
     if (isCoreProject) totals.projectMinutes += block.minutes;
+    if (isCoreProject && block.mode.toLowerCase() === "execution") totals.coreExecutionMinutes += block.minutes;
     if (block.project && block.mode.toLowerCase() === "execution") totals.executionMinutes += block.minutes;
     if (block.category === "admin" || block.category === "workout") totals.executionMinutes += block.minutes;
     return totals;
-  }, { projectMinutes: 0, executionMinutes: 0 });
+  }, { projectMinutes: 0, executionMinutes: 0, coreExecutionMinutes: 0 });
 }
 
 class WeeklySnapshotChild extends MarkdownRenderChild {
@@ -2370,7 +2378,6 @@ class WeeklySnapshotChild extends MarkdownRenderChild {
     });
 
     const charts = wrap.createDiv({ cls: "cx-weekly-charts" });
-    this.renderStateChart(charts, days);
     this.renderAllocationChart(charts, days);
     const sleepAverage = average(days.map((day) => stateTrendValue(day.frontmatter, "sleep")));
     const energyAverage = average(days.map((day) => stateTrendValue(day.frontmatter, "energy")));
@@ -2378,6 +2385,864 @@ class WeeklySnapshotChild extends MarkdownRenderChild {
     const footer = wrap.createDiv({ cls: "cx-weekly-snapshot-footer" });
     footer.createSpan({ text: `Sleep ${sleepAverage?.toFixed(1) ?? "—"} · Energy ${energyAverage?.toFixed(1) ?? "—"} · Activation ${activationAverage?.toFixed(1) ?? "—"}` });
     footer.createSpan({ text: "Current Daily Note YAML · human corrections take precedence" });
+  }
+}
+
+function analyticsTimeHour(value, overnight = false) {
+  const match = String(value || "").match(/T(\d{2}):(\d{2})/);
+  if (!match) return null;
+  let result = Number(match[1]) + Number(match[2]) / 60;
+  if (overnight && result < 6) result += 24;
+  return result;
+}
+
+function analyticsClock(value) {
+  if (!Number.isFinite(value)) return "—";
+  const normalized = ((value % 24) + 24) % 24;
+  const roundedMinutes = Math.round(normalized * 60);
+  const hours = Math.floor(roundedMinutes / 60) % 24;
+  const minutes = roundedMinutes % 60;
+  return `${pad(hours)}:${pad(minutes)}`;
+}
+
+function analyticsDeviation(values) {
+  const numeric = values.filter(Number.isFinite);
+  if (!numeric.length) return null;
+  const mean = average(numeric);
+  return Math.sqrt(numeric.reduce((sum, value) => sum + (value - mean) ** 2, 0) / numeric.length);
+}
+
+function analyticsAdd(map, key, amount) {
+  if (!key || !amount) return;
+  map.set(key, (map.get(key) || 0) + amount);
+}
+
+function analyticsCount(map, values) {
+  healthArray(values).filter(Boolean).forEach((value) => map.set(value, (map.get(value) || 0) + 1));
+}
+
+function analyticsLabel(definitions, value) {
+  return definitions.find(([id]) => id === value)?.[1] || String(value || "—");
+}
+
+function analyticsProjectProgressAt(markdown, frontmatter, cutoffISO) {
+  const bySection = new Map();
+  let currentSection = "";
+  let reliable = true;
+  String(markdown || "").split(/\r?\n/).forEach((line) => {
+    const heading = line.match(/^##\s+(.+?)\s*$/);
+    if (heading) currentSection = heading[1];
+    const checkbox = line.match(/^\s*- \[([ xX])\] (.+)$/);
+    if (!checkbox) return;
+    const checked = checkbox[1].toLowerCase() === "x";
+    const completedAt = checkbox[2].match(/✅ ?(\d{4}-\d{2}-\d{2})/)?.[1] ?? null;
+    if (checked && !completedAt) reliable = false;
+    const completed = checked && Boolean(completedAt && completedAt <= cutoffISO);
+    if (!bySection.has(currentSection)) bySection.set(currentSection, []);
+    bySection.get(currentSection).push({ completed, completedAt });
+  });
+  const configuredSections = progressSections(frontmatter.progress_sections);
+  if (!configuredSections.length) return { progress: null, completed: 0, total: 0, reliable: false };
+  let completed = 0;
+  let total = 0;
+  const progress = clamp(configuredSections.reduce((sum, { section, weight }) => {
+    const items = bySection.get(section) ?? [];
+    if (!items.length) return sum;
+    completed += items.filter((item) => item.completed).length;
+    total += items.length;
+    return sum + items.filter((item) => item.completed).length / items.length * weight;
+  }, 0), 0, 100);
+  return { progress, completed, total, reliable };
+}
+
+function analyticsProjectTarget(value) {
+  const text = String(value || "").trim().replace(/^['"]|['"]$/g, "");
+  const link = text.match(/^\[\[([^|\]]+)(?:\|[^\]]+)?\]\]$/);
+  if (!link) return null;
+  const target = link[1].replace(/\.md$/i, "");
+  return normalizePath(`${target}.md`);
+}
+
+function analyticsMentalIndex(frontmatter) {
+  const values = MENTAL_METRICS.map((metric) => mentalDisplayValue(metric, frontmatter[metric.key]));
+  const mean = average(values);
+  return mean === null ? null : Math.round(mean / 5 * 100);
+}
+
+function analyticsFragmentation(blocks) {
+  const minutes = blocks.map((block) => block.minutes).filter((value) => value > 0);
+  const total = minutes.reduce((sum, value) => sum + value, 0);
+  if (!total) return { index: null, count: 0, average: 0, longest: 0 };
+  const concentration = minutes.reduce((sum, value) => sum + (value / total) ** 2, 0);
+  return {
+    index: Math.round((1 - concentration) * 100),
+    count: minutes.length,
+    average: Math.round(total / minutes.length),
+    longest: Math.max(...minutes),
+  };
+}
+
+function analyticsDelta(current, previous) {
+  if (!Number.isFinite(current) || !Number.isFinite(previous)) return { label: "—", cls: "is-missing" };
+  if (previous === 0) {
+    if (current === 0) return { label: "→ 0%", cls: "is-flat" };
+    return { label: "↑ New", cls: "is-up" };
+  }
+  const percent = (current - previous) / previous * 100;
+  if (Math.abs(percent) < 0.05) return { label: "→ 0%", cls: "is-flat" };
+  return {
+    label: `${percent > 0 ? "↑" : "↓"} ${Math.abs(percent).toFixed(1)}%`,
+    cls: percent > 0 ? "is-up" : "is-down",
+  };
+}
+
+function analyticsWorkoutChoice(workout, mode) {
+  const id = String(workout || "");
+  if (!id) return "—";
+  const definition = HEALTH_WORKOUTS[id];
+  const label = definition?.shortLabel || definition?.label || id;
+  return mode ? `${label} · ${healthModeLabel(mode)}` : label;
+}
+
+const ANALYTICS_HEALTH_TERMS = {
+  dream: [["none", "无梦境印象"], ["dream", "普通梦境"], ["vivid", "明显梦境"], ["nightmare", "噩梦"]],
+  need: [["rest", "休息"], ["movement", "活动"], ["quiet", "安静"], ["focus", "专注"], ["connection", "连接"], ["space", "空间"]],
+  nap: [["none", "无午睡"], ["15-30", "午睡 15–30m"], ["30-45", "午睡 30–45m"], ["45-60", "午睡 45–60m"], ["60+", "午睡 60m+"]],
+  workout: [["rest", "休息日"], ["pool", "水中慢跑"], ["back", "背部"], ["upper", "上肢"], ["legs", "腿部"], ["stretch", "拉伸"]],
+};
+
+class WeeklyAnalyticsChild extends MarkdownRenderChild {
+  constructor(container, app, file, config = {}) {
+    super(container);
+    this.app = app;
+    this.file = file;
+    this.config = config;
+    this.periodPaths = new Set();
+    this.renderTimer = null;
+  }
+
+  onload() {
+    this.render();
+    const schedule = (changedFile) => {
+      if (changedFile.path !== this.file.path && !this.periodPaths.has(changedFile.path)) return;
+      if (this.renderTimer) window.clearTimeout(this.renderTimer);
+      this.renderTimer = window.setTimeout(() => this.render(), 180);
+    };
+    this.registerEvent(this.app.metadataCache.on("changed", schedule));
+    this.registerEvent(this.app.vault.on("modify", schedule));
+  }
+
+  onunload() {
+    if (this.renderTimer) window.clearTimeout(this.renderTimer);
+  }
+
+  async loadDay(date) {
+    const iso = localISO(date);
+    const path = dailyPathFromISO(iso);
+    const file = path ? this.app.vault.getAbstractFileByPath(path) : null;
+    const frontmatter = file instanceof TFile ? await freshFrontmatter(this.app, file) : {};
+    const markdown = file instanceof TFile ? await this.app.vault.cachedRead(file) : "";
+    const ledger = parseDailyLedger(markdown);
+    const values = TIME_METRICS.map((metric) => minutesValue(frontmatter?.[metric.key]));
+    return {
+      iso,
+      file,
+      frontmatter,
+      ledger,
+      totalMinutes: values.filter((value) => value !== null).reduce((sum, value) => sum + value, 0),
+      hasTimeData: values.some((value) => value !== null),
+      dayMetrics: parseDailyDayMetrics(markdown, frontmatter),
+    };
+  }
+
+  section(parent, title, subtitle = "") {
+    const section = parent.createDiv({ cls: "cx-weekly-analytics-section" });
+    const heading = section.createDiv({ cls: "cx-weekly-section-heading" });
+    heading.createEl("h4", { text: title });
+    if (subtitle) heading.createSpan({ text: subtitle, cls: "cx-weekly-section-subtitle" });
+    return section;
+  }
+
+  renderStats(parent, days) {
+    const projects = new Set(days.flatMap((day) => day.ledger.filter((block) => block.project).map((block) => ledgerProjectLabel(block.project))));
+    const executionMinutes = days.flatMap((day) => day.ledger)
+      .filter((block) => block.project && block.mode.toLowerCase() === "execution")
+      .reduce((sum, block) => sum + block.minutes, 0);
+    const values = [
+      [String(projects.size), "Projects"],
+      [formatDuration(executionMinutes), "Project Execution"],
+      [`${days.filter((day) => day.frontmatter.time_data_reviewed === true).length}/${days.length}`, "Verified Time Days"],
+      [`${days.filter((day) => MENTAL_METRICS.some((metric) => rating(day.frontmatter[metric.key]) !== null)).length}/${days.length}`, "Mental Entries"],
+      [`${days.filter((day) => day.frontmatter.health_night_bedtime_at || day.frontmatter.health_early_morning_bedtime_at).length}/${days.length}`, "Bedtime Records"],
+    ];
+    const stats = parent.createDiv({ cls: "cx-weekly-analytics-stats" });
+    values.forEach(([value, label]) => {
+      const stat = stats.createDiv({ cls: "cx-weekly-analytics-stat" });
+      stat.createDiv({ text: value, cls: "cx-weekly-stat-value" });
+      stat.createDiv({ text: label, cls: "cx-weekly-stat-label" });
+    });
+  }
+
+  renderBars(parent, title, subtitle, rows, className = "") {
+    const section = this.section(parent, title, subtitle);
+    const maximum = Math.max(1, ...rows.map((row) => row.value));
+    const list = section.createDiv({ cls: `cx-weekly-analytics-bars ${className}` });
+    rows.forEach((row) => {
+      const item = list.createDiv({ cls: "cx-weekly-analytics-bar-row" });
+      item.createSpan({ text: row.label, cls: "cx-weekly-analytics-bar-label" });
+      const track = item.createDiv({ cls: "cx-weekly-analytics-bar-track" });
+      const fill = track.createDiv({ cls: `cx-weekly-analytics-bar-fill${row.cls ? ` ${row.cls}` : ""}` });
+      fill.style.width = `${row.value / maximum * 100}%`;
+      item.createSpan({ text: row.format || formatDuration(row.value), cls: "cx-weekly-analytics-bar-value" });
+    });
+    return section;
+  }
+
+  renderTimeBreakdown(parent, days) {
+    const projectMap = new Map();
+    const modeMap = new Map();
+    days.flatMap((day) => day.ledger).forEach((block) => {
+      if (!block.project) return;
+      analyticsAdd(projectMap, ledgerProjectLabel(block.project), block.minutes);
+      analyticsAdd(modeMap, block.mode || "Not Classified", block.minutes);
+    });
+    const projectRows = [...projectMap].sort((a, b) => b[1] - a[1]).map(([label, value]) => ({ label, value }));
+    const modeOrder = ["Execution", "Planning", "System", "Not Classified"];
+    const modeRows = modeOrder.filter((label) => modeMap.has(label)).map((label) => ({ label, value: modeMap.get(label) }));
+    const categoryRows = TIME_METRICS.map((metric) => ({
+      label: metric.label,
+      value: days.reduce((sum, day) => sum + (minutesValue(day.frontmatter[metric.key]) || 0), 0),
+      cls: `is-${metric.id}`,
+    })).sort((a, b) => b.value - a.value);
+    const grid = parent.createDiv({ cls: "cx-weekly-analytics-grid is-three" });
+    this.renderBars(grid, "Project Time", `${projectRows.length} projects`, projectRows);
+    this.renderBars(grid, "Project Activity Mode", "Ledger classifications", modeRows);
+    this.renderBars(grid, "Time Categories", "Daily YAML totals", categoryRows);
+  }
+
+  async renderProjectProgress(parent, days, weeklyFrontmatter) {
+    const invested = new Map();
+    days.flatMap((day) => day.ledger).forEach((block) => {
+      if (!block.project) return;
+      const target = analyticsProjectTarget(block.project);
+      if (!target) return;
+      const current = invested.get(target) ?? { label: ledgerProjectLabel(block.project), minutes: 0, executionMinutes: 0 };
+      current.minutes += block.minutes;
+      if (block.mode.toLowerCase() === "execution") current.executionMinutes += block.minutes;
+      invested.set(target, current);
+    });
+    const periodStart = isoDateValue(weeklyFrontmatter.period_start);
+    const periodEnd = isoDateValue(weeklyFrontmatter.period_end);
+    const startCutoff = localISO(addDays(dateFromISO(periodStart), -1));
+    const rows = [];
+    for (const [path, allocation] of invested) {
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (!(file instanceof TFile)) continue;
+      const frontmatter = await freshFrontmatter(this.app, file);
+      const markdown = await this.app.vault.cachedRead(file);
+      this.periodPaths.add(file.path);
+      const start = analyticsProjectProgressAt(markdown, frontmatter, startCutoff);
+      const end = analyticsProjectProgressAt(markdown, frontmatter, periodEnd);
+      rows.push({
+        ...allocation,
+        file,
+        start,
+        end,
+        delta: start.progress === null || end.progress === null ? null : end.progress - start.progress,
+        completedDelta: end.completed - start.completed,
+        reliable: start.reliable && end.reliable,
+      });
+    }
+    rows.sort((a, b) => (b.delta ?? -1) - (a.delta ?? -1) || b.minutes - a.minutes);
+    const section = this.section(parent, "Project Velocity", "Progress Δ · completed tasks · execution time");
+    const grid = section.createDiv({ cls: "cx-weekly-project-progress" });
+    rows.forEach((row) => {
+      const card = grid.createDiv({ cls: `cx-weekly-project-progress-card${row.reliable ? "" : " is-unreliable"}` });
+      const header = card.createDiv({ cls: "cx-weekly-project-progress-header" });
+      header.createSpan({ text: row.label, cls: "cx-weekly-project-progress-name" });
+      header.createSpan({ text: `${formatDuration(row.executionMinutes)} execution`, cls: "cx-weekly-project-progress-time" });
+      const values = card.createDiv({ cls: "cx-weekly-project-progress-values" });
+      values.createSpan({ text: row.start.progress === null ? "—" : `${row.start.progress.toFixed(1)}%` });
+      values.createSpan({ text: "→", cls: "cx-weekly-project-progress-arrow" });
+      values.createSpan({ text: row.end.progress === null ? "—" : `${row.end.progress.toFixed(1)}%` });
+      values.createSpan({
+        text: row.delta === null ? "—" : `${row.delta >= 0 ? "+" : ""}${row.delta.toFixed(1)} pp`,
+        cls: `cx-weekly-project-progress-delta${(row.delta || 0) > 0 ? " is-positive" : ""}`,
+      });
+      const track = card.createDiv({ cls: "cx-weekly-project-progress-track" });
+      const startFill = track.createSpan({ cls: "cx-weekly-project-progress-start" });
+      startFill.style.width = `${row.start.progress || 0}%`;
+      const gainFill = track.createSpan({ cls: "cx-weekly-project-progress-gain" });
+      gainFill.style.left = `${row.start.progress || 0}%`;
+      gainFill.style.width = `${Math.max(0, row.delta || 0)}%`;
+      card.createDiv({
+        text: `${row.completedDelta >= 0 ? "+" : ""}${row.completedDelta} completed tasks · ${row.end.completed}/${row.end.total}`,
+        cls: "cx-weekly-project-progress-tasks",
+      });
+      card.createDiv({
+        text: `${formatDuration(row.executionMinutes)} execution · ${formatDuration(row.minutes)} total invested`,
+        cls: "cx-weekly-project-progress-tasks",
+      });
+    });
+    if (!rows.length) grid.createDiv({ text: "—", cls: "cx-weekly-frequency-empty" });
+  }
+
+  renderDayMatrix(parent, days) {
+    const section = this.section(parent, "Project / Execution Days", "Threshold: 120 minutes");
+    const matrix = section.createDiv({ cls: "cx-weekly-day-matrix" });
+    const labels = matrix.createDiv({ cls: "cx-weekly-day-matrix-labels" });
+    labels.createSpan();
+    days.forEach((day) => labels.createSpan({ text: day.iso.slice(5).replace("-", "/") }));
+    [
+      ["Project Day", "projectMinutes"],
+      ["Execution Day", "executionMinutes"],
+    ].forEach(([label, key]) => {
+      const row = matrix.createDiv({ cls: "cx-weekly-day-matrix-row" });
+      row.createSpan({ text: label, cls: "cx-weekly-day-matrix-name" });
+      days.forEach((day) => {
+        const minutes = day.dayMetrics[key] || 0;
+        const cell = row.createDiv({ cls: `cx-weekly-day-cell${minutes >= 120 ? " is-active" : ""}` });
+        cell.createSpan({ text: minutes >= 120 ? "●" : "○", cls: "cx-weekly-day-symbol" });
+        cell.createSpan({ text: `${minutes}m`, cls: "cx-weekly-day-minutes" });
+      });
+    });
+  }
+
+  renderWeeklyTrend(parent, weeks) {
+    const section = this.section(parent, "Four-Week Trend", "Sunday–Saturday · current Daily YAML");
+    const chart = section.createDiv({ cls: "cx-weekly-history-chart" });
+    const maximum = Math.max(1, ...weeks.map((week) => week.days.reduce((sum, day) => sum + day.totalMinutes, 0)));
+    weeks.forEach((week) => {
+      const total = week.days.reduce((sum, day) => sum + day.totalMinutes, 0);
+      const column = chart.createDiv({ cls: `cx-weekly-history-column${week.current ? " is-current" : ""}` });
+      column.createSpan({ text: formatDuration(total), cls: "cx-weekly-history-total" });
+      const track = column.createDiv({ cls: "cx-weekly-history-track" });
+      const fill = track.createDiv({ cls: "cx-weekly-history-fill" });
+      fill.style.height = `${total / maximum * 100}%`;
+      TIME_METRICS.forEach((metric) => {
+        const minutes = week.days.reduce((sum, day) => sum + (minutesValue(day.frontmatter[metric.key]) || 0), 0);
+        if (!minutes || !total) return;
+        const segment = fill.createSpan({ cls: `cx-weekly-history-segment is-${metric.id}` });
+        segment.style.height = `${minutes / total * 100}%`;
+        segment.setAttr("title", `${metric.label}: ${formatDuration(minutes)}`);
+      });
+      column.createSpan({ text: week.start.slice(5).replace("-", "/"), cls: "cx-weekly-history-label" });
+    });
+
+    const table = section.createDiv({ cls: "cx-weekly-trend-table" });
+    const header = table.createDiv({ cls: "cx-weekly-trend-row is-header" });
+    header.createSpan();
+    weeks.forEach((week) => header.createSpan({ text: week.start.slice(5).replace("-", "/") }));
+    [
+      ["Sleep", (day) => stateTrendValue(day.frontmatter, "sleep")],
+      ["Energy", (day) => stateTrendValue(day.frontmatter, "energy")],
+      ["Activation", (day) => stateTrendValue(day.frontmatter, "activation")],
+      ["Project Days", null],
+      ["Execution Days", null],
+    ].forEach(([label, accessor], rowIndex) => {
+      const row = table.createDiv({ cls: "cx-weekly-trend-row" });
+      row.createSpan({ text: label });
+      weeks.forEach((week) => {
+        let value = "—";
+        if (accessor) {
+          const mean = average(week.days.map(accessor));
+          value = mean === null ? "—" : mean.toFixed(1);
+        } else if (week.current) {
+          const key = rowIndex === 3 ? "projectMinutes" : "executionMinutes";
+          value = `${week.days.filter((day) => day.dayMetrics[key] >= 120).length}/7`;
+        }
+        row.createSpan({ text: value, cls: value === "—" ? "is-missing" : "" });
+      });
+    });
+  }
+
+  renderInvestmentChange(parent, weeks, precedingWeek = null) {
+    const visibleWeeks = weeks.slice(-4);
+    const contextWeeks = precedingWeek ? [precedingWeek, ...weeks] : weeks;
+    const section = this.section(parent, "Week-over-Week Investment Change", "Rolling four weeks · each visible week compared with its preceding week");
+    const cards = section.createDiv({ cls: "cx-weekly-investment-grid" });
+    const definitions = [
+      { id: "total", label: "Total Engaged", value: (week) => week.days.reduce((sum, day) => sum + day.totalMinutes, 0) },
+      ...TIME_METRICS.map((metric) => ({
+        id: metric.id,
+        label: metric.label,
+        value: (week) => week.days.reduce((sum, day) => sum + (minutesValue(day.frontmatter[metric.key]) || 0), 0),
+      })),
+    ];
+    definitions.forEach((definition) => {
+      const values = visibleWeeks.map((week) => definition.value(week));
+      const contextValues = contextWeeks.map((week) => definition.value(week));
+      const maximum = Math.max(1, ...values);
+      const card = cards.createDiv({ cls: `cx-weekly-investment-card is-${definition.id}` });
+      const header = card.createDiv({ cls: "cx-weekly-investment-header" });
+      header.createSpan({ text: definition.label, cls: "cx-weekly-investment-title" });
+      const chart = card.createDiv({ cls: "cx-weekly-investment-chart" });
+      visibleWeeks.forEach((week, index) => {
+        const contextIndex = contextWeeks.findIndex((candidate) => candidate.start === week.start);
+        const previousWeek = contextWeeks[contextIndex - 1];
+        const hasCurrentData = week.days.length === 7 && week.days.every((day) => day.hasTimeData);
+        const hasPreviousData = previousWeek?.days.length === 7 && previousWeek.days.every((day) => day.hasTimeData);
+        const delta = hasCurrentData && hasPreviousData
+          ? analyticsDelta(contextValues[contextIndex], contextValues[contextIndex - 1])
+          : { label: "—", cls: "is-missing" };
+        const column = chart.createDiv({ cls: `cx-weekly-investment-column${week.current ? " is-current" : ""}` });
+        column.createSpan({ text: delta.label, cls: `cx-weekly-investment-delta ${delta.cls}` });
+        column.createSpan({ text: formatDuration(values[index]), cls: "cx-weekly-investment-time" });
+        const track = column.createDiv({ cls: "cx-weekly-investment-track" });
+        const fill = track.createDiv({ cls: `cx-weekly-investment-fill is-${definition.id}` });
+        fill.style.height = `${values[index] / maximum * 100}%`;
+        column.createSpan({ text: week.start.slice(5).replace("-", "/"), cls: "cx-weekly-investment-week" });
+      });
+    });
+  }
+
+  renderCapacityLoad(parent, days) {
+    const health = days.map((day) => {
+      const value = Number(day.frontmatter.health_recommendation_capacity);
+      return Number.isFinite(value) ? value : null;
+    });
+    const mental = days.map((day) => analyticsMentalIndex(day.frontmatter));
+    const gaps = days.map((day, index) => {
+      if (health[index] === null || mental[index] === null) return null;
+      const capacity = (health[index] + mental[index]) / 2;
+      const load = clamp(day.totalMinutes / 480 * 100, 0, 100);
+      return Math.round(load - capacity);
+    });
+    const gapSection = this.section(parent, "Capacity–Load Gap", "Load: engaged time ÷ 8h · Capacity: mean of Health and Mental");
+    const gapSummary = average(gaps);
+    gapSection.createDiv({
+      text: gapSummary === null ? "—" : `${gapSummary > 0 ? "+" : ""}${gapSummary.toFixed(1)} pp weekly mean`,
+      cls: `cx-weekly-derived-summary${gapSummary === null ? " is-missing" : gapSummary > 0 ? " is-over" : " is-reserve"}`,
+    });
+    const gapChart = gapSection.createDiv({ cls: "cx-weekly-gap-chart" });
+    days.forEach((day, index) => {
+      const row = gapChart.createDiv({ cls: "cx-weekly-gap-row" });
+      row.createSpan({ text: day.iso.slice(5).replace("-", "/"), cls: "cx-weekly-derived-date" });
+      const track = row.createDiv({ cls: "cx-weekly-gap-track" });
+      track.createSpan({ cls: "cx-weekly-gap-zero" });
+      const gap = gaps[index];
+      if (gap !== null) {
+        const fill = track.createSpan({ cls: `cx-weekly-gap-fill${gap > 0 ? " is-over" : " is-reserve"}` });
+        fill.style.left = gap > 0 ? "50%" : `${50 - Math.min(50, Math.abs(gap) / 2)}%`;
+        fill.style.width = `${Math.min(50, Math.abs(gap) / 2)}%`;
+      }
+      row.createSpan({ text: gap === null ? "—" : `${gap > 0 ? "+" : ""}${gap} pp`, cls: "cx-weekly-derived-value" });
+    });
+  }
+
+  renderExecutionQuality(parent, days) {
+    const grid = parent.createDiv({ cls: "cx-weekly-derived-grid" });
+    const ratioSection = this.section(grid, "Core Execution Ratio", "Core Project Execution ÷ total engaged time");
+    const coreExecution = days.reduce((sum, day) => sum + (day.dayMetrics.coreExecutionMinutes || 0), 0);
+    const total = days.reduce((sum, day) => sum + day.totalMinutes, 0);
+    const weeklyRatio = total ? coreExecution / total * 100 : null;
+    ratioSection.createDiv({
+      text: weeklyRatio === null ? "—" : `${weeklyRatio.toFixed(1)}% · ${formatDuration(coreExecution)} / ${formatDuration(total)}`,
+      cls: "cx-weekly-derived-summary is-ratio",
+    });
+    const ratioChart = ratioSection.createDiv({ cls: "cx-weekly-derived-bars" });
+    days.forEach((day) => {
+      const value = day.totalMinutes ? day.dayMetrics.coreExecutionMinutes / day.totalMinutes * 100 : null;
+      const row = ratioChart.createDiv({ cls: "cx-weekly-derived-row" });
+      row.createSpan({ text: day.iso.slice(5).replace("-", "/"), cls: "cx-weekly-derived-date" });
+      const track = row.createDiv({ cls: "cx-weekly-derived-track" });
+      if (value !== null) {
+        const fill = track.createSpan({ cls: "cx-weekly-derived-fill is-ratio" });
+        fill.style.width = `${value}%`;
+      }
+      row.createSpan({ text: value === null ? "—" : `${value.toFixed(0)}%`, cls: "cx-weekly-derived-value" });
+    });
+
+    const fragmentation = days.map((day) => analyticsFragmentation(day.ledger));
+    const fragmentSection = this.section(grid, "Time Fragmentation Index", "1 − Σ(block share²) · 0 single block → 100 dispersed");
+    const allBlocks = days.flatMap((day) => day.ledger);
+    const weeklyFragmentation = analyticsFragmentation(allBlocks);
+    const weeklyFragmentationMean = average(fragmentation.map((value) => value.index));
+    fragmentSection.createDiv({
+      text: weeklyFragmentationMean === null ? "—" : `${weeklyFragmentationMean.toFixed(1)} daily mean · ${weeklyFragmentation.count} blocks · ${formatDuration(weeklyFragmentation.average)} avg`,
+      cls: "cx-weekly-derived-summary is-fragmentation",
+    });
+    const fragmentChart = fragmentSection.createDiv({ cls: "cx-weekly-derived-bars" });
+    days.forEach((day, index) => {
+      const value = fragmentation[index];
+      const row = fragmentChart.createDiv({ cls: "cx-weekly-derived-row" });
+      row.createSpan({ text: day.iso.slice(5).replace("-", "/"), cls: "cx-weekly-derived-date" });
+      const track = row.createDiv({ cls: "cx-weekly-derived-track" });
+      if (value.index !== null) {
+        const fill = track.createSpan({ cls: "cx-weekly-derived-fill is-fragmentation" });
+        fill.style.width = `${value.index}%`;
+      }
+      row.createSpan({
+        text: value.index === null ? "—" : `${value.index} · ${value.count}b`,
+        cls: "cx-weekly-derived-value",
+        attr: { title: value.index === null ? "No ledger blocks" : `Average ${formatDuration(value.average)} · longest ${formatDuration(value.longest)}` },
+      });
+    });
+  }
+
+  renderCrossDomain(parent, days) {
+    const section = this.section(parent, "Health × Mental × Time", "Daily alignment · no causal inference");
+    const healthValues = days.map((day) => {
+      const value = Number(day.frontmatter.health_recommendation_capacity);
+      return Number.isFinite(value) ? value : null;
+    });
+    const mentalValues = days.map((day) => analyticsMentalIndex(day.frontmatter));
+    const maximumMinutes = Math.max(1, ...days.map((day) => day.totalMinutes));
+    const svg = createSvgElement(section, "svg", {
+      viewBox: "0 0 760 286",
+      class: "cx-weekly-cross-chart",
+      role: "img",
+      "aria-label": "Daily health capacity and mental availability over engaged time",
+    });
+    const left = 48; const right = 712; const top = 24; const bottom = 214; const edgeInset = 18;
+    const xAt = (index) => days.length === 1
+      ? (left + right) / 2
+      : left + edgeInset + index * ((right - left - edgeInset * 2) / (days.length - 1));
+    const yAt = (value) => bottom - value / 100 * (bottom - top);
+    [0, 25, 50, 75, 100].forEach((value) => {
+      const y = yAt(value);
+      createSvgElement(svg, "line", { x1: left, y1: y, x2: right, y2: y, class: "cx-weekly-grid-line" });
+      const label = createSvgElement(svg, "text", { x: 27, y: y + 4, class: "cx-weekly-axis-label", "text-anchor": "middle" });
+      label.textContent = String(value);
+    });
+    days.forEach((day, index) => {
+      const height = day.totalMinutes / maximumMinutes * (bottom - top);
+      const bar = createSvgElement(svg, "rect", {
+        x: xAt(index) - 17,
+        y: bottom - height,
+        width: 34,
+        height,
+        rx: 6,
+        class: "cx-weekly-cross-time-bar",
+      });
+      const title = createSvgElement(bar, "title");
+      title.textContent = `${day.iso} · Engaged: ${formatDuration(day.totalMinutes)}`;
+    });
+    [
+      { label: "Health", values: healthValues, cls: "is-health" },
+      { label: "Mental", values: mentalValues, cls: "is-mental" },
+    ].forEach((series) => {
+      let segment = [];
+      const flush = () => {
+        if (segment.length > 1) createSvgElement(svg, "polyline", { points: segment.join(" "), class: `cx-weekly-cross-line ${series.cls}` });
+        segment = [];
+      };
+      series.values.forEach((value, index) => {
+        if (value === null) { flush(); return; }
+        const x = xAt(index); const y = yAt(value);
+        segment.push(`${x},${y}`);
+        const point = createSvgElement(svg, "circle", { cx: x, cy: y, r: 4.5, class: `cx-weekly-cross-point ${series.cls}` });
+        const title = createSvgElement(point, "title");
+        title.textContent = `${days[index].iso} · ${series.label}: ${value}%`;
+      });
+      flush();
+    });
+    days.forEach((day, index) => {
+      const label = createSvgElement(svg, "text", { x: xAt(index), y: 244, class: "cx-weekly-date-label", "text-anchor": "middle" });
+      label.textContent = day.iso.slice(5).replace("-", "/");
+    });
+    const rightTop = createSvgElement(svg, "text", { x: 745, y: top + 4, class: "cx-weekly-axis-label", "text-anchor": "end" });
+    rightTop.textContent = formatDuration(maximumMinutes);
+    const rightBottom = createSvgElement(svg, "text", { x: 745, y: bottom + 4, class: "cx-weekly-axis-label", "text-anchor": "end" });
+    rightBottom.textContent = "0m";
+    const legend = section.createDiv({ cls: "cx-weekly-legend cx-weekly-cross-legend" });
+    [["is-health", "Health Capacity"], ["is-mental", "Mental Availability"], ["is-time", "Engaged Time"]].forEach(([cls, label]) => {
+      const item = legend.createSpan({ cls: `cx-weekly-legend-item ${cls}` });
+      item.createSpan({ cls: "cx-weekly-legend-mark" });
+      item.createSpan({ text: label });
+    });
+    const matrix = section.createDiv({ cls: "cx-weekly-cross-matrix" });
+    const header = matrix.createDiv({ cls: "cx-weekly-cross-row is-header" });
+    header.createSpan();
+    days.forEach((day) => header.createSpan({ text: day.iso.slice(5).replace("-", "/") }));
+    [
+      ["Health", healthValues, (value) => value === null ? "—" : `${value}%`],
+      ["Mental", mentalValues, (value) => value === null ? "—" : `${value}%`],
+      ["Time", days.map((day) => day.totalMinutes), (value) => formatDuration(value)],
+    ].forEach(([label, values, format]) => {
+      const row = matrix.createDiv({ cls: `cx-weekly-cross-row is-${label.toLowerCase()}` });
+      row.createSpan({ text: label });
+      values.forEach((value) => row.createSpan({ text: format(value), cls: value === null ? "is-missing" : "" }));
+    });
+  }
+
+  renderHeatmap(parent, title, subtitle, days, metrics) {
+    const section = this.section(parent, title, subtitle);
+    const table = section.createDiv({ cls: "cx-weekly-metric-matrix" });
+    const header = table.createDiv({ cls: "cx-weekly-metric-row is-header" });
+    header.createSpan();
+    days.forEach((day) => header.createSpan({ text: day.iso.slice(5).replace("-", "/") }));
+    metrics.forEach((metric) => {
+      const row = table.createDiv({ cls: "cx-weekly-metric-row" });
+      row.createSpan({ text: metric.label, cls: "cx-weekly-metric-label" });
+      days.forEach((day) => {
+        const value = metric.value(day.frontmatter);
+        row.createSpan({ text: value === null ? "—" : String(value), cls: `cx-weekly-metric-cell${value === null ? " is-missing" : ` is-${value}`}` });
+      });
+    });
+  }
+
+  renderPercentageChart(parent, days) {
+    const section = this.section(parent, "Health Capacity", "Morning · Daytime · Recommendation (%)");
+    const series = [
+      { key: "health_morning_capacity", label: "Morning", cls: "is-morning" },
+      { key: "health_afternoon_state", label: "Daytime", cls: "is-daytime" },
+      { key: "health_recommendation_capacity", label: "Recommendation", cls: "is-recommendation" },
+    ];
+    const svg = createSvgElement(section, "svg", { viewBox: "0 0 760 244", class: "cx-weekly-percentage-chart", role: "img", "aria-label": "Daily health capacity percentages" });
+    const left = 48; const right = 720; const top = 22; const bottom = 184; const edgeInset = 18;
+    const xAt = (index) => days.length === 1
+      ? (left + right) / 2
+      : left + edgeInset + index * ((right - left - edgeInset * 2) / (days.length - 1));
+    const yAt = (value) => bottom - value / 100 * (bottom - top);
+    [0, 25, 50, 75, 100].forEach((value) => {
+      const y = yAt(value);
+      createSvgElement(svg, "line", { x1: left, y1: y, x2: right, y2: y, class: "cx-weekly-grid-line" });
+      const label = createSvgElement(svg, "text", { x: 27, y: y + 4, class: "cx-weekly-axis-label", "text-anchor": "middle" });
+      label.textContent = String(value);
+    });
+    series.forEach((definition) => {
+      const points = [];
+      days.forEach((day, index) => {
+        const value = Number(day.frontmatter[definition.key]);
+        if (!Number.isFinite(value)) return;
+        const x = xAt(index); const y = yAt(value);
+        points.push(`${x},${y}`);
+        const point = createSvgElement(svg, "circle", { cx: x, cy: y, r: 4.5, class: `cx-weekly-percentage-point ${definition.cls}` });
+        const title = createSvgElement(point, "title"); title.textContent = `${day.iso} · ${definition.label}: ${value}%`;
+      });
+      if (points.length > 1) createSvgElement(svg, "polyline", { points: points.join(" "), class: `cx-weekly-percentage-line ${definition.cls}` });
+    });
+    days.forEach((day, index) => {
+      const label = createSvgElement(svg, "text", { x: xAt(index), y: 216, class: "cx-weekly-date-label", "text-anchor": "middle" });
+      label.textContent = day.iso.slice(5).replace("-", "/");
+    });
+    const legend = section.createDiv({ cls: "cx-weekly-legend" });
+    series.forEach((definition) => {
+      const item = legend.createSpan({ cls: `cx-weekly-legend-item ${definition.cls}` });
+      item.createSpan({ cls: "cx-weekly-legend-mark" }); item.createSpan({ text: definition.label });
+    });
+  }
+
+  renderFrequency(parent, title, groups) {
+    const section = this.section(parent, title, "Frequency");
+    const grid = section.createDiv({ cls: "cx-weekly-frequency-grid" });
+    groups.forEach((group) => {
+      const card = grid.createDiv({ cls: "cx-weekly-frequency-card" });
+      card.createDiv({ text: group.label, cls: "cx-weekly-frequency-title" });
+      const rows = [...group.map].sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])));
+      if (!rows.length) card.createDiv({ text: "—", cls: "cx-weekly-frequency-empty" });
+      rows.forEach(([key, count]) => {
+        const row = card.createDiv({ cls: "cx-weekly-frequency-row" });
+        row.createSpan({ text: group.format(key) });
+        const dots = row.createSpan({ cls: "cx-weekly-frequency-dots" });
+        for (let index = 0; index < count; index += 1) dots.createSpan({ text: "●" });
+        row.createSpan({ text: String(count), cls: "cx-weekly-frequency-count" });
+      });
+    });
+  }
+
+  renderMentalDimensions(parent, days) {
+    this.renderHeatmap(parent, "Mental Dimensions", "Display direction: higher = more available", days, MENTAL_METRICS.map((metric) => ({
+      label: metric.label,
+      value: (frontmatter) => mentalDisplayValue(metric, frontmatter[metric.key]),
+    })));
+  }
+
+  renderMentalTerms(parent, days) {
+    const stress = new Map(); const emotions = new Map(); const relief = new Map(); const closure = new Map();
+    days.forEach((day) => {
+      analyticsCount(stress, day.frontmatter.mental_evening_stress_source);
+      analyticsCount(emotions, day.frontmatter.mental_evening_emotions);
+      analyticsCount(relief, day.frontmatter.mental_evening_relief_factors);
+      analyticsCount(closure, day.frontmatter.mental_evening_closure);
+    });
+    this.renderFrequency(parent, "Mental Terms", [
+      { label: "Stress Source", map: stress, format: (key) => analyticsLabel(MENTAL_STRESS_SOURCES, key) },
+      { label: "Emotions", map: emotions, format: (key) => analyticsLabel(MENTAL_EMOTIONS, key) },
+      { label: "Relief Factors", map: relief, format: (key) => analyticsLabel(MENTAL_RELIEF_FACTORS, key) },
+      { label: "Closure", map: closure, format: (key) => analyticsLabel(MENTAL_CLOSURES, key) },
+    ]);
+  }
+
+  renderHealthSignals(parent, days) {
+    const healthMetrics = [
+      ["Morning · Sleep", "health_morning_sleep"], ["Morning · Recovery", "health_morning_recovery"],
+      ["Morning · Body", "health_morning_body"], ["Morning · Outlook", "health_morning_outlook"],
+      ["Daytime · Energy", "health_afternoon_energy_signal"], ["Daytime · Calmness", "health_afternoon_calmness"],
+      ["Daytime · Clarity", "health_afternoon_clarity"], ["Daytime · Body", "health_afternoon_body"],
+      ["Evening · Body", "health_evening_body"], ["Evening · Energy", "health_evening_overall_energy"],
+      ["Evening · Appetite", "health_evening_appetite_stability"], ["Night · Sleepiness", "health_night_sleepiness"],
+      ["Night · Calmness", "health_night_calmness"],
+    ].map(([label, key]) => ({ label, value: (frontmatter) => healthSignal(frontmatter[key]) }));
+    this.renderHeatmap(parent, "Health Signals", "1–5", days, healthMetrics);
+  }
+
+  renderHealthCategories(parent, days) {
+    const dream = new Map(); const need = new Map(); const nap = new Map(); const workout = new Map();
+    days.forEach((day) => {
+      analyticsCount(dream, day.frontmatter.health_morning_dream);
+      analyticsCount(need, day.frontmatter.health_morning_need);
+      analyticsCount(nap, day.frontmatter.health_afternoon_nap);
+      analyticsCount(workout, day.frontmatter.health_workout_type);
+    });
+    this.renderFrequency(parent, "Health Categories", [
+      { label: "Dream", map: dream, format: (key) => analyticsLabel(ANALYTICS_HEALTH_TERMS.dream, key) },
+      { label: "Morning Need", map: need, format: (key) => analyticsLabel(ANALYTICS_HEALTH_TERMS.need, key) },
+      { label: "Nap", map: nap, format: (key) => analyticsLabel(ANALYTICS_HEALTH_TERMS.nap, key) },
+      { label: "Workout", map: workout, format: (key) => analyticsLabel(ANALYTICS_HEALTH_TERMS.workout, key) },
+    ]);
+  }
+
+  renderWorkoutFunnel(parent, days) {
+    const section = this.section(parent, "Workout Decision → Execution", "Planned · Recommended · Selected · Actual");
+    const stageDefinitions = [
+      { id: "planned", label: "Planned", value: (fm) => ({ workout: fm.health_planned_workout, mode: "" }) },
+      { id: "recommended", label: "Recommended", value: (fm) => ({ workout: fm.health_recommended_workout, mode: fm.health_recommended_mode }) },
+      { id: "selected", label: "Selected", value: (fm) => ({ workout: fm.health_selected_workout, mode: fm.health_selected_mode }) },
+      { id: "actual", label: "Actual", value: (fm) => {
+        const executed = ["completed", "rest"].includes(String(fm.health_workout_status || ""));
+        return {
+          workout: fm.health_actual_workout || (executed ? fm.health_workout_type : ""),
+          mode: fm.health_actual_workout_mode || (executed ? fm.health_workout_mode : ""),
+        };
+      } },
+    ];
+    const stageValues = stageDefinitions.map((stage) => ({
+      ...stage,
+      values: days.map((day) => stage.value(day.frontmatter)),
+    }));
+    const funnel = section.createDiv({ cls: "cx-weekly-workout-funnel" });
+    stageValues.forEach((stage, index) => {
+      const recorded = stage.values.filter((value) => value.workout).length;
+      const step = funnel.createDiv({ cls: `cx-weekly-workout-funnel-step is-${stage.id}` });
+      step.style.width = `${(72 + (stageValues.length - index) * 7) * recorded / Math.max(1, days.length)}%`;
+      step.createSpan({ text: stage.label });
+      step.createSpan({ text: `${recorded}/${days.length}` });
+    });
+
+    const table = section.createDiv({ cls: "cx-weekly-workout-flow" });
+    const header = table.createDiv({ cls: "cx-weekly-workout-flow-row is-header" });
+    header.createSpan();
+    stageDefinitions.forEach((stage) => header.createSpan({ text: stage.label }));
+    days.forEach((day, dayIndex) => {
+      const row = table.createDiv({ cls: "cx-weekly-workout-flow-row" });
+      row.createSpan({ text: day.iso.slice(5).replace("-", "/"), cls: "cx-weekly-workout-date" });
+      let previous = null;
+      stageValues.forEach((stage) => {
+        const value = stage.values[dayIndex];
+        const currentKey = value.workout ? `${value.workout}:${value.mode || ""}` : "";
+        const previousKey = previous?.workout ? `${previous.workout}:${previous.mode || ""}` : "";
+        const state = !value.workout ? " is-missing" : previous && currentKey !== previousKey ? " is-changed" : " is-aligned";
+        const cell = row.createDiv({ cls: `cx-weekly-workout-flow-cell${state}` });
+        cell.createSpan({ text: analyticsWorkoutChoice(value.workout, value.mode), cls: "cx-weekly-workout-choice" });
+        if (stage.id === "selected" && day.frontmatter.health_manual_override === true) {
+          cell.createSpan({ text: "Override", cls: "cx-weekly-workout-flag" });
+        }
+        if (stage.id === "actual" && value.workout) {
+          const minutes = minutesValue(day.frontmatter.workout_minutes) || 0;
+          cell.createSpan({ text: `${String(day.frontmatter.health_workout_status || "—")} · ${formatDuration(minutes)}`, cls: "cx-weekly-workout-meta" });
+        }
+        previous = value;
+      });
+    });
+  }
+
+  renderRhythm(parent, days) {
+    const section = this.section(parent, "Daily Rhythm", "Clock time · bedtime shown on 24–28h axis");
+    const definitions = [
+      { label: "Bedtime", value: (frontmatter) => analyticsTimeHour(frontmatter.health_early_morning_bedtime_at || frontmatter.health_night_bedtime_at, true), cls: "is-bedtime" },
+      { label: "Morning Check-in", value: (frontmatter) => analyticsTimeHour(frontmatter.health_morning_started_at), cls: "is-morning" },
+      { label: "Voyage Start", value: (frontmatter) => analyticsTimeHour(frontmatter.voyage_started_at), cls: "is-start" },
+      { label: "Voyage End", value: (frontmatter) => analyticsTimeHour(frontmatter.voyage_ended_at, true), cls: "is-end" },
+    ];
+    const svg = createSvgElement(section, "svg", { viewBox: "0 0 760 286", class: "cx-weekly-rhythm-chart", role: "img", "aria-label": "Daily bedtime, morning check-in, voyage start, and voyage end clock times" });
+    const left = 130; const right = 718; const top = 30; const rowGap = 52;
+    const xAt = (hour) => left + (clamp(hour, 0, 28) / 28) * (right - left);
+    [0, 4, 8, 12, 16, 20, 24, 28].forEach((hour) => {
+      const x = xAt(hour);
+      createSvgElement(svg, "line", { x1: x, y1: 16, x2: x, y2: 238, class: "cx-weekly-grid-line" });
+      const label = createSvgElement(svg, "text", { x, y: 264, class: "cx-weekly-axis-label", "text-anchor": "middle" });
+      label.textContent = hour === 28 ? "04" : pad(hour % 24);
+    });
+    definitions.forEach((definition, rowIndex) => {
+      const y = top + rowIndex * rowGap;
+      const values = days.map((day) => definition.value(day.frontmatter));
+      const mean = average(values); const deviation = analyticsDeviation(values);
+      const label = createSvgElement(svg, "text", { x: 8, y: y + 4, class: "cx-weekly-rhythm-label" });
+      label.textContent = definition.label;
+      if (mean !== null) {
+        const spread = createSvgElement(svg, "line", { x1: xAt(mean - deviation), y1: y, x2: xAt(mean + deviation), y2: y, class: `cx-weekly-rhythm-spread ${definition.cls}` });
+        const title = createSvgElement(spread, "title"); title.textContent = `${analyticsClock(mean)} ± ${Math.round(deviation * 60)}m`;
+      }
+      values.forEach((value, index) => {
+        if (!Number.isFinite(value)) return;
+        const point = createSvgElement(svg, "circle", { cx: xAt(value), cy: y, r: 5, class: `cx-weekly-rhythm-point ${definition.cls}` });
+        const title = createSvgElement(point, "title"); title.textContent = `${days[index].iso} · ${analyticsClock(value)}`;
+      });
+      const stat = createSvgElement(svg, "text", { x: 8, y: y + 19, class: "cx-weekly-rhythm-stat" });
+      stat.textContent = mean === null ? "—" : `${analyticsClock(mean)} ± ${Math.round(deviation * 60)}m`;
+    });
+  }
+
+  async render() {
+    const weeklyFrontmatter = await freshFrontmatter(this.app, this.file);
+    const dates = dateRange(weeklyFrontmatter.period_start, weeklyFrontmatter.period_end);
+    const historyWeeks = clamp(Number(this.config.history_weeks) || 4, 1, 8);
+    const currentStart = dateFromISO(isoDateValue(weeklyFrontmatter.period_start));
+    if (!dates.length || !currentStart) {
+      this.containerEl.empty();
+      this.containerEl.createDiv({ text: "Set valid period_start and period_end values.", cls: "cx-weekly-empty" });
+      return;
+    }
+    const allDates = [];
+    for (let offset = historyWeeks * 7; offset >= 0; offset -= 7) {
+      dateRange(localISO(addDays(currentStart, -offset)), localISO(addDays(currentStart, -offset + 6))).forEach((date) => allDates.push(date));
+    }
+    const uniqueDates = [...new Map(allDates.map((date) => [localISO(date), date])).values()];
+    const loaded = await Promise.all(uniqueDates.map((date) => this.loadDay(date)));
+    const byISO = new Map(loaded.map((day) => [day.iso, day]));
+    this.periodPaths = new Set(loaded.map((day) => day.file?.path).filter(Boolean));
+    const days = dates.map((date) => byISO.get(localISO(date))).filter(Boolean);
+    const weeks = [];
+    for (let offset = (historyWeeks - 1) * 7; offset >= 0; offset -= 7) {
+      const start = localISO(addDays(currentStart, -offset));
+      weeks.push({
+        start,
+        current: offset === 0,
+        days: dateRange(start, localISO(addDays(dateFromISO(start), 6))).map((date) => byISO.get(localISO(date))).filter(Boolean),
+      });
+    }
+    const precedingStart = localISO(addDays(currentStart, -historyWeeks * 7));
+    const precedingWeek = {
+      start: precedingStart,
+      current: false,
+      days: dateRange(precedingStart, localISO(addDays(dateFromISO(precedingStart), 6))).map((date) => byISO.get(localISO(date))).filter(Boolean),
+    };
+    if (!this.containerEl.isConnected) return;
+    this.containerEl.empty();
+    const wrap = this.containerEl.createDiv({ cls: "cx-weekly-analytics" });
+    const header = wrap.createDiv({ cls: "cx-weekly-header" });
+    const copy = header.createDiv();
+    copy.createEl("h3", { text: "Detailed Weekly Analytics" });
+    copy.createSpan({ text: `${isoDateValue(weeklyFrontmatter.period_start)} → ${isoDateValue(weeklyFrontmatter.period_end)}`, cls: "cx-weekly-period" });
+    this.renderStats(wrap, days);
+    this.renderInvestmentChange(wrap, weeks, precedingWeek);
+    this.renderWeeklyTrend(wrap, weeks);
+    this.renderTimeBreakdown(wrap, days);
+    await this.renderProjectProgress(wrap, days, weeklyFrontmatter);
+    this.renderDayMatrix(wrap, days);
+    this.renderExecutionQuality(wrap, days);
+    this.renderCapacityLoad(wrap, days);
+    this.renderCrossDomain(wrap, days);
+    this.renderPercentageChart(wrap, days);
+    WeeklySnapshotChild.prototype.renderStateChart.call(this, wrap, days);
+    this.renderWorkoutFunnel(wrap, days);
+    this.renderRhythm(wrap, days);
+    this.renderHealthSignals(wrap, days);
+    this.renderHealthCategories(wrap, days);
+    this.renderMentalDimensions(wrap, days);
+    this.renderMentalTerms(wrap, days);
   }
 }
 
@@ -5363,6 +6228,17 @@ module.exports = class CastleXDashboardPlugin extends Plugin {
     this.registerMarkdownCodeBlockProcessor("castlex-weekly-snapshot", (_source, element, context) => {
       const file = this.app.vault.getAbstractFileByPath(context.sourcePath);
       if (file instanceof TFile) context.addChild(new WeeklySnapshotChild(element, this.app, file));
+    });
+    this.registerMarkdownCodeBlockProcessor("castlex-weekly-analytics", (source, element, context) => {
+      const file = this.app.vault.getAbstractFileByPath(context.sourcePath);
+      if (!(file instanceof TFile)) return;
+      let config = {};
+      try {
+        config = parseYaml(source) ?? {};
+      } catch (_error) {
+        config = {};
+      }
+      context.addChild(new WeeklyAnalyticsChild(element, this.app, file, config));
     });
     this.registerMarkdownCodeBlockProcessor("castlex-health-summary", (_source, element, context) => {
       const file = this.app.vault.getAbstractFileByPath(context.sourcePath);
