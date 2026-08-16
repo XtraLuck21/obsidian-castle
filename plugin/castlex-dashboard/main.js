@@ -4510,7 +4510,6 @@ class CastleXHealthView extends ItemView {
     this.nightRitualAnimationUntil = 0;
     this.morningRitualAnimationUntil = 0;
     this.renderedDateISO = null;
-    this.pendingScrollAnchor = null;
   }
 
   getViewType() {
@@ -4795,14 +4794,6 @@ class CastleXHealthView extends ItemView {
     this.textTimers.set(key, timer);
   }
 
-  rememberScrollAnchor(field, key) {
-    this.pendingScrollAnchor = {
-      key,
-      top: field.getBoundingClientRect().top,
-      expiresAt: Date.now() + 1600,
-    };
-  }
-
   scrollAncestors() {
     const ancestors = [];
     let element = this.contentEl;
@@ -4817,20 +4808,17 @@ class CastleXHealthView extends ItemView {
 
   captureScrollPosition() {
     if (this.renderedDateISO !== this.currentDateISO) return null;
-    const activeField = this.contentEl.ownerDocument?.activeElement?.closest?.("[data-health-key]");
-    const activeKey = activeField?.dataset.healthKey;
-    const remembered = this.pendingScrollAnchor?.expiresAt > Date.now()
-      ? this.pendingScrollAnchor
-      : null;
     return {
       positions: this.scrollAncestors().map((element) => ({
         element,
         top: element.scrollTop,
         left: element.scrollLeft,
       })),
-      anchor: activeKey
-        ? { key: activeKey, top: activeField.getBoundingClientRect().top }
-        : remembered,
+      regions: [...this.contentEl.querySelectorAll("[data-health-scroll-key]")].map((element) => ({
+        key: element.dataset.healthScrollKey,
+        top: element.scrollTop,
+        left: element.scrollLeft,
+      })),
     };
   }
 
@@ -4842,19 +4830,13 @@ class CastleXHealthView extends ItemView {
         element.scrollTop = Math.min(top, maximumTop);
         element.scrollLeft = left;
       });
-      const anchor = position.anchor;
-      if (!anchor) return;
-      const target = this.contentEl.querySelector(`[data-health-key="${anchor.key}"]`);
-      if (!target) return;
-      const delta = target.getBoundingClientRect().top - anchor.top;
-      if (Math.abs(delta) < 1) return;
-      const candidates = position.positions.filter(({ element }) => (
-        element.contains(target)
-        && element.scrollHeight > element.clientHeight + 1
-      ));
-      const scroller = candidates.find(({ top }) => top > 0)?.element
-        ?? candidates[0]?.element;
-      if (scroller) scroller.scrollTop += delta;
+      position.regions.forEach(({ key, top, left }) => {
+        const element = this.contentEl.querySelector(`[data-health-scroll-key="${key}"]`);
+        if (!element) return;
+        const maximumTop = Math.max(0, element.scrollHeight - element.clientHeight);
+        element.scrollTop = Math.min(top, maximumTop);
+        element.scrollLeft = left;
+      });
     };
     restore();
     window.requestAnimationFrame(() => {
@@ -4916,7 +4898,6 @@ class CastleXHealthView extends ItemView {
 
   renderSignal(parent, file, frontmatter, key, label, labelSet) {
     const field = parent.createDiv({ cls: "cx-health-field" });
-    field.dataset.healthKey = key;
     field.createDiv({ text: label, cls: "cx-health-field-label" });
     const selected = healthSignal(frontmatter[key]);
     const control = field.createDiv({ cls: "cx-health-signal", attr: { role: "radiogroup", "aria-label": label } });
@@ -4932,12 +4913,9 @@ class CastleXHealthView extends ItemView {
         },
       });
       bar.style.setProperty("--cx-signal-height", `${12 + value * 6}px`);
-      bar.addEventListener("click", () => {
-        this.rememberScrollAnchor(field, key);
-        this.updateHealth(file, (next) => {
-          next[key] = value;
-        }, `${label}：${labelSet[value - 1]}`);
-      });
+      bar.addEventListener("click", () => this.updateHealth(file, (next) => {
+        next[key] = value;
+      }, `${label}：${labelSet[value - 1]}`));
     }
     field.createDiv({ text: selected ? `${selected}/5 · ${labelSet[selected - 1]}` : "尚未记录", cls: "cx-health-field-value" });
     return field;
@@ -4945,7 +4923,6 @@ class CastleXHealthView extends ItemView {
 
   renderChoice(parent, file, frontmatter, key, label, choices) {
     const field = parent.createDiv({ cls: "cx-health-field" });
-    field.dataset.healthKey = key;
     field.createDiv({ text: label, cls: "cx-health-field-label" });
     const selected = String(frontmatter[key] ?? "");
     const options = field.createDiv({ cls: "cx-health-choice-grid" });
@@ -4955,18 +4932,14 @@ class CastleXHealthView extends ItemView {
         cls: `cx-health-choice${selected === value ? " is-selected" : ""}`,
         attr: { type: "button", "aria-pressed": String(selected === value) },
       });
-      button.addEventListener("click", () => {
-        this.rememberScrollAnchor(field, key);
-        this.updateHealth(file, (next) => {
-          next[key] = value;
-        }, `${label}：${text}`);
-      });
+      button.addEventListener("click", () => this.updateHealth(file, (next) => {
+        next[key] = value;
+      }, `${label}：${text}`));
     });
   }
 
   renderMultiChoice(parent, file, frontmatter, key, label, choices) {
     const field = parent.createDiv({ cls: "cx-health-field" });
-    field.dataset.healthKey = key;
     field.createDiv({ text: label, cls: "cx-health-field-label" });
     const selected = new Set(healthArray(frontmatter[key]));
     const options = field.createDiv({ cls: "cx-health-choice-grid is-multi" });
@@ -4976,28 +4949,24 @@ class CastleXHealthView extends ItemView {
         cls: `cx-health-choice${selected.has(value) ? " is-selected" : ""}`,
         attr: { type: "button", "aria-pressed": String(selected.has(value)) },
       });
-      button.addEventListener("click", () => {
-        this.rememberScrollAnchor(field, key);
-        this.updateHealth(file, (next) => {
-          const values = new Set(healthArray(next[key]));
-          if (value === "none") {
-            values.clear();
-            values.add("none");
-          } else {
-            values.delete("none");
-            if (values.has(value)) values.delete(value);
-            else values.add(value);
-          }
-          next[key] = [...values];
-        });
-      });
+      button.addEventListener("click", () => this.updateHealth(file, (next) => {
+        const values = new Set(healthArray(next[key]));
+        if (value === "none") {
+          values.clear();
+          values.add("none");
+        } else {
+          values.delete("none");
+          if (values.has(value)) values.delete(value);
+          else values.add(value);
+        }
+        next[key] = [...values];
+      }));
     });
     return field;
   }
 
   renderTextField(parent, file, frontmatter, key, label, placeholder) {
     const field = parent.createDiv({ cls: "cx-health-field" });
-    field.dataset.healthKey = key;
     field.createDiv({ text: label, cls: "cx-health-field-label" });
     const input = field.createEl("textarea", {
       cls: "cx-health-textarea",
@@ -5250,7 +5219,10 @@ class CastleXHealthView extends ItemView {
       });
     });
 
-    const form = card.createDiv({ cls: "cx-health-form" });
+    const form = card.createDiv({
+      cls: "cx-health-form",
+      attr: { "data-health-scroll-key": `checkin-${stage}` },
+    });
     if (stage === "sleep") this.renderNight(form, file, frontmatter);
     else if (stage === "morning") this.renderMorning(form, file, frontmatter, context);
     else if (stage === "afternoon") this.renderAfternoon(form, file, frontmatter);
