@@ -429,6 +429,15 @@ remain `—` rather than being reconstructed from current Project metadata or
 silently treated as `0/7`. Visible Weekly model files and Daily sources are
 render dependencies, so their creation, deletion, rename, or edit refreshes the
 analytics view.
+Weekly Snapshot and Detailed Analytics also keep a runtime dependency signature
+for the current Weekly file. The signature contains only consumed frontmatter
+(`type`, period boundaries, and `day_metrics_model`) plus the Analytics
+`history_weeks` configuration. Ordinary Weekly body edits therefore leave the
+existing rendered DOM intact in Live Preview. Relevant frontmatter or block
+configuration changes still schedule one debounced render, while Daily and
+historical Weekly source-path events retain their direct refresh behavior.
+Generation guards discard stale asynchronous renders; the plugin never writes
+editor selection, active-leaf position, or scroll state during this process.
 Project progress uses the same `progress_sections` weights as Home and only
 reconstructs historical completion from checked tasks carrying an explicit
 `✅ YYYY-MM-DD` date. Undated checked tasks make the historical delta

@@ -2208,28 +2208,140 @@ function parseDailyDayMetrics(markdown, frontmatter = {}) {
   }, { projectMinutes: 0, executionMinutes: 0, coreExecutionMinutes: 0 });
 }
 
-class WeeklySnapshotChild extends MarkdownRenderChild {
-  constructor(container, app, file) {
+function weeklyAnalyticsConfigFromMarkdown(markdown) {
+  const match = String(markdown || "").match(/^```castlex-weekly-analytics[\t ]*\r?\n([\s\S]*?)^```[\t ]*$/m);
+  if (!match) return {};
+  try {
+    return parseYaml(match[1]) ?? {};
+  } catch (_error) {
+    return {};
+  }
+}
+
+function weeklyDependencySignature(frontmatter, analyticsConfig = null) {
+  const signature = {
+    type: String(frontmatter?.type || "").trim(),
+    periodStart: isoDateValue(frontmatter?.period_start),
+    periodEnd: isoDateValue(frontmatter?.period_end),
+    dayMetricsModel: String(frontmatter?.day_metrics_model || "").trim(),
+  };
+  if (analyticsConfig !== null) {
+    signature.historyWeeks = clamp(Number(analyticsConfig?.history_weeks) || 4, 1, 8);
+  }
+  return JSON.stringify(signature);
+}
+
+async function freshWeeklyDependencyState(app, file, includeAnalyticsConfig = false) {
+  try {
+    const content = await app.vault.read(file);
+    const match = content.match(/^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+    const frontmatter = match ? parseYaml(match[1]) ?? {} : {};
+    return {
+      frontmatter,
+      analyticsConfig: includeAnalyticsConfig ? weeklyAnalyticsConfigFromMarkdown(content) : null,
+    };
+  } catch (error) {
+    console.warn(`CastleX could not read Weekly dependencies for ${file.path}`, error);
+    return {
+      frontmatter: app.metadataCache.getFileCache(file)?.frontmatter ?? {},
+      analyticsConfig: includeAnalyticsConfig ? {} : null,
+    };
+  }
+}
+
+class WeeklyRenderChild extends MarkdownRenderChild {
+  constructor(container, app, file, analyticsConfig = null) {
     super(container);
     this.app = app;
     this.file = file;
+    this.config = analyticsConfig ?? {};
+    this.includeAnalyticsConfig = analyticsConfig !== null;
     this.periodPaths = new Set();
     this.renderTimer = null;
+    this.signatureTimer = null;
+    this.signatureGeneration = 0;
+    this.renderGeneration = 0;
+    this.lastDependencySignature = null;
+    this.weeklyUnloaded = false;
   }
 
-  onload() {
+  startWeeklyRefresh() {
     this.render();
-    const schedule = (changedFile) => {
-      if (changedFile.path !== this.file.path && !this.periodPaths.has(changedFile.path)) return;
-      if (this.renderTimer) window.clearTimeout(this.renderTimer);
-      this.renderTimer = window.setTimeout(() => this.render(), 180);
+    const schedule = (changedFile, oldPath = null) => {
+      const currentFileEvent = changedFile === this.file
+        || changedFile?.path === this.file.path
+        || oldPath === this.file.path;
+      if (currentFileEvent) {
+        this.scheduleWeeklySignatureCheck();
+        return;
+      }
+      if (!this.periodPaths.has(changedFile?.path) && !this.periodPaths.has(oldPath)) return;
+      this.scheduleWeeklyRender();
     };
     this.registerEvent(this.app.metadataCache.on("changed", schedule));
     this.registerEvent(this.app.vault.on("modify", schedule));
+    this.registerEvent(this.app.vault.on("create", schedule));
+    this.registerEvent(this.app.vault.on("delete", schedule));
+    this.registerEvent(this.app.vault.on("rename", schedule));
   }
 
   onunload() {
+    this.weeklyUnloaded = true;
+    this.renderGeneration += 1;
+    this.signatureGeneration += 1;
     if (this.renderTimer) window.clearTimeout(this.renderTimer);
+    if (this.signatureTimer) window.clearTimeout(this.signatureTimer);
+  }
+
+  scheduleWeeklyRender() {
+    if (this.renderTimer) window.clearTimeout(this.renderTimer);
+    this.renderTimer = window.setTimeout(() => {
+      this.renderTimer = null;
+      this.render();
+    }, 180);
+  }
+
+  scheduleWeeklySignatureCheck() {
+    const generation = ++this.signatureGeneration;
+    if (this.signatureTimer) window.clearTimeout(this.signatureTimer);
+    this.signatureTimer = window.setTimeout(async () => {
+      this.signatureTimer = null;
+      const state = await freshWeeklyDependencyState(this.app, this.file, this.includeAnalyticsConfig);
+      if (this.weeklyUnloaded || generation !== this.signatureGeneration) return;
+      const signature = weeklyDependencySignature(state.frontmatter, state.analyticsConfig);
+      if (signature === this.lastDependencySignature) return;
+      if (this.includeAnalyticsConfig) this.config = state.analyticsConfig;
+      this.scheduleWeeklyRender();
+    }, 120);
+  }
+
+  beginWeeklyRender() {
+    return ++this.renderGeneration;
+  }
+
+  captureWeeklyDependencySignature(generation, frontmatter) {
+    if (this.weeklyUnloaded || generation !== this.renderGeneration) return false;
+    this.lastDependencySignature = weeklyDependencySignature(
+      frontmatter,
+      this.includeAnalyticsConfig ? this.config : null,
+    );
+    return true;
+  }
+
+  weeklyRenderIsCurrent(generation) {
+    return !this.weeklyUnloaded
+      && generation === this.renderGeneration
+      && this.containerEl.isConnected;
+  }
+}
+
+class WeeklySnapshotChild extends WeeklyRenderChild {
+  constructor(container, app, file) {
+    super(container, app, file);
+  }
+
+  onload() {
+    this.startWeeklyRefresh();
   }
 
   renderStateChart(parent, days) {
@@ -2343,7 +2455,9 @@ class WeeklySnapshotChild extends MarkdownRenderChild {
   }
 
   async render() {
+    const generation = this.beginWeeklyRender();
     const weeklyFrontmatter = await freshFrontmatter(this.app, this.file);
+    if (!this.captureWeeklyDependencySignature(generation, weeklyFrontmatter)) return;
     const dayMetricsEnabled = weeklyFrontmatter.day_metrics_model === DAY_METRICS_MODEL;
     const dates = dateRange(weeklyFrontmatter.period_start, weeklyFrontmatter.period_end);
     this.periodPaths = new Set(dates.map((date) => dailyPathFromISO(localISO(date))).filter(Boolean));
@@ -2363,7 +2477,7 @@ class WeeklySnapshotChild extends MarkdownRenderChild {
         dayMetrics: dayMetricsEnabled ? parseDailyDayMetrics(markdown, frontmatter) : null,
       };
     }));
-    if (!this.containerEl.isConnected) return;
+    if (!this.weeklyRenderIsCurrent(generation)) return;
     this.containerEl.empty();
     if (!dates.length) {
       this.containerEl.createDiv({ text: "Set valid period_start and period_end values to render the Weekly Snapshot.", cls: "cx-weekly-empty" });
@@ -2535,36 +2649,13 @@ const ANALYTICS_HEALTH_TERMS = {
   workout: [["rest", "休息日"], ["pool", "水中慢跑"], ["back", "背部"], ["upper", "上肢"], ["legs", "腿部"], ["stretch", "拉伸"]],
 };
 
-class WeeklyAnalyticsChild extends MarkdownRenderChild {
+class WeeklyAnalyticsChild extends WeeklyRenderChild {
   constructor(container, app, file, config = {}) {
-    super(container);
-    this.app = app;
-    this.file = file;
-    this.config = config;
-    this.periodPaths = new Set();
-    this.renderTimer = null;
+    super(container, app, file, config);
   }
 
   onload() {
-    this.render();
-    const schedule = (changedFile, oldPath = null) => {
-      if (
-        changedFile.path !== this.file.path
-        && !this.periodPaths.has(changedFile.path)
-        && !this.periodPaths.has(oldPath)
-      ) return;
-      if (this.renderTimer) window.clearTimeout(this.renderTimer);
-      this.renderTimer = window.setTimeout(() => this.render(), 180);
-    };
-    this.registerEvent(this.app.metadataCache.on("changed", schedule));
-    this.registerEvent(this.app.vault.on("modify", schedule));
-    this.registerEvent(this.app.vault.on("create", schedule));
-    this.registerEvent(this.app.vault.on("delete", schedule));
-    this.registerEvent(this.app.vault.on("rename", schedule));
-  }
-
-  onunload() {
-    if (this.renderTimer) window.clearTimeout(this.renderTimer);
+    this.startWeeklyRefresh();
   }
 
   async loadDay(date) {
@@ -2651,7 +2742,7 @@ class WeeklyAnalyticsChild extends MarkdownRenderChild {
     this.renderBars(grid, "Time Categories", "Daily YAML totals", categoryRows);
   }
 
-  async renderProjectProgress(parent, days, weeklyFrontmatter) {
+  async renderProjectProgress(parent, days, weeklyFrontmatter, generation) {
     const invested = new Map();
     days.flatMap((day) => day.ledger).forEach((block) => {
       if (!block.project) return;
@@ -2684,6 +2775,7 @@ class WeeklyAnalyticsChild extends MarkdownRenderChild {
         reliable: start.reliable && end.reliable,
       });
     }
+    if (!this.weeklyRenderIsCurrent(generation)) return false;
     rows.sort((a, b) => (b.delta ?? -1) - (a.delta ?? -1) || b.minutes - a.minutes);
     const section = this.section(parent, "Project Velocity", "Progress Δ · completed tasks · execution time");
     const grid = section.createDiv({ cls: "cx-weekly-project-progress" });
@@ -2716,6 +2808,7 @@ class WeeklyAnalyticsChild extends MarkdownRenderChild {
       });
     });
     if (!rows.length) grid.createDiv({ text: "—", cls: "cx-weekly-frequency-empty" });
+    return true;
   }
 
   renderDayMatrix(parent, days) {
@@ -3217,11 +3310,14 @@ class WeeklyAnalyticsChild extends MarkdownRenderChild {
   }
 
   async render() {
+    const generation = this.beginWeeklyRender();
     const weeklyFrontmatter = await freshFrontmatter(this.app, this.file);
+    if (!this.captureWeeklyDependencySignature(generation, weeklyFrontmatter)) return;
     const dates = dateRange(weeklyFrontmatter.period_start, weeklyFrontmatter.period_end);
     const historyWeeks = clamp(Number(this.config.history_weeks) || 4, 1, 8);
     const currentStart = dateFromISO(isoDateValue(weeklyFrontmatter.period_start));
     if (!dates.length || !currentStart) {
+      if (!this.weeklyRenderIsCurrent(generation)) return;
       this.containerEl.empty();
       this.containerEl.createDiv({ text: "Set valid period_start and period_end values.", cls: "cx-weekly-empty" });
       return;
@@ -3256,6 +3352,7 @@ class WeeklyAnalyticsChild extends MarkdownRenderChild {
           && weekDays.every((day) => day.file instanceof TFile),
       });
     }
+    if (!this.weeklyRenderIsCurrent(generation)) return;
     this.periodPaths = periodPaths;
     const precedingStart = localISO(addDays(currentStart, -historyWeeks * 7));
     const precedingWeek = {
@@ -3263,7 +3360,7 @@ class WeeklyAnalyticsChild extends MarkdownRenderChild {
       current: false,
       days: dateRange(precedingStart, localISO(addDays(dateFromISO(precedingStart), 6))).map((date) => byISO.get(localISO(date))).filter(Boolean),
     };
-    if (!this.containerEl.isConnected) return;
+    if (!this.weeklyRenderIsCurrent(generation)) return;
     this.containerEl.empty();
     const wrap = this.containerEl.createDiv({ cls: "cx-weekly-analytics" });
     const header = wrap.createDiv({ cls: "cx-weekly-header" });
@@ -3274,7 +3371,8 @@ class WeeklyAnalyticsChild extends MarkdownRenderChild {
     this.renderInvestmentChange(wrap, weeks, precedingWeek);
     this.renderWeeklyTrend(wrap, weeks);
     this.renderTimeBreakdown(wrap, days);
-    await this.renderProjectProgress(wrap, days, weeklyFrontmatter);
+    if (!await this.renderProjectProgress(wrap, days, weeklyFrontmatter, generation)) return;
+    if (!this.weeklyRenderIsCurrent(generation)) return;
     this.renderDayMatrix(wrap, days);
     this.renderExecutionQuality(wrap, days);
     this.renderCapacityLoad(wrap, days);

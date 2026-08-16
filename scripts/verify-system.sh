@@ -405,6 +405,20 @@ rg -Fq 'this.app.vault.on("rename", schedule)' "$plugin/main.js" || fail "Weekly
 if rg -Fq '} else if (week.current) {' "$plugin/main.js"; then
   fail "Weekly trend still contains the historical day-metrics false-positive branch"
 fi
+rg -Fq 'class WeeklyRenderChild extends MarkdownRenderChild' "$plugin/main.js" || fail "Weekly components do not share dependency-filtered refresh behavior"
+rg -Fq 'function weeklyDependencySignature(frontmatter, analyticsConfig = null)' "$plugin/main.js" || fail "Weekly components are missing the current-file dependency signature"
+rg -Fq 'weeklyAnalyticsConfigFromMarkdown(content)' "$plugin/main.js" || fail "Weekly Analytics does not detect history_weeks configuration changes"
+rg -Fq 'if (signature === this.lastDependencySignature) return;' "$plugin/main.js" || fail "Unrelated Weekly body edits still schedule full renders"
+rg -Fq 'this.signatureTimer = window.setTimeout(async () => {' "$plugin/main.js" || fail "Weekly current-file events are not coalesced"
+rg -Fq 'this.renderTimer = window.setTimeout(() => {' "$plugin/main.js" || fail "Weekly source events are not coalesced"
+rg -Fq 'generation === this.renderGeneration' "$plugin/main.js" || fail "Weekly renders are missing stale-generation protection"
+rg -Fq 'if (!this.weeklyRenderIsCurrent(generation)) return;' "$plugin/main.js" || fail "Weekly components may replace DOM from a stale render"
+if rg -Fq 'class WeeklySnapshotChild extends MarkdownRenderChild' "$plugin/main.js"; then
+  fail "Weekly Snapshot bypasses dependency-filtered refresh behavior"
+fi
+if rg -Fq 'class WeeklyAnalyticsChild extends MarkdownRenderChild' "$plugin/main.js"; then
+  fail "Weekly Analytics bypasses dependency-filtered refresh behavior"
+fi
 rg -q 'castlex-weekly-snapshot' "$plugin/main.js" || fail "Dashboard missing Weekly Snapshot processor"
 rg -q 'castlex-weekly-analytics' "$plugin/main.js" || fail "Dashboard missing detailed Weekly Analytics processor"
 rg -Fq 'health_early_morning_bedtime_at || frontmatter.health_night_bedtime_at' "$plugin/main.js" || fail "Weekly Analytics does not support both bedtime fields"

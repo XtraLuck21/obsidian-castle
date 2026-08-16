@@ -972,6 +972,17 @@ model, or mismatched period renders `—` for both metrics instead of `0/7`.
 `time_data_reviewed` is not an eligibility gate. Visible Weekly model files and
 Daily sources are render dependencies and refresh the view when changed.
 
+Weekly render refreshes are dependency-filtered. For the current Weekly file,
+Snapshot and Detailed Analytics compare only the frontmatter they consume:
+`type`, `period_start`, `period_end`, and `day_metrics_model`. Detailed Analytics
+also compares the normalized `history_weeks` value from its code block. A change
+to ordinary Markdown body content is not a data dependency and must not destroy
+or rebuild either rendered component. Relevant current-file changes and direct
+Daily or historical Weekly source events are debounced, and stale asynchronous
+generations are discarded before DOM replacement. These runtime signatures and
+generation tokens are never persisted to the Weekly, plugin data, or Obsidian
+workspace state.
+
 Detailed Weekly Analytics may also reconstruct Project progress at the day
 before `period_start` and at `period_end`. It uses the same weighted
 `progress_sections` calculation as Home, restricted to checked Project tasks
