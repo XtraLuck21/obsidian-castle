@@ -400,9 +400,11 @@ Navigation v1 dates.
   stage has an answer, or when the user explicitly presses its completion
   button. Optional text fields do not gate completion. 夜间 completes through
   the lights-out action.
-- A same-date Health rerender preserves the view's current horizontal and
-  vertical scroll offsets. Immediate YAML writes and the resulting Vault
-  change events must not move a scrolled check-in back to the page header.
+- A same-date Health rerender preserves every stable scroll ancestor and the
+  viewport position of the active Health field. Immediate YAML writes and the
+  resulting Vault change events must not move a scrolled check-in back to the
+  page header, including in mobile and narrow-window layouts where the actual
+  scrolling element may sit outside `contentEl`.
 - Text fields use a short debounce before writing to reduce sync churn.
 
 Five-level state questions use signal bars whose illuminated count matches the

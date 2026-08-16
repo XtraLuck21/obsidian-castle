@@ -146,6 +146,9 @@ rg -Fq 'healthStageComplete(frontmatter, "afternoon")' "$plugin/main.js" || fail
 rg -Fq 'captureScrollPosition()' "$plugin/main.js" || fail "Health Dashboard does not capture its scroll position before rerendering"
 rg -Fq 'this.restoreScrollPosition(scrollPosition)' "$plugin/main.js" || fail "Health Dashboard does not restore its scroll position after rerendering"
 rg -Fq 'this.renderedDateISO !== this.currentDateISO' "$plugin/main.js" || fail "Health Dashboard scroll restoration is not limited to the current natural date"
+rg -Fq 'scrollAncestors()' "$plugin/main.js" || fail "Health Dashboard does not preserve outer mobile scroll containers"
+rg -Fq 'data-health-key' "$plugin/main.js" || fail "Health Dashboard fields do not provide stable rerender anchors"
+rg -Fq 'this.rememberScrollAnchor(field, key)' "$plugin/main.js" || fail "Health Dashboard selections do not retain their visual field anchor"
 if rg -q 'sleepTargetISO|text: "进入夜间状态"' "$plugin/main.js"; then
   fail "Health still locks Night to a prior date or exposes the removed Evening-to-Night shortcut"
 fi
