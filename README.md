@@ -28,7 +28,7 @@ committed to this repository.
 ## Dashboard features
 
 - Full-screen blue-hour rain-glass Dashboard with separate 3072×2048 desktop and 1440×2560 mobile backgrounds
-- Separate Chinese-first Health Dashboard linked from CastleX Home, with its own empty outdoor-pool desktop/mobile backgrounds
+- Separate Chinese-first Health Dashboard linked from CastleX Home, with its own empty outdoor-pool desktop/mobile backgrounds and scroll-stable check-in interactions
 - Separate warm, cabin-inspired Mental Dashboard for one evening reflection and voyage closure
 - Home, Health, and Mental share one Hero structure: left-aligned date/time/signature content and three vertically stacked navigation buttons; Health and Mental use matching compact typography
 - The Home 14-day route anchors its line and voyage nodes to the card's vertical center while weekday labels sit independently below

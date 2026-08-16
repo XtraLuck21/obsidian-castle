@@ -4523,6 +4523,7 @@ class CastleXHealthView extends ItemView {
     this.addingWorkout = false;
     this.nightRitualAnimationUntil = 0;
     this.morningRitualAnimationUntil = 0;
+    this.renderedDateISO = null;
   }
 
   getViewType() {
@@ -4805,6 +4806,28 @@ class CastleXHealthView extends ItemView {
       });
     }, 700);
     this.textTimers.set(key, timer);
+  }
+
+  captureScrollPosition() {
+    if (this.renderedDateISO !== this.currentDateISO) return null;
+    return {
+      top: this.contentEl.scrollTop,
+      left: this.contentEl.scrollLeft,
+    };
+  }
+
+  restoreScrollPosition(position) {
+    if (!position) return;
+    const restore = () => {
+      const maximumTop = Math.max(0, this.contentEl.scrollHeight - this.contentEl.clientHeight);
+      this.contentEl.scrollTop = Math.min(position.top, maximumTop);
+      this.contentEl.scrollLeft = position.left;
+    };
+    restore();
+    window.requestAnimationFrame(() => {
+      restore();
+      window.requestAnimationFrame(restore);
+    });
   }
 
   createCanvas() {
@@ -5761,6 +5784,7 @@ class CastleXHealthView extends ItemView {
       isoDateValue(page.frontmatter.date) === previousISO
       && Boolean(page.frontmatter.health_night_bedtime_at)
     ));
+    const scrollPosition = this.captureScrollPosition();
     const dashboard = this.createCanvas();
     this.renderHeader(dashboard);
     const main = dashboard.createDiv({ cls: "cx-health-main-grid" });
@@ -5778,6 +5802,8 @@ class CastleXHealthView extends ItemView {
       cls: "cx-mobile-scroll-spacer",
       attr: { "aria-hidden": "true" },
     });
+    this.renderedDateISO = this.currentDateISO;
+    this.restoreScrollPosition(scrollPosition);
   }
 }
 

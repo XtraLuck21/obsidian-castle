@@ -140,6 +140,9 @@ rg -Fq '["morning", "afternoon", "evening", "sleep"]' "$plugin/main.js" || fail 
 rg -Fq 'if (hour < 9) return "sleep"' "$plugin/main.js" || fail "Health Dashboard dropped the pre-cutover schedule compatibility branch"
 rg -Fq 'healthStageComplete(frontmatter, item)' "$plugin/main.js" || fail "Health stage tracker does not derive completion from all core answers"
 rg -Fq 'healthStageComplete(frontmatter, "afternoon")' "$plugin/main.js" || fail "Health recommendation does not honor auto-completed Afternoon check-in"
+rg -Fq 'captureScrollPosition()' "$plugin/main.js" || fail "Health Dashboard does not capture its scroll position before rerendering"
+rg -Fq 'this.restoreScrollPosition(scrollPosition)' "$plugin/main.js" || fail "Health Dashboard does not restore its scroll position after rerendering"
+rg -Fq 'this.renderedDateISO !== this.currentDateISO' "$plugin/main.js" || fail "Health Dashboard scroll restoration is not limited to the current natural date"
 if rg -q 'sleepTargetISO|text: "进入夜间状态"' "$plugin/main.js"; then
   fail "Health still locks Night to a prior date or exposes the removed Evening-to-Night shortcut"
 fi
